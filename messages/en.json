@@ -478,7 +478,8 @@
       "unauthorized": "Sign-in required",
       "unknown": "The action could not be completed",
       "date": "The date is invalid"
-    }
+    },
+    "chooseHouse": "House"
   },
   "onboarding": {
     "title": "Move-in",
@@ -612,6 +613,62 @@
         "inPast": "The move-out date cannot be in the past",
         "beforeMoveIn": "The move-out date cannot precede the move-in date"
       }
+    }
+  },
+  "houseSetup": {
+    "title": "House settings",
+    "subtitle": "Areas, beds and default prices",
+    "chooseHouse": "House",
+    "noHouse": "No house selected",
+    "noHouseHint": "Create a house in the network settings to set up areas and beds",
+    "depositTitle": "House deposit",
+    "depositHint": "The amount goes into the move-in invoice. Only the superadmin changes it, in the network settings.",
+    "empty": "No areas yet",
+    "emptyHint": "Add the living rooms and common areas of the house",
+    "addAreaTitle": "New area",
+    "areaName": "Name",
+    "areaType": "Area type",
+    "sortOrder": "Order",
+    "addArea": "Add area",
+    "archiveArea": "Archive area",
+    "beds": "Beds",
+    "noBeds": "No beds in this room yet",
+    "bedLabel": "Label",
+    "bedNumber": "Number",
+    "tier": "Tier",
+    "defaultPrice": "Default price",
+    "addBed": "Add bed",
+    "archiveBed": "Archive bed",
+    "save": "Save",
+    "occupied": "Occupied",
+    "free": "Free",
+    "types": {
+      "living": "Living room",
+      "common": "Common area"
+    },
+    "tiers": {
+      "lower": "Lower",
+      "upper": "Upper"
+    },
+    "areaCreated": "Area added",
+    "areaUpdated": "Area saved",
+    "areaArchived": "Area archived",
+    "bedCreated": "Bed added",
+    "bedUpdated": "Bed saved",
+    "bedArchived": "Bed archived",
+    "errors": {
+      "unauthorized": "Sign-in required",
+      "unknown": "The action could not be completed",
+      "nameRequired": "The name is required",
+      "priceInvalid": "The price is a non-negative whole number of tenge",
+      "numberInvalid": "The bed number is a positive whole number",
+      "typeInvalid": "Unknown area type",
+      "sortOrderInvalid": "The order is a whole number",
+      "bedFields": "Check the label, number, tier and price",
+      "notLivingArea": "A bed belongs to a living room only",
+      "bedDuplicate": "This room already has a bed with that number and tier",
+      "bedOccupied": "An occupied bed cannot be archived",
+      "areaHasBeds": "Remove the beds of this area first"
     }
   }
 }

@@ -8,6 +8,7 @@ import { getDb, type Executor } from '../client';
 import { periodLiteral } from '../period';
 import {
   bedAssignments,
+  beds,
   residencies,
   type BedAssignment,
   type NewResidency,
@@ -141,6 +142,38 @@ export async function findOpenAssignment(
     .limit(1);
 
   return assignment ?? null;
+}
+
+/**
+ * Действующее назначение на место, если оно занято сейчас.
+ * Нужно настройке дома: занятое место не архивируется, иначе жилец
+ * оказался бы в комнате, которой в схеме больше нет.
+ */
+export async function findOpenAssignmentOfBed(
+  bedId: string,
+  executor: Executor = getDb(),
+): Promise<BedAssignment | null> {
+  const [assignment] = await executor
+    .select()
+    .from(bedAssignments)
+    .where(and(eq(bedAssignments.bedId, bedId), sql`upper_inf(${bedAssignments.period})`))
+    .limit(1);
+
+  return assignment ?? null;
+}
+
+/** Идентификаторы занятых сейчас мест дома — одной выборкой, а не по месту. */
+export async function listOccupiedBedIds(
+  houseId: string,
+  executor: Executor = getDb(),
+): Promise<string[]> {
+  const rows = await executor
+    .select({ bedId: bedAssignments.bedId })
+    .from(bedAssignments)
+    .innerJoin(beds, eq(beds.id, bedAssignments.bedId))
+    .where(and(eq(beds.houseId, houseId), sql`upper_inf(${bedAssignments.period})`));
+
+  return rows.map((row) => row.bedId);
 }
 
 export async function listAssignments(

@@ -46,6 +46,17 @@ export default async function SettingsPage() {
         </Card>
       ) : null}
 
+      {can(session.context, 'settings.house.read', { houseId: session.context.houseId }) ? (
+        <Card>
+          <CardTitle>
+            <Link className="text-primary hover:underline" href="/settings/house">
+              {t('houseSetup.title')}
+            </Link>
+          </CardTitle>
+          <p className="text-text-muted mt-1 text-[13px]">{t('houseSetup.subtitle')}</p>
+        </Card>
+      ) : null}
+
       {can(session.context, 'settings.org.read') ? (
         <Card>
           <CardTitle>

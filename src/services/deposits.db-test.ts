@@ -126,15 +126,13 @@ describe('счёт на депозит', () => {
     });
   });
 
-  it('сумма дома берётся из настройки, когда она задана', async () => {
+  it('сумма берётся из поля дома, а не из отдельной настройки (P2-38)', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '7002');
-      await tx.insert(schema.settings).values({
-        scope: 'house',
-        scopeId: fixture.houseA,
-        key: 'deposit.default',
-        value: 30_000,
-      });
+      await tx
+        .update(schema.houses)
+        .set({ defaultDeposit: 30_000 })
+        .where(eq(schema.houses.id, fixture.houseA));
 
       const invoice = await issueDepositInvoice(
         fixture.admin,

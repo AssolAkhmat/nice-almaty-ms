@@ -1,6 +1,8 @@
 import { getTranslations } from 'next-intl/server';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
+import { listHouses } from '@/db/repositories/houses';
 import { listResidencies } from '@/db/repositories/residencies';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -21,7 +23,11 @@ export const dynamic = 'force-dynamic';
  * Админ видит схему своего дома с занятостью и назначает места. Жилец видит
  * только своё место: схема дома — рабочий инструмент админа, а не общий вид.
  */
-export default async function BedsPage() {
+export default async function BedsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ house?: string }>;
+}) {
   const session = await getCurrentSession();
   if (session === null) {
     redirect('/login');
@@ -59,14 +65,19 @@ export default async function BedsPage() {
     );
   }
 
-  const houseId = context.houseId;
-  const residencies = await listResidencies(context, {});
-
   /*
    * Суперадмин не привязан к дому: схему он открывает по конкретному дому,
-   * а сводного экрана по всей сети в модуле 1 нет. До появления выбора дома
-   * (T2.15) ему показывается тот же пустой вид, что и админу без дома.
+   * а сводного экрана по всей сети в модуле 1 нет. Дом выбирается ссылкой —
+   * это обещанное в P2-26 продолжение, появившееся вместе с настройкой зон.
    */
+  const houses = context.role === 'superadmin' ? await listHouses(context) : [];
+  const { house: requested } = await searchParams;
+
+  const houseId =
+    context.role === 'superadmin' ? (requested ?? houses[0]?.id ?? null) : context.houseId;
+
+  const residencies = await listResidencies(context, houseId === null ? {} : { houseId });
+
   const layout = houseId === null ? [] : await houseLayout(actor, houseId);
 
   /** Имена показываются вместо идентификаторов: схему читает человек. */
@@ -115,6 +126,26 @@ export default async function BedsPage() {
         <h1>{t('title')}</h1>
         <p className="text-text-muted text-[13px]">{t('adminSubtitle')}</p>
       </div>
+
+      {houses.length > 1 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('chooseHouse')}</CardTitle>
+          </CardHeader>
+
+          <div className="flex flex-wrap gap-3 text-[13px]">
+            {houses.map((house) => (
+              <Link
+                className={house.id === houseId ? 'font-medium' : 'text-accent underline'}
+                href={{ pathname: '/beds', query: { house: house.id } }}
+                key={house.id}
+              >
+                {house.name}
+              </Link>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <HouseLayout rooms={rooms} unplaced={unplaced} />
     </section>

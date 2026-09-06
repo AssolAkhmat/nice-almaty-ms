@@ -1,4 +1,5 @@
 import { getDb, type Executor } from '@/db/client';
+import { requireHouse } from '@/db/repositories/houses';
 import { getSetting, listSettings, putSetting } from '@/db/repositories/settings';
 import { updateUser } from '@/db/repositories/users';
 import { assertCan } from '@/lib/authz';
@@ -31,16 +32,13 @@ export const ORG_SETTINGS = {
 } as const;
 
 /**
- * Настройки дома. Первый ключ появляется здесь: размер депозита по умолчанию
- * (§1.2 п.7 — 45 000 ₸, настраивается на уровне дома). Механизм со `scope=house`
- * готов с фазы 1, ключей до сих пор не было.
+ * Настройки дома ключей пока не имеют: всё, что фаза 2 настраивает у дома, —
+ * это его собственные колонки (`default_deposit`, `curfew_time`) и таблицы
+ * зон и мест. Отдельный ключ `deposit.default` здесь был вторым источником
+ * той же суммы: суперадмин правил колонку, а счёт читал ключ, и значения
+ * расходились молча (P2-38). Ключи со `scope=house` появятся с чек-листами
+ * и рядами ротаций в фазе 4.
  */
-export const HOUSE_SETTINGS = {
-  depositDefault: {
-    key: 'deposit.default',
-    defaultValue: 45_000,
-  },
-} as const;
 
 export interface OrgSettings {
   ratingVisibleToResidents: boolean;
@@ -75,9 +73,10 @@ export async function readOrgSettings(
 }
 
 /**
- * Размер депозита по умолчанию для дома. Деньги — целые тенге (D9):
- * дробное или отрицательное значение из настроек не принимается,
- * иначе счёт вышел бы с невозможной суммой.
+ * Размер депозита по умолчанию для дома (§1.2 п.7 — 45 000 ₸, настраивается
+ * на уровне дома). Источник один — колонка `houses.default_deposit` из
+ * `02-DATA-MODEL.md`; правит её суперадмин в настройках сети, и ровно это
+ * значение попадает в счёт.
  */
 export async function readHouseDepositDefault(
   actor: UserActor,
@@ -86,19 +85,9 @@ export async function readHouseDepositDefault(
 ): Promise<number> {
   assertCan(actor.context, 'settings.house.read', { houseId });
 
-  const setting = await getSetting(
-    actor.context,
-    'house',
-    houseId,
-    HOUSE_SETTINGS.depositDefault.key,
-    executor,
-  );
+  const house = await requireHouse(actor.context, houseId, executor);
 
-  const value = setting?.value;
-
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0
-    ? value
-    : HOUSE_SETTINGS.depositDefault.defaultValue;
+  return house.defaultDeposit;
 }
 
 export async function writeHouseSetting(
