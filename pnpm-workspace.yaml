@@ -1,5 +1,9 @@
 # pnpm 12 читает настройки отсюда, а не из поля "pnpm" в package.json.
-# Сборочные скрипты разрешены поимённо: unrs-resolver подтягивает нативный
-# резолвер для eslint-config-next.
+# Сборочные скрипты разрешены поимённо.
+#   unrs-resolver     — нативный резолвер для eslint-config-next, нужен.
+#   @parcel/watcher   — опциональный вотчер, работает на предсобранных бинарниках.
+#   @swc/core         — бинарник ставится отдельным платформенным пакетом.
 allowBuilds:
+  '@parcel/watcher': false
+  '@swc/core': false
   unrs-resolver: true

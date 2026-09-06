@@ -80,12 +80,14 @@
 - Коммит: `feat(ui): три режима темы без мигания`
 
 ### T0.5 — i18n: ru / kk / en
-- [ ] `next-intl` **без локали в URL** (локаль из cookie `NEXT_LOCALE`, далее — из профиля)
-- [ ] `src/lib/i18n/` — конфиг, `getLocale`, `setLocale` (server action)
-- [ ] `messages/ru.json`, `messages/kk.json`, `messages/en.json` — все три заполнены сразу
+
+> Выполнен раньше T0.4: без i18n подписи переключателя темы пришлось бы хардкодить.
+- [x] `next-intl` **без локали в URL** (локаль из cookie `NEXT_LOCALE`, далее — из профиля)
+- [x] `src/lib/i18n/` — конфиг, `getLocale`, `setLocale` (server action)
+- [x] `messages/ru.json`, `messages/kk.json`, `messages/en.json` — все три заполнены сразу
 - [ ] Форматирование дат и денег через `next-intl` + `src/lib/time.ts`, зона `Asia/Almaty`
-- [ ] Переключатель языка в шапке
-- [ ] Тест: во всех трёх файлах локалей одинаковый набор ключей
+- [x] Переключатель языка в шапке
+- [x] Тест: во всех трёх файлах локалей одинаковый набор ключей
 - Коммит: `feat(i18n): три локали и переключатель языка`
 
 ### T0.6 — Окружение: `src/env.ts` и логгер

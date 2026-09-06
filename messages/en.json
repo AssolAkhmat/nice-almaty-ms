@@ -1,0 +1,22 @@
+{
+  "app": {
+    "name": "Nice Almaty",
+    "description": "Student housing network administration system"
+  },
+  "theme": {
+    "label": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "language": {
+    "label": "Language",
+    "ru": "Русский",
+    "kk": "Қазақша",
+    "en": "English"
+  },
+  "home": {
+    "title": "Nice Almaty",
+    "subtitle": "Application shell"
+  }
+}

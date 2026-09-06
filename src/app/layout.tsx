@@ -1,5 +1,8 @@
-import type { Metadata, Viewport } from 'next';
+import { NextIntlClientProvider } from 'next-intl';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { Montserrat } from 'next/font/google';
+
+import type { Metadata, Viewport } from 'next';
 
 import './globals.css';
 
@@ -10,20 +13,28 @@ const montserrat = Montserrat({
   variable: '--font-montserrat',
 });
 
-export const metadata: Metadata = {
-  title: 'Nice Almaty',
-  description: 'Система администрирования сетью студенческих домов',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('app');
+
+  return {
+    title: t('name'),
+    description: t('description'),
+  };
+}
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const locale = await getLocale();
+
   return (
-    <html lang="ru" className={montserrat.variable} suppressHydrationWarning>
-      <body>{children}</body>
+    <html className={montserrat.variable} lang={locale} suppressHydrationWarning>
+      <body>
+        <NextIntlClientProvider>{children}</NextIntlClientProvider>
+      </body>
     </html>
   );
 }

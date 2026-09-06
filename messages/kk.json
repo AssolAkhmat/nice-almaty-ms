@@ -1,0 +1,22 @@
+{
+  "app": {
+    "name": "Nice Almaty",
+    "description": "Студенттік үйлер желісін басқару жүйесі"
+  },
+  "theme": {
+    "label": "Тақырып",
+    "light": "Ашық",
+    "dark": "Қараңғы",
+    "system": "Жүйелік"
+  },
+  "language": {
+    "label": "Тіл",
+    "ru": "Русский",
+    "kk": "Қазақша",
+    "en": "English"
+  },
+  "home": {
+    "title": "Nice Almaty",
+    "subtitle": "Қолданба қаңқасы"
+  }
+}
