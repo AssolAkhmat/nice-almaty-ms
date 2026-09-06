@@ -100,15 +100,15 @@
 - Коммит: `feat(env): типизированные переменные окружения и логгер`
 
 ### T0.7 — Drizzle и первая миграция
-- [ ] `drizzle.config.ts` (`DIRECT_DATABASE_URL` для миграций, иначе `DATABASE_URL`)
-- [ ] `src/db/client.ts` — postgres-js; при `DEPLOY_TARGET=vercel` — `prepare: false`, пул под pooler
-- [ ] `src/db/schema/index.ts`, первая таблица `job_runs` (`job`, `period_key`, уникальность `(job, period_key)`) — чистая инфраструктура идемпотентности cron
-- [ ] Миграция 0000: `job_runs` + `btree_gist` в `DO`-блоке — идемпотентно и без падения при отсутствии прав
+- [x] `drizzle.config.ts` (`DIRECT_DATABASE_URL` для миграций, иначе `DATABASE_URL`)
+- [x] `src/db/client.ts` — postgres-js; при `DEPLOY_TARGET=vercel` — `prepare: false`, пул под pooler
+- [x] `src/db/schema/index.ts`, первая таблица `job_runs` (`job`, `period_key`, уникальность `(job, period_key)`) — чистая инфраструктура идемпотентности cron
+- [x] Миграция 0000: `job_runs` + `btree_gist` в `DO`-блоке — идемпотентно и без падения при отсутствии прав
       суперпользователя (`insufficient_privilege` → `RAISE WARNING`, а не ошибка)
 - [ ] При первом переключении на Supabase фактически проверить, что `btree_gist` ставится,
       и записать результат в `docs/08-DECISIONS.md`
-- [ ] Скрипты `db:generate`, `db:migrate`, `db:studio`
-- [ ] Проверка: миграция применяется на чистой БД в docker
+- [x] Скрипты `db:generate`, `db:migrate`, `db:studio`
+- [x] Проверка: миграция применяется на чистой БД в docker
 - Коммит: `feat(db): drizzle, клиент под оба окружения, первая миграция`
 
 ### T0.8 — Базовые компоненты `src/components/ui/*`

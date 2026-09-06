@@ -3,7 +3,9 @@
 #   unrs-resolver     — нативный резолвер для eslint-config-next, нужен.
 #   @parcel/watcher   — опциональный вотчер, работает на предсобранных бинарниках.
 #   @swc/core         — бинарник ставится отдельным платформенным пакетом.
+#   esbuild           — нужен drizzle-kit, без postinstall не находит бинарник.
 allowBuilds:
   '@parcel/watcher': false
   '@swc/core': false
+  esbuild: true
   unrs-resolver: true

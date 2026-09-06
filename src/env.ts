@@ -1,12 +1,12 @@
 import 'server-only';
 
-import { parseEnv } from '@/lib/env/schema';
+import { loadEnv } from '@/lib/env/load';
 
 /**
- * Единственная точка чтения process.env (CLAUDE.md §5).
- * Разбор происходит при первом импорте: некорректное окружение
- * должно ронять приложение сразу, а не в середине запроса.
+ * Единственная точка чтения process.env в серверном коде приложения
+ * (CLAUDE.md §5). Некорректное окружение роняет процесс сразу,
+ * а не в середине запроса.
  */
-export const env = parseEnv(process.env);
+export const env = loadEnv();
 
 export type { Env } from '@/lib/env/schema';
