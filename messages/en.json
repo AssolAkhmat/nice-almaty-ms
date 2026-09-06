@@ -3,6 +3,40 @@
     "name": "Nice Almaty",
     "description": "Student housing network administration system"
   },
+  "auth": {
+    "signIn": {
+      "title": "Sign in",
+      "hint": "Accounts are created by the network administrator. There is no self-registration.",
+      "submit": "Sign in"
+    },
+    "changePassword": {
+      "title": "Change password",
+      "hint": "Set a new password.",
+      "required": "Other sections stay closed until the password is changed.",
+      "rule": "At least {min} characters. Must differ from the phone number and the previous password.",
+      "submit": "Save password",
+      "done": "Password changed. Sign in again."
+    },
+    "fields": {
+      "phone": "Phone",
+      "password": "Password",
+      "newPassword": "New password",
+      "confirmation": "Repeat"
+    },
+    "errors": {
+      "required": "Enter phone and password",
+      "unauthorized": "Wrong phone or password",
+      "rate_limited": "Too many attempts. Try later",
+      "rate_limited_with_seconds": "Too many attempts. Retry in {seconds} s",
+      "forbidden": "Action not available",
+      "not_found": "Not found",
+      "validation_error": "Check the entered data",
+      "conflict": "Data changed, try again",
+      "internal": "Something went wrong",
+      "confirmationMismatch": "Passwords do not match"
+    },
+    "signOut": "Sign out"
+  },
   "common": {
     "close": "Close",
     "previous": "Previous",
@@ -33,6 +67,14 @@
     "accounting": "Accounting",
     "inventory": "Inventory",
     "settings": "Settings"
+  },
+  "validation": {
+    "password": {
+      "tooShort": "Password is shorter than 10 characters",
+      "tooLong": "Password is longer than 128 characters",
+      "sameAsPhone": "Password cannot match the phone number",
+      "reused": "This password was already used"
+    }
   },
   "theme": {
     "label": "Theme",

@@ -4,7 +4,7 @@ const STORAGE_KEY = 'nice-almaty-theme';
 
 test.describe('тема оформления', () => {
   test('переключается и переживает перезагрузку', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/login');
 
     await page.getByTestId('theme-dark').click();
     await expect(page.locator('html')).toHaveClass(/dark/);
@@ -29,13 +29,13 @@ test.describe('тема оформления', () => {
 
     // Скрипт в <head> обязан проставить класс до того, как страница отрисуется,
     // иначе выбравшие тёмную тему увидят вспышку светлого фона.
-    await page.goto('/', { waitUntil: 'commit' });
+    await page.goto('/login', { waitUntil: 'commit' });
     await expect(page.locator('html')).toHaveClass(/dark/);
   });
 
   test('системный режим следует за настройкой ОС', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'dark' });
-    await page.goto('/');
+    await page.goto('/login');
 
     await page.getByTestId('theme-system').click();
     await expect(page.locator('html')).toHaveClass(/dark/);
@@ -45,7 +45,7 @@ test.describe('тема оформления', () => {
   });
 
   test('фон и текст берутся из токенов темы', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/login');
 
     await page.getByTestId('theme-light').click();
     const lightBackground = await page.evaluate(
