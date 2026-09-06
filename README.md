@@ -95,6 +95,7 @@ pnpm dev
 
 - **Docker/VPS** — `docker compose up -d`. Это основная цель разработки и первичного прода.
 - **Vercel + Supabase** — по инструкции `docs/DEPLOY-VERCEL.md`.
+- **Файлы в Google Drive** — по инструкции `docs/GDRIVE-SETUP.md`; до неё драйвер `local`.
   Локальная сборка с `DEPLOY_TARGET=vercel` подтверждает только сборку бандла;
   пулер соединений, лимит тела запроса и serverless-рантайм проверяются
   лишь настоящим превью-деплоем.

@@ -84,10 +84,12 @@
 - Коммит: `feat(files): двухшаговая загрузка и приватная отдача`
 
 ### T2.7 — Драйвер Google Drive
-- [ ] OAuth от имени владельца диска (D3), `refresh_token` из окружения
-- [ ] Путь `/{house_slug}/{residency_id}/{document_type}/`
-- [ ] Resumable upload session для прямой загрузки
-- [ ] Без ключей драйвер отвечает внятной ошибкой, а не молчит
+- [x] OAuth от имени владельца диска (D3), `refresh_token` из окружения
+- [x] Путь `/{house_slug}/{residency_id}/{document_type}/`
+- [x] Resumable upload session для прямой загрузки
+- [x] Без ключей драйвер отвечает внятной ошибкой, а не молчит
+- [x] Инструкция владельцу по получению ключей: `docs/GDRIVE-SETUP.md`
+- Живого прогона с Drive не было: ключей владельца нет. Открытый вопрос в `08-DECISIONS.md`
 - Коммит: `feat(storage): драйвер Google Drive`
 
 ### T2.8 — Типы документов и проверка
