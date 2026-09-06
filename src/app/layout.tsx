@@ -3,6 +3,7 @@ import { getLocale, getTranslations } from 'next-intl/server';
 import { Montserrat } from 'next/font/google';
 
 import { ThemeProvider } from '@/components/theme/theme-provider';
+import { getCurrentSession } from '@/lib/session';
 import { ThemeScript } from '@/components/theme/theme-script';
 
 import type { Metadata, Viewport } from 'next';
@@ -31,7 +32,7 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const locale = await getLocale();
+  const [locale, session] = await Promise.all([getLocale(), getCurrentSession()]);
 
   return (
     <html className={montserrat.variable} lang={locale} suppressHydrationWarning>
@@ -40,7 +41,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body>
         <NextIntlClientProvider>
-          <ThemeProvider>{children}</ThemeProvider>
+          <ThemeProvider {...(session === null ? {} : { profileTheme: session.user.theme })}>
+            {children}
+          </ThemeProvider>
         </NextIntlClientProvider>
       </body>
     </html>

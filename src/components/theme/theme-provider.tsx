@@ -42,6 +42,14 @@ function subscribeToStoredTheme(onChange: () => void): () => void {
   };
 }
 
+function hasStoredTheme(): boolean {
+  try {
+    return isTheme(localStorage.getItem(THEME_STORAGE_KEY));
+  } catch {
+    return false;
+  }
+}
+
 function readStoredTheme(): Theme {
   try {
     const stored = localStorage.getItem(THEME_STORAGE_KEY);
@@ -65,10 +73,24 @@ function readSystemPrefersDark(): boolean {
   return window.matchMedia(DARK_MEDIA_QUERY).matches;
 }
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
+export function ThemeProvider({
+  children,
+  profileTheme,
+}: {
+  children: React.ReactNode;
+  /** Выбор из учётной записи: переживает смену устройства (P0-7). */
+  profileTheme?: Theme;
+}) {
   // На сервере выбор пользователя неизвестен: класс на <html> уже проставлен
   // скриптом до отрисовки, поэтому серверный снимок нейтральный.
-  const theme = useSyncExternalStore(subscribeToStoredTheme, readStoredTheme, () => DEFAULT_THEME);
+  const stored = useSyncExternalStore(
+    subscribeToStoredTheme,
+    readStoredTheme,
+    () => profileTheme ?? DEFAULT_THEME,
+  );
+
+  // На новом устройстве в хранилище пусто — тогда действует выбор из профиля.
+  const theme = hasStoredTheme() ? stored : (profileTheme ?? stored);
   const systemPrefersDark = useSyncExternalStore(
     subscribeToSystemTheme,
     readSystemPrefersDark,

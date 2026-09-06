@@ -22,7 +22,12 @@ PostgreSQL 16. Все таблицы: `id uuid pk default gen_random_uuid()`, `c
 **users** — `org_id`, `phone` (уникальный, `+7XXXXXXXXXX`), `password_hash`,
 `role enum(superadmin, admin, resident)`, `house_id` (обязателен для `admin`, иначе null),
 `must_change_password bool`, `password_reset_allowed_until timestamptz`,
-`locale enum(ru, kk, en) default ru`, `status enum(active, archived)`, `last_login_at`.
+`locale enum(ru, kk, en) default ru`, `theme enum(light, dark, system) default system`,
+`status enum(active, archived)`, `last_login_at`.
+
+Колонка `theme` добавлена в фазе 1: личные настройки в `04-MODULES/11-users-settings.md`
+называют тему наравне с языком, но в модели данных её не было. Выбор оформления обязан
+переживать смену устройства, иначе настройка бессмысленна.
 
 **sessions** — `user_id`, `token_hash`, `expires_at`, `ip`, `user_agent`, `revoked_at`.
 

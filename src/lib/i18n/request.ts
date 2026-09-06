@@ -5,7 +5,18 @@ import { ALMATY_TIME_ZONE } from '@/lib/time';
 
 import { DEFAULT_LOCALE, isLocale, LOCALE_COOKIE, type Locale } from './config';
 
+/**
+ * Язык — атрибут пользователя (P0-2), поэтому профиль главнее cookie.
+ * Cookie остаётся для анонимных страниц: экран входа тоже переключается.
+ */
 async function resolveLocale(): Promise<Locale> {
+  const { getCurrentSession } = await import('@/lib/session');
+  const session = await getCurrentSession();
+
+  if (session !== null && isLocale(session.user.locale)) {
+    return session.user.locale;
+  }
+
   const store = await cookies();
   const value = store.get(LOCALE_COOKIE)?.value;
 

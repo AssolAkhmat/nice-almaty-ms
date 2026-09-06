@@ -45,6 +45,26 @@ export default async function SettingsPage() {
           <p className="text-text-muted mt-1 text-[13px]">{t('houses.subtitle')}</p>
         </Card>
       ) : null}
+
+      {can(session.context, 'settings.org.read') ? (
+        <Card>
+          <CardTitle>
+            <Link className="text-primary hover:underline" href="/settings/network">
+              {t('settings.network.title')}
+            </Link>
+          </CardTitle>
+          <p className="text-text-muted mt-1 text-[13px]">{t('settings.network.subtitle')}</p>
+        </Card>
+      ) : null}
+
+      <Card>
+        <CardTitle>
+          <Link className="text-primary hover:underline" href="/settings/personal">
+            {t('settings.personal.title')}
+          </Link>
+        </CardTitle>
+        <p className="text-text-muted mt-1 text-[13px]">{t('settings.personal.subtitle')}</p>
+      </Card>
     </section>
   );
 }

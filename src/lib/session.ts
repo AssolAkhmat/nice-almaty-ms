@@ -1,3 +1,5 @@
+import { cache } from 'react';
+
 import { cookies } from 'next/headers';
 
 import { getSession } from '@/services/auth';
@@ -35,12 +37,18 @@ export async function clearSessionCookie(): Promise<void> {
   store.delete(SESSION_COOKIE_NAME);
 }
 
-/** Действующая сессия или null. Проверка идёт в базу: cookie сама по себе ничего не значит. */
-export async function getCurrentSession(): Promise<AuthSession | null> {
+/**
+ * Действующая сессия или null. Проверка идёт в базу: cookie сама по себе
+ * ничего не значит.
+ *
+ * Обёрнута в `cache`: за один запрос сессию спрашивают и layout, и страница,
+ * и конфиг локализации — поход в базу должен быть один.
+ */
+export const getCurrentSession = cache(async (): Promise<AuthSession | null> => {
   const token = await readSessionToken();
   if (token === null) {
     return null;
   }
 
   return getSession(token);
-}
+});

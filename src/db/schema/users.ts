@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { boolean, check, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
-import { localeEnum, userRoleEnum, userStatusEnum } from './enums';
+import { localeEnum, userRoleEnum, userStatusEnum, userThemeEnum } from './enums';
 import { houses } from './houses';
 import { organizations } from './organizations';
 
@@ -28,6 +28,8 @@ export const users = pgTable(
     /** Одноразовое разрешение сброса пароля живёт 24 часа. */
     passwordResetAllowedUntil: timestamp('password_reset_allowed_until', { withTimezone: true }),
     locale: localeEnum('locale').notNull().default('ru'),
+    /** Личная настройка оформления; выбор переживает смену устройства. */
+    theme: userThemeEnum('theme').notNull().default('system'),
     status: userStatusEnum('status').notNull().default('active'),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

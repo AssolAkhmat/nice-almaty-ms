@@ -118,6 +118,38 @@
       "internal": "Something went wrong"
     }
   },
+  "settings": {
+    "personal": {
+      "title": "Personal settings",
+      "subtitle": "Language, theme and password. The choice lives in the account and survives a device change.",
+      "localeHint": "Interface language",
+      "themeHint": "Light, dark or follow the system",
+      "submit": "Save",
+      "changePassword": "Change password"
+    },
+    "network": {
+      "title": "Network settings",
+      "subtitle": "Apply to every house. Only the superadmin can change them.",
+      "ratingVisible": "Show rating to residents",
+      "ratingVisibleHint": "Turning this off hides the rating number from every resident in the network.",
+      "defaultLocale": "Default language",
+      "defaultLocaleHint": "Assigned to new accounts",
+      "submit": "Save"
+    },
+    "done": {
+      "personalSaved": "Settings saved",
+      "networkSaved": "Network settings saved"
+    },
+    "errors": {
+      "unauthorized": "Sign-in required",
+      "forbidden": "Action not available to this role",
+      "not_found": "Not found",
+      "validation_error": "Check the entered data",
+      "conflict": "Data changed, try again",
+      "rate_limited": "Too often, try later",
+      "internal": "Something went wrong"
+    }
+  },
   "users": {
     "title": "Users",
     "subtitle": "Accounts are created by the superadmin. There is no deletion, only archiving.",
