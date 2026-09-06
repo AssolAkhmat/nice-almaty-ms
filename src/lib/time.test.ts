@@ -19,6 +19,7 @@ import {
   startOfNextDayUtc,
   todayInAlmaty,
   toAlmatyParts,
+  tryParseBusinessDate,
 } from './time';
 
 /**
@@ -102,6 +103,12 @@ describe('бизнес-даты', () => {
     expect(() => parseBusinessDate('2026-13-01')).toThrow(/дата/i);
     expect(() => parseBusinessDate('2027-02-29')).toThrow(/дата/i);
     expect(() => parseBusinessDate('2026-09-06T00:00:00Z')).toThrow(/дата/i);
+  });
+
+  it('мягкий разбор даёт null вместо исключения: фильтры приходят пустыми', () => {
+    expect(tryParseBusinessDate('2026-09-06')).toBe('2026-09-06');
+    expect(tryParseBusinessDate('')).toBeNull();
+    expect(tryParseBusinessDate('06.09.2026')).toBeNull();
   });
 
   it('сравнивает даты лексикографически и хронологически одинаково', () => {

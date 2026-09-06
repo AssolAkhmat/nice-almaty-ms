@@ -57,6 +57,17 @@ export default async function SettingsPage() {
         </Card>
       ) : null}
 
+      {can(session.context, 'audit.read') ? (
+        <Card>
+          <CardTitle>
+            <Link className="text-primary hover:underline" href="/settings/audit">
+              {t('audit.title')}
+            </Link>
+          </CardTitle>
+          <p className="text-text-muted mt-1 text-[13px]">{t('audit.subtitle')}</p>
+        </Card>
+      ) : null}
+
       <Card>
         <CardTitle>
           <Link className="text-primary hover:underline" href="/settings/personal">

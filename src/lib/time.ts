@@ -75,6 +75,15 @@ export function parseBusinessDate(value: string): BusinessDate {
   return businessDate(Number(year), Number(month), Number(day));
 }
 
+/** Мягкий разбор для фильтров: пустая строка и мусор дают null, а не исключение. */
+export function tryParseBusinessDate(value: string): BusinessDate | null {
+  try {
+    return parseBusinessDate(value);
+  } catch {
+    return null;
+  }
+}
+
 export function businessDateToParts(date: BusinessDate): {
   year: number;
   month: number;

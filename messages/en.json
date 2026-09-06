@@ -3,6 +3,31 @@
     "name": "Nice Almaty",
     "description": "Student housing network administration system"
   },
+  "audit": {
+    "title": "Audit log",
+    "subtitle": "Who changed what and when. Available to the superadmin only.",
+    "empty": "No entries",
+    "emptyHint": "Change the filters or wait for the first actions.",
+    "columns": {
+      "actor": "Actor",
+      "ip": "Address",
+      "before": "Before",
+      "after": "After"
+    },
+    "filters": {
+      "actor": "Actor",
+      "entity": "Entity",
+      "from": "From",
+      "to": "To",
+      "any": "Any",
+      "apply": "Show"
+    },
+    "entities": {
+      "user": "Account",
+      "house": "House",
+      "setting": "Setting"
+    }
+  },
   "auth": {
     "signIn": {
       "title": "Sign in",
