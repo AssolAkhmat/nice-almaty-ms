@@ -1,0 +1,108 @@
+import { compareBusinessDates, startOfMonth, type BusinessDate } from '@/lib/time';
+
+/**
+ * Месячный счёт (docs/03-BUSINESS-RULES.md §3).
+ *
+ * Чистая сборка строк: сервис приносит цену, долю коммуналки и долг депозита,
+ * а решение, какие строки в счёт войдут и в каком порядке, принимается здесь
+ * и проверяется числами.
+ *
+ * Штрафы и скидка за рейтинг — фаза 5: пока их источников нет, счёт собирается
+ * без них, и это видно по составу, а не по умолчанию.
+ */
+export type MonthlyLineKind = 'rent' | 'utilities' | 'damage_carryover' | 'extra';
+
+export interface MonthlyInvoiceLine {
+  kind: MonthlyLineKind;
+  title: string;
+  amount: number;
+}
+
+export interface ManualLine {
+  title: string;
+  amount: number;
+}
+
+/** Назначение места с ценой: цена берётся из того, что действует 1 числа. */
+export interface PricedAssignment {
+  price: number;
+  from: BusinessDate;
+  /** Пусто — назначение действует до сих пор. */
+  to: BusinessDate | null;
+}
+
+export interface MonthlyInvoiceInput {
+  /** Первое число месяца, за который выставляется счёт. */
+  month: BusinessDate;
+  /** Цена проживания на первое число месяца; всегда полная сумма (§3). */
+  rent: number;
+  /** Доля за прошлый месяц; `null` — период ещё не закрыт (§4.2). */
+  utilities?: { amount: number; title: string } | null;
+  /** Непогашенный перерасход депозита (§2.4); ноль — строки нет. */
+  depositDebt?: number;
+  manualLines?: readonly ManualLine[];
+}
+
+export interface MonthlyInvoiceDraft {
+  lines: MonthlyInvoiceLine[];
+  total: number;
+}
+
+function assertMoney(amount: number): void {
+  // Деньги — целые тенге (§0). Дробь и минус в начислении означают ошибку ввода.
+  if (!Number.isSafeInteger(amount) || amount < 0) {
+    throw new RangeError(`Начисление должно быть целым числом тенге, получено: ${String(amount)}`);
+  }
+}
+
+/**
+ * Цена проживания на первое число месяца. Смена цены или места внутри месяца
+ * текущий счёт не меняет: перерасчёт делается вручную отдельной строкой (§3).
+ */
+export function rentForMonth(
+  month: BusinessDate,
+  assignments: readonly PricedAssignment[],
+): number {
+  const first = startOfMonth(month);
+
+  const active = assignments.find(
+    (assignment) =>
+      compareBusinessDates(assignment.from, first) <= 0 &&
+      (assignment.to === null || compareBusinessDates(first, assignment.to) < 0),
+  );
+
+  return active?.price ?? 0;
+}
+
+export function buildMonthlyInvoice(input: MonthlyInvoiceInput): MonthlyInvoiceDraft {
+  assertMoney(input.rent);
+
+  const lines: MonthlyInvoiceLine[] = [{ kind: 'rent', title: 'Проживание', amount: input.rent }];
+
+  if (input.utilities != null) {
+    assertMoney(input.utilities.amount);
+    lines.push({
+      kind: 'utilities',
+      title: input.utilities.title,
+      amount: input.utilities.amount,
+    });
+  }
+
+  const debt = input.depositDebt ?? 0;
+  assertMoney(debt);
+
+  if (debt > 0) {
+    lines.push({
+      kind: 'damage_carryover',
+      title: 'Погашение перерасхода депозита',
+      amount: debt,
+    });
+  }
+
+  for (const manual of input.manualLines ?? []) {
+    assertMoney(manual.amount);
+    lines.push({ kind: 'extra', title: manual.title, amount: manual.amount });
+  }
+
+  return { lines, total: lines.reduce((sum, line) => sum + line.amount, 0) };
+}
