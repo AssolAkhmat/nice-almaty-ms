@@ -1,7 +1,11 @@
 /**
  * Хранилище файлов за адаптером (docs/01-ARCHITECTURE.md).
- * В фазе 0 интерфейс содержит только проверку доступности: она нужна
- * эндпоинту /api/health. Загрузка и отдача файлов появляются в фазе 2.
+ * Драйверы `gdrive` и `supabase` появятся в фазе 2 вместе с двухшаговой
+ * загрузкой; здесь интерфейс и полностью рабочий драйвер `local`.
+ *
+ * Метаданные файла — mime, размер, владелец — живут в таблице `files`,
+ * которая тоже относится к фазе 2. Хранилище знает только байты и ключ:
+ * иначе получилось бы два источника правды об одном файле.
  */
 export type StorageDriver = 'gdrive' | 'local' | 'supabase';
 
@@ -10,7 +14,22 @@ export type StorageHealth =
   | { status: 'skipped'; driver: StorageDriver; reason: string }
   | { status: 'error'; driver: StorageDriver; reason: string };
 
+export interface StoredObject {
+  /** Ключ внутри хранилища, всегда с прямыми слэшами. */
+  key: string;
+  sizeBytes: number;
+}
+
 export interface StorageProvider {
   readonly driver: StorageDriver;
   checkHealth: () => Promise<StorageHealth>;
+  /** Кладёт объект, перезаписывая существующий по тому же ключу. */
+  put: (key: string, data: Uint8Array) => Promise<StoredObject>;
+  /** Читает объект целиком. `null` — объекта нет. */
+  get: (key: string) => Promise<Uint8Array | null>;
+  /** Отдаёт объект потоком: файлы бывают крупнее, чем стоит держать в памяти. */
+  stream: (key: string) => Promise<ReadableStream<Uint8Array> | null>;
+  exists: (key: string) => Promise<boolean>;
+  /** Удаление несуществующего объекта — не ошибка. */
+  delete: (key: string) => Promise<void>;
 }
