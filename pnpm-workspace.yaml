@@ -1,0 +1,5 @@
+# pnpm 12 читает настройки отсюда, а не из поля "pnpm" в package.json.
+# Сборочные скрипты разрешены поимённо: unrs-resolver подтягивает нативный
+# резолвер для eslint-config-next.
+allowBuilds:
+  unrs-resolver: true

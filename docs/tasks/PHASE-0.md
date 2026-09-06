@@ -29,7 +29,7 @@
 | zod | 4.5.4 | |
 | vitest | 5.0.0 | |
 | @playwright/test | 1.63.0 | |
-| eslint | 10.10.0 | peer `eslint-config-next` — `>=9` |
+| eslint | 9.39.5 | **не 10**: парсер `eslint-config-next@16.3.4` не реализует `ScopeManager#addGlobals`, которого требует ESLint 10 |
 | typescript-eslint | 8.69.0 | |
 | prettier / eslint-config-prettier | 3.9.6 / 10.1.8 | |
 | @radix-ui/react-* | 1.x | headless-примитивы |
@@ -63,12 +63,12 @@
 - Коммит: `feat(domain): splitCeil и утилиты времени Asia/Almaty`
 
 ### T0.3 — Каркас Next.js 16 и токены дизайн-системы
-- [ ] `next.config.ts` (`output: 'standalone'` только при `DEPLOY_TARGET=docker`)
-- [ ] `src/app/layout.tsx`, `src/app/page.tsx`
-- [ ] Montserrat через `next/font/google`, веса 400/500/600/700, `subsets: ['latin','cyrillic']`, `display: swap`
-- [ ] `src/app/globals.css`: `@import "tailwindcss"`, блок `@theme` и переменные `:root` / `.dark` — **дословно** из `05-DESIGN-SYSTEM.md`
-- [ ] `@custom-variant dark` через класс `.dark` (Tailwind v4 по умолчанию смотрит на `prefers-color-scheme`)
-- [ ] Типографическая шкала (H1 28/600 … метка таблицы 12/600 uppercase), `tabular-nums` для чисел
+- [x] `next.config.ts` (`output: 'standalone'` только при `DEPLOY_TARGET=docker`)
+- [x] `src/app/layout.tsx`, `src/app/page.tsx`
+- [x] Montserrat через `next/font/google`, веса 400/500/600/700, `subsets: ['latin','cyrillic']`, `display: swap`
+- [x] `src/app/globals.css`: `@import "tailwindcss"`, блок `@theme` и переменные `:root` / `.dark` — **дословно** из `05-DESIGN-SYSTEM.md`
+- [x] `@custom-variant dark` через класс `.dark` (Tailwind v4 по умолчанию смотрит на `prefers-color-scheme`)
+- [x] Типографическая шкала (H1 28/600 … метка таблицы 12/600 uppercase), `tabular-nums` для чисел
 - Коммит: `feat(ui): каркас приложения и токены дизайн-системы`
 - DoD: проверка на 375 / 768 / 1440, обе темы
 

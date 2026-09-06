@@ -1,0 +1,135 @@
+@import 'tailwindcss';
+
+/*
+ * Тема переключается классом .dark на <html> (docs/05-DESIGN-SYSTEM.md).
+ * По умолчанию Tailwind v4 смотрит на prefers-color-scheme — переопределяем.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+
+  --color-brand-blue: #004aad;
+  --color-brand-blue-hover: #003c8c;
+  --color-brand-blue-light: #4c8df6;
+  --color-brand-yellow: #fee274;
+  --color-brand-yellow-dim: #f5d15a;
+
+  --radius-card: 10px;
+  --radius-control: 8px;
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-primary: var(--primary);
+  --color-primary-fg: var(--primary-fg);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+}
+
+:root {
+  --bg: #ffffff;
+  --surface: #f7f8fa;
+  --surface-2: #eef0f4;
+  --border: #e2e5ea;
+  --border-strong: #c8cdd6;
+  --text: #0b0b0c;
+  --text-muted: #5b6270;
+  --primary: #004aad;
+  --primary-fg: #ffffff;
+  --accent: #fee274;
+  --accent-fg: #0b0b0c;
+  --success: #12805c;
+  --warning: #9a6700;
+  --danger: #b42318;
+}
+
+.dark {
+  --bg: #0b0f17;
+  --surface: #131a24;
+  --surface-2: #1a2331;
+  --border: #263042;
+  --border-strong: #3a465c;
+  --text: #f2f4f7;
+  --text-muted: #9aa4b5;
+  --primary: #4c8df6;
+  --primary-fg: #06101f;
+  --accent: #fee274;
+  --accent-fg: #0b0b0c;
+  --success: #3ecf9b;
+  --warning: #e3b341;
+  --danger: #ff6f61;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.55;
+  }
+
+  /* Типографическая шкала из docs/05-DESIGN-SYSTEM.md. */
+  h1 {
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.25;
+  }
+
+  h2 {
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  h3 {
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  small {
+    font-size: 13px;
+  }
+
+  /* Фокус видим всегда: кольцо 2px основным цветом. */
+  :focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: var(--primary);
+    color: var(--primary-fg);
+  }
+}
+
+@utility text-label {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}

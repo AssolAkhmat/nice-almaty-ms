@@ -7,6 +7,9 @@ test-results/
 pnpm-lock.yaml
 src/db/migrations/
 
+# генерируется Next.js
+next-env.d.ts
+
 # Документация — источник истины, механически не переформатируется
 *.md
 docs/

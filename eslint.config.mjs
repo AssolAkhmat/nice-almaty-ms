@@ -1,25 +1,7 @@
 import js from '@eslint/js';
-import tseslint from 'typescript-eslint';
+import nextCoreWebVitals from 'eslint-config-next/core-web-vitals';
 import prettier from 'eslint-config-prettier';
-
-/**
- * Инварианты из CLAUDE.md, которые проверяет линтер:
- *  - прямой `new Date()` / `Date.now()` в бизнес-логике запрещён (единственная точка — src/lib/time.ts);
- *  - `src/domain/**` не импортирует ничего из db / app / adapters / services.
- */
-const forbidRawDate = {
-  'no-restricted-syntax': [
-    'error',
-    {
-      selector: "NewExpression[callee.name='Date']",
-      message: 'Прямой new Date() запрещён. Используй src/lib/time.ts (зона Asia/Almaty).',
-    },
-    {
-      selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']",
-      message: 'Date.now() запрещён. Используй src/lib/time.ts (зона Asia/Almaty).',
-    },
-  ],
-};
+import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
@@ -36,9 +18,12 @@ export default tseslint.config(
   },
 
   js.configs.recommended,
-  ...tseslint.configs.recommendedTypeChecked,
+  ...nextCoreWebVitals,
 
+  // Типовая проверка — только для TypeScript. JS-конфиги парсятся без типов.
   {
+    files: ['**/*.ts', '**/*.tsx', '**/*.mts'],
+    extends: [tseslint.configs.recommendedTypeChecked],
     languageOptions: {
       parserOptions: {
         projectService: true,
@@ -58,15 +43,29 @@ export default tseslint.config(
       '@typescript-eslint/no-misused-promises': 'error',
       eqeqeq: ['error', 'always', { null: 'ignore' }],
       'no-console': ['error', { allow: ['warn', 'error'] }],
-      ...forbidRawDate.rules,
     },
   },
 
-  // Единственное место, где разрешено обращаться к системным часам напрямую.
+  /*
+   * Инварианты CLAUDE.md.
+   * Часы: прямой new Date() / Date.now() запрещён — единственная точка src/lib/time.ts.
+   * Тесты исключены: им нужны фиксированные моменты времени.
+   */
   {
-    files: ['src/lib/time.ts'],
+    files: ['src/**/*.ts', 'src/**/*.tsx'],
+    ignores: ['src/lib/time.ts', 'src/**/*.test.ts', 'src/**/*.test.tsx'],
     rules: {
-      'no-restricted-syntax': 'off',
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "NewExpression[callee.name='Date']",
+          message: 'Прямой new Date() запрещён. Используй src/lib/time.ts (зона Asia/Almaty).',
+        },
+        {
+          selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']",
+          message: 'Date.now() запрещён. Используй src/lib/time.ts (зона Asia/Almaty).',
+        },
+      ],
     },
   },
 
@@ -98,16 +97,6 @@ export default tseslint.config(
           ],
         },
       ],
-    },
-  },
-
-  // Конфигурационные файлы в корне: без типовой проверки и без запрета на часы.
-  {
-    files: ['**/*.mjs', '**/*.js', '*.config.ts', '*.config.mts'],
-    ...tseslint.configs.disableTypeChecked,
-    rules: {
-      ...tseslint.configs.disableTypeChecked.rules,
-      'no-restricted-syntax': 'off',
     },
   },
 
