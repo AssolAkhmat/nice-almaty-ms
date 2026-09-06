@@ -91,7 +91,8 @@
     "rating": "Рейтинг",
     "accounting": "Бухгалтерия",
     "inventory": "Инвентарь",
-    "settings": "Настройки"
+    "settings": "Настройки",
+    "documents": "Документы"
   },
   "houses": {
     "title": "Дома",
@@ -317,5 +318,48 @@
   "home": {
     "title": "Nice Almaty",
     "subtitle": "Каркас приложения"
+  },
+  "documents": {
+    "title": "Документы",
+    "subtitle": "Загрузите справки и следите за сроками их действия",
+    "reviewSubtitle": "Документы жильцов вашего дома, ожидающие проверки",
+    "file": "Файл",
+    "issueDate": "Дата снимка",
+    "issueDateHint": "Срок действия считается от неё, а не от дня загрузки",
+    "issueDateInvalid": "Дата снимка указана неверно",
+    "send": "Отправить",
+    "uploading": "Загрузка",
+    "submitted": "Документ отправлен на проверку",
+    "approved": "Документ принят",
+    "rejected": "Документ отклонён",
+    "approve": "Принять",
+    "reject": "Отклонить",
+    "confirmReject": "Отклонить документ",
+    "rejectReason": "Причина отклонения",
+    "rejectedBecause": "Отклонён: {reason}",
+    "openFile": "Открыть файл",
+    "uploadedAt": "Загружен {date}",
+    "validUntil": "Действует до {date}",
+    "expiredOn": "Истёк {date}",
+    "daysLeft": "осталось дней: {days}",
+    "permanent": "Бессрочный",
+    "queueEmpty": "Проверять нечего",
+    "queueEmptyHint": "Новые документы появятся здесь сразу после загрузки",
+    "noResidency": "Проживание ещё не оформлено",
+    "noResidencyHint": "Документы можно будет загрузить, когда админ оформит заселение",
+    "status": {
+      "missing": "Требуется",
+      "uploaded": "На проверке",
+      "approved": "Принят",
+      "rejected": "Отклонён"
+    },
+    "issueDateRequired": "Для флюорографии нужна дата снимка",
+    "issueDateInFuture": "Дата снимка не может быть в будущем",
+    "rejectReasonRequired": "Укажите причину отклонения",
+    "errors": {
+      "unauthorized": "Требуется вход",
+      "unknown": "Не удалось выполнить действие",
+      "upload": "Файл загрузить не удалось"
+    }
   }
 }

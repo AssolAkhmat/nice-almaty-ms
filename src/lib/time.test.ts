@@ -4,6 +4,7 @@ import {
   ALMATY_TIME_ZONE,
   ALMATY_UTC_OFFSET_MINUTES,
   addDays,
+  addMonths,
   businessDate,
   compareBusinessDates,
   daysInMonth,
@@ -202,5 +203,31 @@ describe('сдвиг момента времени', () => {
 describe('now', () => {
   it('возвращает момент времени', () => {
     expect(now()).toBeInstanceOf(Date);
+  });
+});
+
+describe('addMonths', () => {
+  it('сдвигает на календарные месяцы, сохраняя день', () => {
+    expect(addMonths(parseBusinessDate('2027-03-15'), 12)).toEqual(parseBusinessDate('2028-03-15'));
+    expect(addMonths(parseBusinessDate('2027-03-15'), 6)).toEqual(parseBusinessDate('2027-09-15'));
+  });
+
+  it('переносит год через границу декабря', () => {
+    expect(addMonths(parseBusinessDate('2027-11-30'), 2)).toEqual(parseBusinessDate('2028-01-30'));
+  });
+
+  it('короткий месяц не сдвигает срок вперёд, а укорачивает его', () => {
+    // 31 марта плюс месяц — 30 апреля, а не 1 мая.
+    expect(addMonths(parseBusinessDate('2027-03-31'), 1)).toEqual(parseBusinessDate('2027-04-30'));
+    // 29 февраля високосного года плюс год — 28 февраля.
+    expect(addMonths(businessDate(2028, 2, 29), 12)).toEqual(parseBusinessDate('2029-02-28'));
+  });
+
+  it('умеет назад: отрицательный сдвиг — тоже сдвиг', () => {
+    expect(addMonths(parseBusinessDate('2027-01-15'), -2)).toEqual(parseBusinessDate('2026-11-15'));
+  });
+
+  it('нулевой сдвиг ничего не меняет', () => {
+    expect(addMonths(parseBusinessDate('2027-01-31'), 0)).toEqual(parseBusinessDate('2027-01-31'));
   });
 });

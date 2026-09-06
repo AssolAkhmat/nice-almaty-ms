@@ -91,7 +91,8 @@
     "rating": "Rating",
     "accounting": "Accounting",
     "inventory": "Inventory",
-    "settings": "Settings"
+    "settings": "Settings",
+    "documents": "Documents"
   },
   "houses": {
     "title": "Houses",
@@ -317,5 +318,48 @@
   "home": {
     "title": "Nice Almaty",
     "subtitle": "Application shell"
+  },
+  "documents": {
+    "title": "Documents",
+    "subtitle": "Upload your certificates and keep an eye on their validity",
+    "reviewSubtitle": "Documents from residents of your house awaiting review",
+    "file": "File",
+    "issueDate": "Date of the scan",
+    "issueDateHint": "Validity is counted from this date, not from the upload day",
+    "issueDateInvalid": "The date of the scan is invalid",
+    "send": "Submit",
+    "uploading": "Uploading",
+    "submitted": "The document was sent for review",
+    "approved": "The document is accepted",
+    "rejected": "The document is rejected",
+    "approve": "Accept",
+    "reject": "Reject",
+    "confirmReject": "Reject the document",
+    "rejectReason": "Reason for rejection",
+    "rejectedBecause": "Rejected: {reason}",
+    "openFile": "Open the file",
+    "uploadedAt": "Uploaded on {date}",
+    "validUntil": "Valid until {date}",
+    "expiredOn": "Expired on {date}",
+    "daysLeft": "days left: {days}",
+    "permanent": "Permanent",
+    "queueEmpty": "Nothing to review",
+    "queueEmptyHint": "New documents appear here as soon as they are uploaded",
+    "noResidency": "Residency is not set up yet",
+    "noResidencyHint": "You will be able to upload documents once the admin sets up your move-in",
+    "status": {
+      "missing": "Required",
+      "uploaded": "In review",
+      "approved": "Accepted",
+      "rejected": "Rejected"
+    },
+    "issueDateRequired": "Fluorography requires the date of the scan",
+    "issueDateInFuture": "The date of the scan cannot be in the future",
+    "rejectReasonRequired": "State the reason for rejection",
+    "errors": {
+      "unauthorized": "Sign-in required",
+      "unknown": "The action could not be completed",
+      "upload": "The file could not be uploaded"
+    }
   }
 }

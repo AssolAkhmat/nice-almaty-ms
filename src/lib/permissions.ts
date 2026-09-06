@@ -33,6 +33,8 @@ export const ACTIONS = [
   'resident.revealSensitive',
   'file.upload',
   'file.read',
+  'document.upload',
+  'document.review',
   'settings.org.read',
   'settings.org.write',
   'settings.house.read',
@@ -68,6 +70,8 @@ export const PERMISSIONS: PermissionMatrix = {
     'resident.revealSensitive': 'org',
     'file.upload': 'org',
     'file.read': 'org',
+    'document.upload': 'org',
+    'document.review': 'org',
     'settings.org.read': 'org',
     'settings.org.write': 'org',
     'settings.house.read': 'org',
@@ -93,6 +97,8 @@ export const PERMISSIONS: PermissionMatrix = {
     'resident.revealSensitive': 'house',
     'file.upload': 'house',
     'file.read': 'house',
+    'document.upload': 'house',
+    'document.review': 'house',
     'settings.org.read': 'none',
     'settings.org.write': 'none',
     'settings.house.read': 'house',
@@ -127,6 +133,12 @@ export const PERMISSIONS: PermissionMatrix = {
      */
     'file.upload': 'self',
     'file.read': 'self',
+    'document.upload': 'self',
+    /*
+     * Свои документы жилец не проверяет: принять или отклонить справку
+     * может только админ дома или суперадмин (модуль 1, «Карточка жильца»).
+     */
+    'document.review': 'none',
     'settings.org.read': 'none',
     'settings.org.write': 'none',
     'settings.house.read': 'none',

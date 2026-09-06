@@ -2,7 +2,10 @@ import { expect, test } from '@playwright/test';
 
 import { login } from './support/login';
 
-const MODULE_COUNT = 12;
+import { NAV_ITEMS } from '../src/lib/navigation';
+
+/** Считается по самому списку разделов: иначе новый раздел ломает тест зря. */
+const MODULE_COUNT = NAV_ITEMS.length;
 
 test.describe('адаптивная навигация', () => {
   test.beforeEach(async ({ page }) => {

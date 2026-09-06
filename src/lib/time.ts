@@ -137,6 +137,25 @@ export function addDays(date: BusinessDate, days: number): BusinessDate {
   return formatParts(shifted.getUTCFullYear(), shifted.getUTCMonth() + 1, shifted.getUTCDate());
 }
 
+/**
+ * Сдвиг на календарные месяцы. День сохраняется; если в новом месяце такого
+ * дня нет, берётся последний — 29 февраля через год становится 28 февраля,
+ * а 31 марта через месяц — 30 апреля. Иначе срок документа уползал бы вперёд
+ * на следующий месяц (docs/03-BUSINESS-RULES.md §1.3).
+ */
+export function addMonths(date: BusinessDate, months: number): BusinessDate {
+  const { year, month, day } = businessDateToParts(date);
+  const shifted = month - 1 + months;
+  const targetYear = year + Math.floor(shifted / 12);
+  const targetMonth = ((shifted % 12) + 12) % 12;
+
+  return formatParts(
+    targetYear,
+    targetMonth + 1,
+    Math.min(day, daysInMonth(targetYear, targetMonth + 1)),
+  );
+}
+
 /** Число дней от `from` до `to`. Отрицательное, если `to` раньше. */
 export function differenceInDays(from: BusinessDate, to: BusinessDate): number {
   const start = businessDateToParts(from);

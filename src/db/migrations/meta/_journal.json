@@ -57,6 +57,13 @@
       "when": 1788720866541,
       "tag": "0007_wide_tony_stark",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788726130477,
+      "tag": "0008_woozy_green_goblin",
+      "breakpoints": true
     }
   ]
 }

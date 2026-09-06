@@ -1,9 +1,9 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 import { generateTemporaryPassword, hashPassword } from '@/lib/password';
 
 import { getDb, type Executor } from './client';
-import { houses, organizations, users } from './schema';
+import { documentTypes, houses, organizations, users } from './schema';
 
 /**
  * Сид сети (docs/07-ROADMAP.md, «Сид-данные»).
@@ -28,6 +28,39 @@ export function adminPhone(houseNumber: number): string {
 export function houseSlug(houseNumber: number): string {
   return `dom-${houseNumber}`;
 }
+
+/**
+ * Типы документов из docs/02-DATA-MODEL.md и §1.3: фото 3×4 бессрочно,
+ * справка — год от загрузки, флюорография — год от даты снимка.
+ * Новые типы заводит суперадмин через настройки, а не сид.
+ */
+export const DOCUMENT_TYPE_SEED = [
+  {
+    code: 'photo_3x4',
+    nameI18n: { ru: 'Фото 3×4', kk: '3×4 фото', en: 'Photo 3×4' },
+    validityMonths: null,
+    requiresIssueDate: false,
+    sortOrder: 10,
+  },
+  {
+    code: 'dispensary',
+    nameI18n: {
+      ru: 'Справка ПНД/нарко/пневмо',
+      kk: 'ПНД/нарко/пневмо анықтамасы',
+      en: 'Dispensary certificate',
+    },
+    validityMonths: 12,
+    requiresIssueDate: false,
+    sortOrder: 20,
+  },
+  {
+    code: 'fluorography',
+    nameI18n: { ru: 'Флюорография', kk: 'Флюорография', en: 'Fluorography' },
+    validityMonths: 12,
+    requiresIssueDate: true,
+    sortOrder: 30,
+  },
+] as const;
 
 export interface SeedAccount {
   phone: string;
@@ -129,6 +162,30 @@ async function ensureUser(
   return { created: true };
 }
 
+/** Типы документов сети. Существующие не трогаются: срок мог быть изменён вручную. */
+async function ensureDocumentTypes(executor: Executor, orgId: string): Promise<void> {
+  for (const type of DOCUMENT_TYPE_SEED) {
+    const [existing] = await executor
+      .select({ id: documentTypes.id })
+      .from(documentTypes)
+      .where(and(eq(documentTypes.orgId, orgId), eq(documentTypes.code, type.code)))
+      .limit(1);
+
+    if (existing !== undefined) {
+      continue;
+    }
+
+    await executor.insert(documentTypes).values({
+      orgId,
+      code: type.code,
+      nameI18n: type.nameI18n,
+      validityMonths: type.validityMonths,
+      requiresIssueDate: type.requiresIssueDate,
+      sortOrder: type.sortOrder,
+    });
+  }
+}
+
 export async function seedNetwork(options: SeedOptions = {}): Promise<SeedResult> {
   const executor = options.executor ?? getDb();
   const passwordFor = options.passwordFor ?? (() => generateTemporaryPassword());
@@ -174,6 +231,8 @@ export async function seedNetwork(options: SeedOptions = {}): Promise<SeedResult
       ...(admin.created ? { temporaryPassword: password } : {}),
     });
   }
+
+  await ensureDocumentTypes(executor, orgId);
 
   return { orgId, houseIds, accounts };
 }

@@ -29,6 +29,9 @@ export const AUDIT_ACTIONS = {
   sensitiveFieldRevealed: 'resident.sensitive_field_revealed',
   fileUploaded: 'file.uploaded',
   fileRead: 'file.read',
+  documentSubmitted: 'document.submitted',
+  documentApproved: 'document.approved',
+  documentRejected: 'document.rejected',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
