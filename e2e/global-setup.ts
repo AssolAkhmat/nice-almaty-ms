@@ -1,7 +1,9 @@
+import { fileURLToPath } from 'node:url';
 import { inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 
+import { dotEnvFallback } from '../scripts/read-dotenv';
 import * as schema from '../src/db/schema';
 import { hashPassword } from '../src/lib/password';
 import { adminPhone, seedNetwork, SUPERADMIN_PHONE } from '../src/db/seed';
@@ -25,9 +27,13 @@ export const E2E_ACCOUNTS = {
 } as const;
 
 export default async function globalSetup(): Promise<void> {
+  const fileEnv = dotEnvFallback(fileURLToPath(new URL('../.env', import.meta.url)));
+
   const url =
     process.env.E2E_DATABASE_URL ??
     process.env.TEST_DATABASE_URL ??
+    fileEnv.E2E_DATABASE_URL ??
+    fileEnv.TEST_DATABASE_URL ??
     'postgres://nice:nice@127.0.0.1:5432/nice_almaty';
 
   const client = postgres(url, { max: 1, connect_timeout: 10, onnotice: () => undefined });

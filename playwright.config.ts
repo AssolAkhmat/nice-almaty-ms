@@ -1,4 +1,14 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig, devices } from '@playwright/test';
+
+import { dotEnvFallback } from './scripts/read-dotenv';
+
+/*
+ * `.env` читается явно: playwright его в окружение не переносит, и прогон
+ * уходил бы в базу по умолчанию — на порт локального PostgreSQL вместо
+ * контейнера (инцидент I2). Заданное в оболочке сильнее файла.
+ */
+const fileEnv = dotEnvFallback(fileURLToPath(new URL('./.env', import.meta.url)));
 
 const PORT = Number(process.env.E2E_PORT ?? 3210);
 const BASE_URL = `http://127.0.0.1:${PORT}`;
@@ -10,6 +20,8 @@ const BASE_URL = `http://127.0.0.1:${PORT}`;
 const DATABASE_URL =
   process.env.E2E_DATABASE_URL ??
   process.env.TEST_DATABASE_URL ??
+  fileEnv.E2E_DATABASE_URL ??
+  fileEnv.TEST_DATABASE_URL ??
   'postgres://nice:nice@127.0.0.1:5432/nice_almaty';
 
 export default defineConfig({
