@@ -141,13 +141,13 @@
 - Коммит: `test(e2e): проверки темы, языка и адаптивности`
 
 ### T0.11 — Docker
-- [ ] `Dockerfile` (multi-stage, `next build` со `standalone`, non-root)
-- [ ] `docker-compose.yml`: `app`, `postgres:16` (healthcheck, volume), `worker`
-- [ ] `src/workers/index.ts` — раннер node-cron; в фазе 0 заданий нет, только старт и лог
-- [ ] `GET /api/health` — проверка БД и `StorageProvider`, ответ `{ status, checks, request_id }`
-- [ ] `healthcheck` сервиса `app` в compose бьёт в `/api/health`
-- [ ] `.dockerignore`
-- [ ] Проверка: `docker compose up` → `/api/health` отвечает `ok`, миграции применены
+- [x] `Dockerfile` (multi-stage, `next build` со `standalone`, non-root)
+- [x] `docker-compose.yml`: `app`, `postgres:16` (healthcheck, volume), `worker`
+- [x] `src/workers/index.ts` — раннер node-cron; в фазе 0 заданий нет, только старт и лог
+- [x] `GET /api/health` — проверка БД и `StorageProvider`, ответ `{ status, checks, request_id }`
+- [x] `healthcheck` сервиса `app` в compose бьёт в `/api/health`
+- [x] `.dockerignore`
+- [x] Проверка: `docker compose up` → `/api/health` отвечает `ok`, миграции применены
 - Коммит: `chore(docker): compose с app, postgres и worker`
 
 ### T0.12 — GitHub Actions

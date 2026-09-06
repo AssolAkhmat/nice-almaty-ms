@@ -40,6 +40,17 @@ describe('разбор окружения', () => {
     }
   });
 
+  it('пустая строка означает «не задано», как в файлах .env', () => {
+    const env = parseEnv(baseEnv({ DIRECT_DATABASE_URL: '', WHATSAPP_WEBHOOK_URL: '' }));
+
+    expect(env.DIRECT_DATABASE_URL).toBeUndefined();
+    expect(env.WHATSAPP_WEBHOOK_URL).toBeUndefined();
+  });
+
+  it('пустая строка не подменяет обязательный секрет', () => {
+    expect(() => parseEnv(baseEnv({ SESSION_SECRET: '' }))).toThrow(/SESSION_SECRET/);
+  });
+
   it('короткий SESSION_SECRET отвергается', () => {
     expect(() => parseEnv(baseEnv({ SESSION_SECRET: 'коротко' }))).toThrow(/SESSION_SECRET/);
   });

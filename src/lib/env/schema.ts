@@ -115,9 +115,21 @@ export class EnvError extends Error {
   }
 }
 
+/**
+ * В файлах .env незаданное значение записывается пустой строкой, а не отсутствует.
+ * Иначе `DIRECT_DATABASE_URL=` считался бы заданным и не проходил проверку.
+ */
+function withoutEmptyValues(
+  source: Record<string, string | undefined>,
+): Record<string, string | undefined> {
+  return Object.fromEntries(
+    Object.entries(source).map(([key, value]) => [key, value === '' ? undefined : value]),
+  );
+}
+
 /** Чистый разбор: принимает произвольный источник, чтобы его можно было проверить тестом. */
 export function parseEnv(source: Record<string, string | undefined>): Env {
-  const result = envSchema.safeParse(source);
+  const result = envSchema.safeParse(withoutEmptyValues(source));
 
   if (!result.success) {
     const problems = result.error.issues.map(

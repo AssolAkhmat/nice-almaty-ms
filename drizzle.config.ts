@@ -5,7 +5,9 @@ import { defineConfig } from 'drizzle-kit';
  * не поддерживает DDL в режиме transaction pooling.
  * Если DIRECT_DATABASE_URL не задан, используется DATABASE_URL.
  */
-const url = process.env.DIRECT_DATABASE_URL ?? process.env.DATABASE_URL;
+// В .env незаданная переменная — это пустая строка, а не отсутствующая.
+const direct = process.env.DIRECT_DATABASE_URL;
+const url = direct === undefined || direct === '' ? process.env.DATABASE_URL : direct;
 
 if (url === undefined || url === '') {
   throw new Error('Не задан DATABASE_URL (или DIRECT_DATABASE_URL) для drizzle-kit');
