@@ -29,6 +29,12 @@ export default defineConfig({
   // Учётные записи для входа готовит сид: обходных путей в приложении нет.
   globalSetup: './e2e/global-setup.ts',
   fullyParallel: true,
+  /*
+   * Ожидание длиннее умолчания: приёмочный сценарий идёт тремя копиями
+   * сразу — по одной на ширину, — и на общей машине шаг иногда не успевает
+   * за пять секунд. Это про скорость прогона, а не про поведение системы.
+   */
+  expect: { timeout: 15_000 },
   forbidOnly: process.env.CI === 'true',
   retries: process.env.CI === 'true' ? 1 : 0,
   reporter: process.env.CI === 'true' ? [['github'], ['html', { open: 'never' }]] : [['list']],
