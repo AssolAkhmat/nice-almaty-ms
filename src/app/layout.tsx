@@ -2,6 +2,9 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { Montserrat } from 'next/font/google';
 
+import { ThemeProvider } from '@/components/theme/theme-provider';
+import { ThemeScript } from '@/components/theme/theme-script';
+
 import type { Metadata, Viewport } from 'next';
 
 import './globals.css';
@@ -32,8 +35,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html className={montserrat.variable} lang={locale} suppressHydrationWarning>
+      <head>
+        <ThemeScript />
+      </head>
       <body>
-        <NextIntlClientProvider>{children}</NextIntlClientProvider>
+        <NextIntlClientProvider>
+          <ThemeProvider>{children}</ThemeProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );
