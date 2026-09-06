@@ -210,16 +210,18 @@ describe('жизнь сессии', () => {
 
   it('просроченная сессия не действует', async () => {
     await inRollback(async (tx) => {
-      await seedUser(tx, '300002');
+      const { user } = await seedUser(tx, '300002');
       const { token } = await localAuthProvider.signIn(
         { phone: '+77021300002', password: PASSWORD },
         tx,
       );
 
+      // Сессия ищется по владельцу, а не «первому пользователю таблицы»:
+      // после сида в базе есть чужие строки, и тест зависел бы от их порядка.
       await tx
         .update(schema.sessions)
         .set({ expiresAt: minusMilliseconds(now(), 1000) })
-        .where(eq(schema.sessions.userId, (await tx.select().from(schema.users).limit(1))[0]!.id));
+        .where(eq(schema.sessions.userId, user.id));
 
       await expect(localAuthProvider.getSession(token, tx)).resolves.toBeNull();
     });
@@ -247,15 +249,19 @@ describe('жизнь сессии', () => {
 
   it('через сутки после последнего продления срок сдвигается', async () => {
     await inRollback(async (tx) => {
-      await seedUser(tx, '300004');
+      const { user } = await seedUser(tx, '300004');
       const { token } = await localAuthProvider.signIn(
         { phone: '+77021300004', password: PASSWORD },
         tx,
       );
 
       // Отматываем срок так, будто последнее продление было двое суток назад.
+      // Только у своей сессии: в базе есть строки сида и других тестов.
       const stale = plusMilliseconds(now(), SESSION_TTL_MS - 2 * 24 * 60 * 60 * 1000);
-      await tx.update(schema.sessions).set({ expiresAt: stale });
+      await tx
+        .update(schema.sessions)
+        .set({ expiresAt: stale })
+        .where(eq(schema.sessions.userId, user.id));
 
       const session = await localAuthProvider.getSession(token, tx);
 

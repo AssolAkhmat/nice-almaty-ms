@@ -1,0 +1,261 @@
+import { eq } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import { afterAll, describe, expect, it } from 'vitest';
+
+import * as schema from '@/db/schema';
+import { listAuditEntries } from '@/db/repositories/audit-log';
+import { ForbiddenError, NotFoundError, UnauthorizedError } from '@/lib/errors';
+import { hashPassword } from '@/lib/password';
+import { minusMilliseconds, now, plusMilliseconds } from '@/lib/time';
+
+import { AUDIT_ACTIONS } from './audit';
+import { signIn } from './auth';
+import { allowPasswordReset, PASSWORD_RESET_TTL_MS } from './users';
+
+import type { AccessContext } from '@/db/access';
+import type { Database, Transaction } from '@/db/client';
+
+const url = process.env.TEST_DATABASE_URL ?? 'postgres://nice:nice@localhost:5432/nice_almaty';
+const client = postgres(url, { max: 1, connect_timeout: 5, onnotice: () => undefined });
+const db = drizzle(client, { schema }) as unknown as Database;
+
+afterAll(async () => {
+  await client.end();
+});
+
+class Rollback extends Error {}
+
+async function inRollback(body: (tx: Transaction) => Promise<void>): Promise<void> {
+  try {
+    await db.transaction(async (tx) => {
+      await body(tx);
+      throw new Rollback();
+    });
+  } catch (error) {
+    if (!(error instanceof Rollback)) {
+      throw error;
+    }
+  }
+}
+
+const PASSWORD = 'pravilny-parol-1';
+
+async function seed(tx: Transaction, suffix: string) {
+  const [org] = await tx
+    .insert(schema.organizations)
+    .values({ name: 'Nice Almaty', slug: `usr-${suffix}` })
+    .returning();
+  const orgId = org?.id ?? '';
+
+  const [houseA] = await tx
+    .insert(schema.houses)
+    .values({ orgId, name: 'Дом A', slug: `usr-a-${suffix}` })
+    .returning();
+  const [houseB] = await tx
+    .insert(schema.houses)
+    .values({ orgId, name: 'Дом B', slug: `usr-b-${suffix}` })
+    .returning();
+
+  const hash = await hashPassword(PASSWORD);
+
+  const [superadminUser] = await tx
+    .insert(schema.users)
+    .values({ orgId, phone: `+77051${suffix}`, passwordHash: hash, role: 'superadmin' })
+    .returning();
+  const [adminAUser] = await tx
+    .insert(schema.users)
+    .values({
+      orgId,
+      phone: `+77052${suffix}`,
+      passwordHash: hash,
+      role: 'admin',
+      houseId: houseA?.id ?? null,
+    })
+    .returning();
+  const [adminBUser] = await tx
+    .insert(schema.users)
+    .values({
+      orgId,
+      phone: `+77053${suffix}`,
+      passwordHash: hash,
+      role: 'admin',
+      houseId: houseB?.id ?? null,
+    })
+    .returning();
+
+  const superadmin: AccessContext = {
+    orgId,
+    userId: superadminUser?.id ?? '',
+    role: 'superadmin',
+    houseId: null,
+  };
+  const adminA: AccessContext = {
+    orgId,
+    userId: adminAUser?.id ?? '',
+    role: 'admin',
+    houseId: houseA?.id ?? null,
+  };
+
+  return {
+    orgId,
+    superadmin,
+    adminA,
+    adminBId: adminBUser?.id ?? '',
+    adminAPhone: `+77052${suffix}`,
+  };
+}
+
+describe('разрешение сброса пароля', () => {
+  it('суперадмин выдаёт разрешение на сутки', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '100001');
+      const before = now();
+
+      const updated = await allowPasswordReset(
+        { context: fixture.superadmin, ip: '203.0.113.4' },
+        fixture.adminA.userId,
+        tx,
+      );
+
+      const until = updated.passwordResetAllowedUntil?.getTime() ?? 0;
+
+      expect(until).toBeGreaterThan(before.getTime() + PASSWORD_RESET_TTL_MS - 60_000);
+      expect(until).toBeLessThan(before.getTime() + PASSWORD_RESET_TTL_MS + 60_000);
+    });
+  });
+
+  it('каждое разрешение попадает в журнал', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '100002');
+
+      await allowPasswordReset(
+        { context: fixture.superadmin, ip: '203.0.113.5' },
+        fixture.adminA.userId,
+        tx,
+      );
+
+      const entries = await listAuditEntries(fixture.superadmin, {}, tx);
+      const entry = entries.find((item) => item.action === AUDIT_ACTIONS.passwordResetAllowed);
+
+      expect(entry).toBeDefined();
+      expect(entry?.entityId).toBe(fixture.adminA.userId);
+      expect(entry?.ip).toBe('203.0.113.5');
+    });
+  });
+
+  it('после выдачи вход проходит с любым паролем ровно один раз', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '100003');
+
+      await allowPasswordReset({ context: fixture.superadmin }, fixture.adminA.userId, tx);
+
+      const first = await signIn({ phone: fixture.adminAPhone, password: 'sovsem-ne-parol' }, tx);
+      expect(first.usedResetPermission).toBe(true);
+      expect(first.mustChangePassword).toBe(true);
+
+      await expect(
+        signIn({ phone: fixture.adminAPhone, password: 'drugoy-ne-parol' }, tx),
+      ).rejects.toBeInstanceOf(UnauthorizedError);
+    });
+  });
+
+  it('просроченное разрешение не действует', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '100004');
+
+      await tx
+        .update(schema.users)
+        .set({ passwordResetAllowedUntil: minusMilliseconds(now(), 1000) })
+        .where(eq(schema.users.id, fixture.adminA.userId));
+
+      await expect(
+        signIn({ phone: fixture.adminAPhone, password: 'lyuboy' }, tx),
+      ).rejects.toBeInstanceOf(UnauthorizedError);
+    });
+  });
+
+  it('выдача поверх действующего разрешения продлевает срок, а не копит их', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '100005');
+
+      await tx
+        .update(schema.users)
+        .set({ passwordResetAllowedUntil: plusMilliseconds(now(), 1000) })
+        .where(eq(schema.users.id, fixture.adminA.userId));
+
+      const updated = await allowPasswordReset(
+        { context: fixture.superadmin },
+        fixture.adminA.userId,
+        tx,
+      );
+
+      expect(updated.passwordResetAllowedUntil?.getTime()).toBeGreaterThan(
+        now().getTime() + PASSWORD_RESET_TTL_MS - 60_000,
+      );
+    });
+  });
+});
+
+describe('кто вправе выдавать разрешение', () => {
+  it('админ не видит учётную запись чужого дома — она неотличима от несуществующей', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '200001');
+
+      await expect(
+        allowPasswordReset({ context: fixture.adminA }, fixture.adminBId, tx),
+      ).rejects.toBeInstanceOf(NotFoundError);
+    });
+  });
+
+  it('жилец не может выдать разрешение даже себе', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '200002');
+
+      const [residentUser] = await tx
+        .insert(schema.users)
+        .values({
+          orgId: fixture.orgId,
+          phone: '+77059200002',
+          passwordHash: await hashPassword(PASSWORD),
+          role: 'resident',
+        })
+        .returning();
+
+      const resident: AccessContext = {
+        orgId: fixture.orgId,
+        userId: residentUser?.id ?? '',
+        role: 'resident',
+        houseId: null,
+      };
+
+      await expect(
+        allowPasswordReset({ context: resident }, resident.userId, tx),
+      ).rejects.toBeInstanceOf(ForbiddenError);
+    });
+  });
+
+  it('чужая сеть недоступна и суперадмину', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '200003');
+
+      const [otherOrg] = await tx
+        .insert(schema.organizations)
+        .values({ name: 'Другая сеть', slug: 'usr-other-200003' })
+        .returning();
+      const [stranger] = await tx
+        .insert(schema.users)
+        .values({
+          orgId: otherOrg?.id ?? '',
+          phone: '+77059200003',
+          passwordHash: await hashPassword(PASSWORD),
+          role: 'resident',
+        })
+        .returning();
+
+      await expect(
+        allowPasswordReset({ context: fixture.superadmin }, stranger?.id ?? '', tx),
+      ).rejects.toBeInstanceOf(NotFoundError);
+    });
+  });
+});
