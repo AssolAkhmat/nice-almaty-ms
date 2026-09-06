@@ -24,7 +24,8 @@
     "db:studio": "drizzle-kit studio",
     "test:e2e": "playwright test",
     "worker": "tsx src/workers/index.ts",
-    "test:db": "vitest run --config vitest.db.config.ts"
+    "test:db": "vitest run --config vitest.db.config.ts",
+    "db:seed": "tsx src/db/seed.cli.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

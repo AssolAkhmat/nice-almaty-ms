@@ -1,15 +1,15 @@
 import { expect, test } from '@playwright/test';
 
+import { login } from './support/login';
+
 const MODULE_COUNT = 12;
 
-/*
- * Защищённая зона требует сессии, а учётных записей до сида (T1.9) нет.
- * Проверки восстанавливаются тем же коммитом, который заводит сид.
- */
-test.describe.skip('адаптивная навигация', () => {
-  test('раскладка соответствует ширине экрана', async ({ page }, testInfo) => {
-    await page.goto('/');
+test.describe('адаптивная навигация', () => {
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+  });
 
+  test('раскладка соответствует ширине экрана', async ({ page }, testInfo) => {
     const sidebar = page.getByTestId('sidebar');
     const bottomNav = page.getByTestId('bottom-nav');
 
@@ -41,7 +41,6 @@ test.describe.skip('адаптивная навигация', () => {
   test('кнопка «Ещё» открывает полный список разделов', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'mobile-375', 'Нижняя навигация только на мобильном');
 
-    await page.goto('/');
     await page.getByTestId('nav-more').click();
 
     const dialog = page.getByRole('dialog');
@@ -56,7 +55,6 @@ test.describe.skip('адаптивная навигация', () => {
   test('переход в раздел меняет адрес и заголовок', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === 'mobile-375', 'Боковое меню скрыто на мобильном');
 
-    await page.goto('/');
     await page.getByTestId('sidebar').getByRole('link', { name: 'Счета' }).click();
 
     await expect(page).toHaveURL(/\/invoices$/);
@@ -68,8 +66,6 @@ test.describe.skip('адаптивная навигация', () => {
   });
 
   test('горизонтальной прокрутки нет ни на одной ширине', async ({ page }) => {
-    await page.goto('/');
-
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
@@ -80,7 +76,6 @@ test.describe.skip('адаптивная навигация', () => {
   test('цели нажатия в навигации не меньше 44px', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'mobile-375', 'Требование касается мобильного');
 
-    await page.goto('/');
     const items = page.getByTestId('bottom-nav').locator('a, button');
     const count = await items.count();
 

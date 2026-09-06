@@ -96,6 +96,20 @@ jobs:
   e2e:
     name: Playwright
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: nice
+          POSTGRES_PASSWORD: nice
+          POSTGRES_DB: nice_almaty
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nice -d nice_almaty"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     steps:
       - uses: actions/checkout@v4
 
@@ -112,6 +126,9 @@ jobs:
 
       - name: Установка браузера
         run: pnpm exec playwright install --with-deps chromium
+
+      - name: Схема для e2e
+        run: pnpm db:migrate
 
       - run: pnpm build
 

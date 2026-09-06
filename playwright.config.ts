@@ -7,8 +7,15 @@ const BASE_URL = `http://127.0.0.1:${PORT}`;
  * Три ширины из docs/05-DESIGN-SYSTEM.md: 375 / 768 / 1440.
  * Каждый экран проверяется во всех трёх.
  */
+const DATABASE_URL =
+  process.env.E2E_DATABASE_URL ??
+  process.env.TEST_DATABASE_URL ??
+  'postgres://nice:nice@127.0.0.1:5432/nice_almaty';
+
 export default defineConfig({
   testDir: './e2e',
+  // Учётные записи для входа готовит сид: обходных путей в приложении нет.
+  globalSetup: './e2e/global-setup.ts',
   fullyParallel: true,
   forbidOnly: process.env.CI === 'true',
   retries: process.env.CI === 'true' ? 1 : 0,
@@ -38,7 +45,7 @@ export default defineConfig({
     timeout: 120_000,
     env: {
       DEPLOY_TARGET: 'docker',
-      DATABASE_URL: 'postgres://nice:nice@127.0.0.1:5432/nice_almaty',
+      DATABASE_URL,
       APP_URL: BASE_URL,
       SESSION_SECRET: 'e2e-session-secret-not-a-real-secret-32',
       FIELD_ENCRYPTION_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
