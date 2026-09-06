@@ -1,6 +1,18 @@
 import { getDb, type Executor } from '@/db/client';
-import { requireUser, updateUserAuthState } from '@/db/repositories/users';
+import { requireHouse } from '@/db/repositories/houses';
+import {
+  createUser as insertUser,
+  findUserByPhone,
+  listUsers,
+  requireUser,
+  updateUser,
+  updateUserAuthState,
+} from '@/db/repositories/users';
+import { revokeAllUserSessions } from '@/db/repositories/sessions';
+import { normalizePhone } from '@/domain/phone';
 import { assertCan } from '@/lib/authz';
+import { ConflictError, ValidationError } from '@/lib/errors';
+import { generateTemporaryPassword, hashPassword } from '@/lib/password';
 import { plusMilliseconds, now } from '@/lib/time';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
@@ -63,5 +75,159 @@ export async function allowPasswordReset(
     );
 
     return { ...target, passwordResetAllowedUntil: allowedUntil };
+  });
+}
+
+/** Список учётных записей в области видимости контекста. */
+export async function listAccounts(
+  actor: UserActor,
+  executor: Executor = getDb(),
+): Promise<User[]> {
+  assertCan(actor.context, 'user.read', {
+    houseId: actor.context.houseId,
+    userId: actor.context.userId,
+  });
+
+  return listUsers(actor.context, executor);
+}
+
+export interface CreateAccountInput {
+  phone: string;
+  role: 'superadmin' | 'admin' | 'resident';
+  /** Обязателен для роли `admin` и запрещён остальным (инвариант БД). */
+  houseId?: string | null;
+}
+
+export interface CreatedAccount {
+  user: User;
+  /** Показывается один раз: в базе только argon2id-хеш. */
+  temporaryPassword: string;
+}
+
+/**
+ * Создание аккаунта. Самостоятельной регистрации нет, заводит только
+ * суперадмин (docs/00-PRD.md). Временный пароль обязателен к смене.
+ */
+export async function createAccount(
+  actor: UserActor,
+  input: CreateAccountInput,
+  executor: Executor = getDb(),
+): Promise<CreatedAccount> {
+  assertCan(actor.context, 'user.create');
+
+  const phone = normalizePhone(input.phone);
+  const houseId = input.role === 'admin' ? (input.houseId ?? null) : null;
+
+  if (input.role === 'admin' && houseId === null) {
+    throw new ValidationError('Админу нужен дом');
+  }
+
+  if (houseId !== null) {
+    // Дом обязан быть видим создателю: иначе аккаунт уедет в чужой дом.
+    await requireHouse(actor.context, houseId, executor);
+  }
+
+  if ((await findUserByPhone(phone, executor)) !== null) {
+    throw new ConflictError('Учётная запись с таким телефоном уже есть');
+  }
+
+  const temporaryPassword = generateTemporaryPassword();
+  const passwordHash = await hashPassword(temporaryPassword);
+
+  return executor.transaction(async (tx) => {
+    const user = await insertUser(
+      actor.context,
+      { phone, role: input.role, houseId, passwordHash, mustChangePassword: true },
+      tx,
+    );
+
+    await recordAudit(
+      auditActor(actor),
+      {
+        action: AUDIT_ACTIONS.userCreated,
+        entityType: 'user',
+        entityId: user.id,
+        after: { phone, role: input.role, houseId },
+      },
+      tx,
+    );
+
+    return { user, temporaryPassword };
+  });
+}
+
+/**
+ * Архивация. Удаления нет: история обязана сохраниться (модуль 11).
+ * Сессии отзываются сразу — архивированный не должен доработать смену.
+ */
+export async function archiveAccount(
+  actor: UserActor,
+  userId: string,
+  executor: Executor = getDb(),
+): Promise<User> {
+  const target = await requireUser(actor.context, userId, executor);
+
+  assertCan(actor.context, 'user.archive', { houseId: target.houseId, userId: target.id });
+
+  if (target.id === actor.context.userId) {
+    throw new ValidationError('Нельзя архивировать собственную учётную запись');
+  }
+
+  return executor.transaction(async (tx) => {
+    const updated = await updateUser(actor.context, target.id, { status: 'archived' }, tx);
+    await revokeAllUserSessions(target.id, tx);
+
+    await recordAudit(
+      auditActor(actor),
+      {
+        action: AUDIT_ACTIONS.userArchived,
+        entityType: 'user',
+        entityId: target.id,
+        before: { status: target.status },
+        after: { status: 'archived' },
+      },
+      tx,
+    );
+
+    return updated ?? target;
+  });
+}
+
+/**
+ * Перевод админа на другой дом. Роль и дом связаны инвариантом БД,
+ * поэтому смена дома возможна только для админа.
+ */
+export async function moveAdminToHouse(
+  actor: UserActor,
+  userId: string,
+  houseId: string,
+  executor: Executor = getDb(),
+): Promise<User> {
+  const target = await requireUser(actor.context, userId, executor);
+
+  assertCan(actor.context, 'user.moveAdmin', { houseId: target.houseId, userId: target.id });
+
+  if (target.role !== 'admin') {
+    throw new ValidationError('Дом в учётной записи есть только у админа');
+  }
+
+  await requireHouse(actor.context, houseId, executor);
+
+  return executor.transaction(async (tx) => {
+    const updated = await updateUser(actor.context, target.id, { houseId }, tx);
+
+    await recordAudit(
+      auditActor(actor),
+      {
+        action: AUDIT_ACTIONS.userHouseChanged,
+        entityType: 'user',
+        entityId: target.id,
+        before: { houseId: target.houseId },
+        after: { houseId },
+      },
+      tx,
+    );
+
+    return updated ?? target;
   });
 }

@@ -68,6 +68,56 @@
     "inventory": "Inventory",
     "settings": "Settings"
   },
+  "users": {
+    "title": "Users",
+    "subtitle": "Accounts are created by the superadmin. There is no deletion, only archiving.",
+    "empty": "No accounts yet",
+    "columns": {
+      "phone": "Phone",
+      "role": "Role",
+      "house": "House",
+      "status": "Status",
+      "lastLogin": "Last sign-in",
+      "actions": "Actions"
+    },
+    "roles": {
+      "superadmin": "Superadmin",
+      "admin": "Admin",
+      "resident": "Resident"
+    },
+    "statuses": {
+      "active": "Active",
+      "archived": "Archived"
+    },
+    "actions": {
+      "allowReset": "Allow reset",
+      "archive": "Archive"
+    },
+    "create": {
+      "title": "Create account",
+      "submit": "Create",
+      "houseHint": "Required for the Admin role",
+      "noHouse": "No house",
+      "passwordOnce": "Temporary password. Shown once, it cannot be recovered later."
+    },
+    "archiveConfirm": {
+      "title": "Archive {phone}?",
+      "description": "The account will no longer sign in and open sessions end. Data and history are kept, nothing is deleted."
+    },
+    "done": {
+      "resetAllowed": "Reset allowed for 24 hours. One sign-in will pass with any password.",
+      "archived": "Account archived"
+    },
+    "errors": {
+      "unauthorized": "Sign-in required",
+      "forbidden": "Action not available to this role",
+      "not_found": "Not found",
+      "validation_error": "Check the entered data",
+      "conflict": "An account with this phone already exists",
+      "rate_limited": "Too often, try later",
+      "internal": "Something went wrong"
+    }
+  },
   "validation": {
     "password": {
       "tooShort": "Password is shorter than 10 characters",

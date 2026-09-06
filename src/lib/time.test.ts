@@ -11,6 +11,7 @@ import {
   endOfMonth,
   minusMilliseconds,
   now,
+  parseInstant,
   plusMilliseconds,
   parseBusinessDate,
   startOfDayUtc,
@@ -154,6 +155,17 @@ describe('арифметика дней', () => {
     expect(differenceInDays(businessDate(2026, 9, 1), businessDate(2026, 9, 30))).toBe(29);
     expect(differenceInDays(businessDate(2026, 9, 30), businessDate(2026, 9, 1))).toBe(-29);
     expect(differenceInDays(businessDate(2026, 9, 1), businessDate(2026, 9, 1))).toBe(0);
+  });
+});
+
+describe('разбор момента времени', () => {
+  it('принимает ISO 8601', () => {
+    expect(parseInstant('2026-09-06T12:00:00.000Z').toISOString()).toBe('2026-09-06T12:00:00.000Z');
+  });
+
+  it('отвергает мусор, а не отдаёт Invalid Date дальше по коду', () => {
+    expect(() => parseInstant('не время')).toThrow(/момент/i);
+    expect(() => parseInstant('')).toThrow(/момент/i);
   });
 });
 

@@ -149,6 +149,21 @@ export function endOfMonth(date: BusinessDate): BusinessDate {
   return formatParts(year, month, daysInMonth(year, month));
 }
 
+/**
+ * Разбор момента времени из строки ISO 8601.
+ * Нужен там, где сервер отдал время строкой: собственный `new Date`
+ * в остальном коде запрещён, и обходить запрет каждый раз заново нельзя.
+ */
+export function parseInstant(value: string): Date {
+  const instant = new Date(value);
+
+  if (Number.isNaN(instant.getTime())) {
+    throw new RangeError(`Некорректный момент времени: ${value}`);
+  }
+
+  return instant;
+}
+
 /** Момент, сдвинутый вперёд на указанное число миллисекунд. */
 export function plusMilliseconds(instant: Date, milliseconds: number): Date {
   return new Date(instant.getTime() + milliseconds);
