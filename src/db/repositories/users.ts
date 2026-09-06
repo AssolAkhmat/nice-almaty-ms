@@ -5,7 +5,8 @@ import { now } from '@/lib/time';
 
 import { visibleHouseIds, type AccessContext } from '../access';
 import { getDb, type Executor } from '../client';
-import { users, type NewUser, type User } from '../schema';
+import { residencies, users, type NewUser, type User } from '../schema';
+import { residencyVisibility } from './residencies';
 
 /**
  * Кого видит контекст доступа.
@@ -13,9 +14,10 @@ import { users, type NewUser, type User } from '../schema';
  * Суперадмин — всю сеть. Админ — себя и учётные записи своего дома.
  * Жилец — только себя.
  *
- * В фазе 1 жилец не привязан к дому (house_id есть только у админа,
- * это следствие D11), поэтому список жильцов дома у админа пуст.
- * Связь появится в фазе 2 вместе с проживанием.
+ * Жилец не привязан к дому напрямую: `house_id` есть только у админа (D11).
+ * Связь идёт через проживание, поэтому админ видит и тех, у кого есть
+ * проживание в его доме, — это и есть список жильцов дома из модуля 1.
+ * В фазе 1 такой связи не было, и список оставался пустым.
  */
 function scope(context: AccessContext) {
   const byOrg = eq(users.orgId, context.orgId);
@@ -30,11 +32,20 @@ function scope(context: AccessContext) {
           ? sql`false`
           : inArray(users.houseId, [...visible]);
 
-      return and(byOrg, or(byHouse, eq(users.id, context.userId)));
+      return and(byOrg, or(byHouse, eq(users.id, context.userId), livesInVisibleHouse(context)));
     }
     case 'resident':
       return and(byOrg, eq(users.id, context.userId));
   }
+}
+
+/** У пользователя есть проживание, видимое этому контексту. */
+function livesInVisibleHouse(context: AccessContext) {
+  return sql`exists (
+    select 1 from ${residencies}
+    where ${residencies.userId} = ${users.id}
+      and ${residencyVisibility(context)}
+  )`;
 }
 
 export async function listUsers(

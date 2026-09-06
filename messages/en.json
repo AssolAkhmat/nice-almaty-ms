@@ -495,5 +495,56 @@
       "documents": "Documents accepted",
       "deposit": "Deposit paid"
     }
+  },
+  "residents": {
+    "title": "Residents",
+    "subtitle": "Residents of your house: bed, status, debts and documents",
+    "search": "Search",
+    "status": "Status",
+    "room": "Room",
+    "price": "Price",
+    "debt": "Debt",
+    "documents": "Documents",
+    "any": "Any",
+    "withDebt": "Has debt",
+    "withDocumentProblems": "Has problems",
+    "apply": "Apply",
+    "empty": "No residents found",
+    "emptyHint": "Change the filters or set up a move-in",
+    "noRoom": "no bed assigned",
+    "debtMark": "Debt",
+    "documentsMark": "Documents",
+    "summary": "Summary",
+    "roleTitle": "Role",
+    "role": "Role",
+    "changeRole": "Change the role",
+    "roleChanged": "The role is changed",
+    "house": "House",
+    "houseHint": "An admin needs a house, a resident does not",
+    "chooseHouse": "Choose a house",
+    "statuses": {
+      "created": "Created",
+      "profile_pending": "Filling in the profile",
+      "docs_pending": "Submitting documents",
+      "deposit_pending": "Awaiting deposit payment",
+      "active": "Moved in",
+      "terminating": "Terminating",
+      "archived": "Archived"
+    },
+    "roles": {
+      "resident": "Resident",
+      "admin": "Admin",
+      "superadmin": "Superadmin"
+    },
+    "links": {
+      "documents": "Documents",
+      "contract": "Contract",
+      "deposit": "Deposit"
+    },
+    "errors": {
+      "unauthorized": "Sign-in required",
+      "unknown": "The action could not be completed",
+      "role": "Choose a role"
+    }
   }
 }

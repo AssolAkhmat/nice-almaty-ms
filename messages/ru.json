@@ -495,5 +495,56 @@
       "documents": "Документы приняты",
       "deposit": "Депозит оплачен"
     }
+  },
+  "residents": {
+    "title": "Жильцы",
+    "subtitle": "Жильцы вашего дома: место, статус, долги и документы",
+    "search": "Поиск",
+    "status": "Статус",
+    "room": "Комната",
+    "price": "Цена",
+    "debt": "Долг",
+    "documents": "Документы",
+    "any": "Любой",
+    "withDebt": "Есть долг",
+    "withDocumentProblems": "Есть проблемы",
+    "apply": "Применить",
+    "empty": "Жильцов не найдено",
+    "emptyHint": "Измените фильтры или оформите заселение",
+    "noRoom": "место не назначено",
+    "debtMark": "Долг",
+    "documentsMark": "Документы",
+    "summary": "Сводка",
+    "roleTitle": "Роль",
+    "role": "Роль",
+    "changeRole": "Изменить роль",
+    "roleChanged": "Роль изменена",
+    "house": "Дом",
+    "houseHint": "Админу дом обязателен, жильцу — не нужен",
+    "chooseHouse": "Выберите дом",
+    "statuses": {
+      "created": "Создан",
+      "profile_pending": "Заполняет профиль",
+      "docs_pending": "Сдаёт документы",
+      "deposit_pending": "Ожидает оплаты депозита",
+      "active": "Заселён",
+      "terminating": "Расторжение",
+      "archived": "В архиве"
+    },
+    "roles": {
+      "resident": "Жилец",
+      "admin": "Админ",
+      "superadmin": "Суперадмин"
+    },
+    "links": {
+      "documents": "Документы",
+      "contract": "Договор",
+      "deposit": "Депозит"
+    },
+    "errors": {
+      "unauthorized": "Требуется вход",
+      "unknown": "Не удалось выполнить действие",
+      "role": "Выберите роль"
+    }
   }
 }

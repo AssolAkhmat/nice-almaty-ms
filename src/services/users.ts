@@ -194,6 +194,67 @@ export async function archiveAccount(
 }
 
 /**
+ * Смена роли отдельным действием (долг фазы 1, модуль 1).
+ *
+ * Роль и дом связаны инвариантом базы «один админ — один дом»: админу дом
+ * обязателен, жильцу и суперадмину — запрещён. Поэтому дом меняется здесь же,
+ * а не отдельным шагом: между двумя шагами запись была бы недопустимой.
+ */
+export async function changeAccountRole(
+  actor: UserActor,
+  userId: string,
+  role: User['role'],
+  houseId: string | null,
+  executor: Executor = getDb(),
+): Promise<User> {
+  const target = await requireUser(actor.context, userId, executor);
+
+  assertCan(actor.context, 'user.changeRole', { houseId: target.houseId, userId: target.id });
+
+  if (target.id === actor.context.userId) {
+    throw new ValidationError('Нельзя менять роль собственной учётной записи');
+  }
+
+  if (role === 'admin' && houseId === null) {
+    throw new ValidationError('Админу нужен дом');
+  }
+
+  const nextHouseId = role === 'admin' ? houseId : null;
+
+  if (nextHouseId !== null) {
+    await requireHouse(actor.context, nextHouseId, executor);
+  }
+
+  if (target.role === role && target.houseId === nextHouseId) {
+    return target;
+  }
+
+  return executor.transaction(async (tx) => {
+    const updated = await updateUser(actor.context, target.id, { role, houseId: nextHouseId }, tx);
+
+    /*
+     * Роль лежит в контексте доступа, а контекст берётся из сессии:
+     * старые сессии продолжили бы работать с прежними правами.
+     */
+    await revokeAllUserSessions(target.id, tx);
+
+    await recordAudit(
+      auditActor(actor),
+      {
+        action: AUDIT_ACTIONS.userRoleChanged,
+        entityType: 'user',
+        entityId: target.id,
+        before: { role: target.role, houseId: target.houseId },
+        after: { role, houseId: nextHouseId },
+      },
+      tx,
+    );
+
+    return updated ?? target;
+  });
+}
+
+/**
  * Перевод админа на другой дом. Роль и дом связаны инвариантом БД,
  * поэтому смена дома возможна только для админа.
  */

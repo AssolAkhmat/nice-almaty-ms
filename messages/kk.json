@@ -495,5 +495,56 @@
       "documents": "Құжаттар қабылданған",
       "deposit": "Депозит төленген"
     }
+  },
+  "residents": {
+    "title": "Тұрғындар",
+    "subtitle": "Үйіңіздің тұрғындары: орын, мәртебе, қарыз және құжаттар",
+    "search": "Іздеу",
+    "status": "Мәртебе",
+    "room": "Бөлме",
+    "price": "Баға",
+    "debt": "Қарыз",
+    "documents": "Құжаттар",
+    "any": "Кез келген",
+    "withDebt": "Қарызы бар",
+    "withDocumentProblems": "Мәселесі бар",
+    "apply": "Қолдану",
+    "empty": "Тұрғын табылмады",
+    "emptyHint": "Сүзгіні өзгертіңіз немесе қоныстануды рәсімдеңіз",
+    "noRoom": "орын тағайындалмаған",
+    "debtMark": "Қарыз",
+    "documentsMark": "Құжаттар",
+    "summary": "Түйін",
+    "roleTitle": "Рөл",
+    "role": "Рөл",
+    "changeRole": "Рөлді өзгерту",
+    "roleChanged": "Рөл өзгертілді",
+    "house": "Үй",
+    "houseHint": "Әкімшіге үй міндетті, тұрғынға қажет емес",
+    "chooseHouse": "Үйді таңдаңыз",
+    "statuses": {
+      "created": "Құрылған",
+      "profile_pending": "Профильді толтыруда",
+      "docs_pending": "Құжат тапсыруда",
+      "deposit_pending": "Депозит төлеуді күтуде",
+      "active": "Қоныстанған",
+      "terminating": "Бұзылуда",
+      "archived": "Мұрағатта"
+    },
+    "roles": {
+      "resident": "Тұрғын",
+      "admin": "Әкімші",
+      "superadmin": "Суперәкімші"
+    },
+    "links": {
+      "documents": "Құжаттар",
+      "contract": "Шарт",
+      "deposit": "Депозит"
+    },
+    "errors": {
+      "unauthorized": "Кіру қажет",
+      "unknown": "Әрекетті орындау мүмкін болмады",
+      "role": "Рөлді таңдаңыз"
+    }
   }
 }
