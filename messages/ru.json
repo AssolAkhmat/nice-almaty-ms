@@ -13,7 +13,26 @@
     "sortDesc": "Сортировать по убыванию",
     "loading": "Загрузка",
     "empty": "Пока пусто",
-    "retry": "Повторить"
+    "retry": "Повторить",
+    "more": "Ещё",
+    "menu": "Меню",
+    "moduleNotReady": "Раздел ещё не реализован",
+    "moduleNotReadyHint": "Он появится в своей фазе по плану работ."
+  },
+  "nav": {
+    "label": "Основная навигация",
+    "dashboard": "Дэшборд",
+    "rotations": "Ротации",
+    "invoices": "Счета",
+    "absences": "Отсутствия",
+    "residents": "Жильцы",
+    "beds": "Места",
+    "utilities": "Коммуналка",
+    "damages": "Ущерб",
+    "rating": "Рейтинг",
+    "accounting": "Бухгалтерия",
+    "inventory": "Инвентарь",
+    "settings": "Настройки"
   },
   "theme": {
     "label": "Тема",

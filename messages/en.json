@@ -13,7 +13,26 @@
     "sortDesc": "Sort descending",
     "loading": "Loading",
     "empty": "Nothing here yet",
-    "retry": "Retry"
+    "retry": "Retry",
+    "more": "More",
+    "menu": "Menu",
+    "moduleNotReady": "This section is not built yet",
+    "moduleNotReadyHint": "It arrives in its own phase of the roadmap."
+  },
+  "nav": {
+    "label": "Main navigation",
+    "dashboard": "Dashboard",
+    "rotations": "Rotations",
+    "invoices": "Invoices",
+    "absences": "Absences",
+    "residents": "Residents",
+    "beds": "Beds",
+    "utilities": "Utilities",
+    "damages": "Damages",
+    "rating": "Rating",
+    "accounting": "Accounting",
+    "inventory": "Inventory",
+    "settings": "Settings"
   },
   "theme": {
     "label": "Theme",
