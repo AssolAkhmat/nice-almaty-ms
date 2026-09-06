@@ -6,6 +6,7 @@ export * from './houses';
 export * from './job-runs';
 export * from './organizations';
 export * from './rate-limits';
+export * from './residencies';
 export * from './sessions';
 export * from './settings';
 export * from './users';

@@ -36,6 +36,13 @@
       "when": 1788708555210,
       "tag": "0004_lock_down_supabase_data_api",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788711750000,
+      "tag": "0005_fuzzy_ogun",
+      "breakpoints": true
     }
   ]
 }
