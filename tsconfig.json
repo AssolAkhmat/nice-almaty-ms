@@ -37,7 +37,8 @@
     "*.config.mts",
     "next-env.d.ts",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts",
+    "e2e/**/*.ts"
   ],
   "exclude": ["node_modules", ".next", "out", "coverage"]
 }
