@@ -151,15 +151,15 @@
 - Коммит: `chore(docker): compose с app, postgres и worker`
 
 ### T0.12 — GitHub Actions
-- [ ] Workflow: `pnpm install --frozen-lockfile` → `verify` → `build`
-- [ ] Сервис `postgres:16` в job, прогон `db:migrate` на чистой БД
-- [ ] Job e2e с Playwright
-- [ ] Тестовые (не секретные) значения переменных окружения задаются в workflow — escape-hatch вида `SKIP_ENV_VALIDATION` не вводим
+- [x] Workflow: `pnpm install --frozen-lockfile` → `verify` → `build`
+- [x] Сервис `postgres:16` в job, прогон `db:migrate` на чистой БД
+- [x] Job e2e с Playwright
+- [x] Тестовые (не секретные) значения переменных окружения задаются в workflow — escape-hatch вида `SKIP_ENV_VALIDATION` не вводим
 - Коммит: `ci: сборка, проверки и e2e в GitHub Actions`
 
 ### T0.13 — Сборка под цель Vercel
-- [ ] `next build` с `DEPLOY_TARGET=vercel` (без `standalone`, драйвер в режиме pooler)
-- [ ] Это проверяет **только** сборку бандла: ни пулер соединений, ни лимит тела запроса,
+- [x] `next build` с `DEPLOY_TARGET=vercel` (без `standalone`, драйвер в режиме pooler)
+- [x] Это проверяет **только** сборку бандла: ни пулер соединений, ни лимит тела запроса,
       ни serverless-рантайм локально не проверяются
 - [ ] `README.md`: быстрый старт, обе цели развёртывания
 - Коммит: `chore(build): сборка под цель vercel`
