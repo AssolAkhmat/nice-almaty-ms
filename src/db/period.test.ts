@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { businessDate, parseBusinessDate } from '@/lib/time';
 
-import { parsePeriod, periodLiteral } from './period';
+import { closedPeriodLiteral, parsePeriod, periodLiteral } from './period';
 
 describe('период занятости места', () => {
   it('записывается полуоткрытым интервалом', () => {
@@ -20,6 +20,23 @@ describe('период занятости места', () => {
 
     expect(() => periodLiteral({ from, to: from })).toThrow(/период/i);
     expect(() => periodLiteral({ from, to: businessDate(2026, 8, 31) })).toThrow(/период/i);
+  });
+
+  it('закрытие в день заезда даёт пустой период, а не ошибку', () => {
+    const from = businessDate(2026, 9, 7);
+
+    /*
+     * Расторжение в день заселения — редкий, но настоящий случай: жилец
+     * не занимал место ни дня. Пустой диапазон база принимает и в пересечения
+     * не считает, поэтому место сразу свободно.
+     */
+    expect(closedPeriodLiteral(from, from)).toBe('[2026-09-07,2026-09-07)');
+  });
+
+  it('закрытие раньше начала отвергается: выезда до заезда не бывает', () => {
+    expect(() => closedPeriodLiteral(businessDate(2026, 9, 7), businessDate(2026, 9, 6))).toThrow(
+      /период/i,
+    );
   });
 
   it('разбирается обратно', () => {

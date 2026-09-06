@@ -51,10 +51,23 @@ export function HouseLayout({
   const t = useTranslations();
   const [state, action, isPending] = useActionState(assignBedAction, INITIAL);
   const [isOpen, setOpen] = useState(false);
-  const [areaId, setAreaId] = useState(rooms[0]?.areaId ?? '');
 
-  const room = rooms.find((candidate) => candidate.areaId === areaId) ?? rooms[0];
+  /*
+   * Открывается комната, где есть свободное место: иначе кнопка назначения
+   * оказывалась выключенной из-за первой попавшейся комнаты, а не из-за
+   * того, что мест в доме нет.
+   */
+  const firstFree = rooms.find((candidate) =>
+    candidate.beds.some((bed) => bed.occupantName === null),
+  );
+
+  const [areaId, setAreaId] = useState(firstFree?.areaId ?? rooms[0]?.areaId ?? '');
+
+  const room = rooms.find((candidate) => candidate.areaId === areaId) ?? firstFree ?? rooms[0];
   const freeBeds = room?.beds.filter((bed) => bed.occupantName === null) ?? [];
+  const hasFreeBeds = rooms.some((candidate) =>
+    candidate.beds.some((bed) => bed.occupantName === null),
+  );
 
   if (rooms.length === 0) {
     return <EmptyState description={t('beds.emptyHint')} title={t('beds.empty')} />;
@@ -64,7 +77,7 @@ export function HouseLayout({
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
         <Button
-          disabled={unplaced.length === 0 || freeBeds.length === 0}
+          disabled={unplaced.length === 0 || !hasFreeBeds}
           onClick={() => {
             setOpen(true);
           }}

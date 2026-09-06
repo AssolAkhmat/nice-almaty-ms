@@ -23,6 +23,23 @@ export function periodLiteral(period: Period): string {
   return `[${period.from},${period.to ?? ''})`;
 }
 
+/**
+ * Период, закрытый датой освобождения места. В отличие от `periodLiteral`,
+ * совпадение границ допускается: это пустой период, и означает он ровно то,
+ * что случилось, — расторжение пришло в день заселения, и место не было
+ * занято ни дня. База пустой диапазон принимает и пересечением не считает,
+ * поэтому новый жилец занимает место сразу.
+ */
+export function closedPeriodLiteral(from: BusinessDate, to: BusinessDate): string {
+  if (compareBusinessDates(from, to) > 0) {
+    throw new RangeError(
+      `Невозможный период занятости: ${from} — ${to}. Выезда раньше заезда не бывает`,
+    );
+  }
+
+  return `[${from},${to})`;
+}
+
 const LITERAL_PATTERN = /^\[(\d{4}-\d{2}-\d{2}),(\d{4}-\d{2}-\d{2})?\)$/;
 
 export function parsePeriod(literal: string): Period {

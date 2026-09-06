@@ -60,15 +60,22 @@ function Message({ state }: { state: TerminationActionState }) {
  */
 function TerminateDialog({ residencyId, today }: { residencyId: string; today: string }) {
   const t = useTranslations('terminations');
-  const [open, setOpen] = useState(false);
+  const [requested, setRequested] = useState(false);
   const [state, action, isPending] = useActionState(terminateResidencyAction, INITIAL);
+
+  /*
+   * Договор расторгнут — модалке больше нечего показывать, за ней уже расчёт.
+   * Открытость выводится, а не хранится вторым состоянием: после успеха
+   * этой формы на экране нет вовсе, и открывать её повторно неоткуда.
+   */
+  const open = requested && state.done === undefined;
 
   return (
     <>
       <Button
         data-testid="terminate-open"
         onClick={() => {
-          setOpen(true);
+          setRequested(true);
         }}
         variant="danger"
       >
@@ -77,7 +84,7 @@ function TerminateDialog({ residencyId, today }: { residencyId: string; today: s
 
       <Modal
         description={t('modalHint')}
-        onOpenChange={setOpen}
+        onOpenChange={setRequested}
         open={open}
         title={t('modalTitle')}
       >

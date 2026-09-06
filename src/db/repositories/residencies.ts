@@ -5,7 +5,7 @@ import { now, type BusinessDate } from '@/lib/time';
 
 import { assertHouseVisible, visibleHouseIds, type AccessContext } from '../access';
 import { getDb, type Executor } from '../client';
-import { periodLiteral } from '../period';
+import { closedPeriodLiteral, periodLiteral } from '../period';
 import {
   bedAssignments,
   beds,
@@ -209,7 +209,7 @@ export async function assignBed(
       await tx
         .update(bedAssignments)
         .set({
-          period: periodLiteral({ from: parsePeriodStart(open.period), to: input.from }),
+          period: closedPeriodLiteral(parsePeriodStart(open.period), input.from),
           updatedAt: now(),
         })
         .where(eq(bedAssignments.id, open.id));
@@ -248,7 +248,7 @@ export async function releaseBed(
   await executor
     .update(bedAssignments)
     .set({
-      period: periodLiteral({ from: parsePeriodStart(open.period), to: on }),
+      period: closedPeriodLiteral(parsePeriodStart(open.period), on),
       updatedAt: now(),
     })
     .where(eq(bedAssignments.id, open.id));

@@ -86,6 +86,17 @@ function terminationFailure(error: unknown): TerminationActionState {
   return { error: error instanceof AppError ? error.message : 'terminations.errors.unknown' };
 }
 
+/**
+ * Карточка жильца лежит под списком, а депозит и дэшборд показывают то же
+ * состояние. Обновляется вся ветка: иначе экран остался бы с прежним видом
+ * до перезагрузки руками.
+ */
+function refreshResident(): void {
+  revalidatePath('/residents', 'layout');
+  revalidatePath('/deposit');
+  revalidatePath('/');
+}
+
 /** Расторжение: дата выезда и причина — оба поля модалки обязательны. */
 export async function terminateResidencyAction(
   _previous: TerminationActionState,
@@ -110,7 +121,7 @@ export async function terminateResidencyAction(
     return terminationFailure(error);
   }
 
-  revalidatePath('/residents');
+  refreshResident();
 
   return { done: 'terminations.terminated' };
 }
@@ -126,7 +137,7 @@ export async function createRefundInvoiceAction(
 
   try {
     const invoice = await createRefundInvoice(current, text(formData, 'residencyId'));
-    revalidatePath('/residents');
+    refreshResident();
 
     // Возвращать нечего — это результат расчёта, а не отказ: счёта просто нет (§2.4).
     return {
@@ -152,7 +163,7 @@ export async function settleRefundAction(
     return terminationFailure(error);
   }
 
-  revalidatePath('/residents');
+  refreshResident();
 
   return { done: 'terminations.refunded' };
 }
@@ -172,7 +183,7 @@ export async function archiveResidencyAction(
     return terminationFailure(error);
   }
 
-  revalidatePath('/residents');
+  refreshResident();
 
   return { done: 'terminations.archived' };
 }

@@ -252,6 +252,34 @@ describe('расторжение договора', () => {
     });
   });
 
+  it('расторжение в день заселения освобождает место сразу же', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '8009');
+
+      // Заезд и выезд одним днём: жилец не занимал место ни дня.
+      await assignBedToResidency(
+        fixture.admin,
+        { residencyId: fixture.residencyA, bedId: fixture.bedId, from: TODAY },
+        { executor: tx, today: TODAY },
+      );
+
+      await terminateResidency(
+        fixture.admin,
+        fixture.residencyA,
+        { moveOutDate: TODAY, reason: 'Передумал в день заселения' },
+        { executor: tx, instant: INSTANT },
+      );
+
+      const assignment = await assignBedToResidency(
+        fixture.admin,
+        { residencyId: fixture.residencyNext, bedId: fixture.bedId, from: TODAY },
+        { executor: tx, today: TODAY },
+      );
+
+      expect(assignment.bedId).toBe(fixture.bedId);
+    });
+  });
+
   it('дата выезда в прошлом не принимается', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '8005');
