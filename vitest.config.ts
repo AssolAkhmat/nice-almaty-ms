@@ -14,6 +14,7 @@ export default defineConfig({
       provider: 'v8',
       reportsDirectory: 'coverage',
       include: ['src/domain/**', 'src/lib/**'],
+      exclude: ['src/**/__fixtures__/**'],
     },
   },
 });

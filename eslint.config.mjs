@@ -13,6 +13,9 @@ export default tseslint.config(
       'playwright-report/**',
       'test-results/**',
       'src/db/migrations/**',
+      // Негативные фикстуры нарушают правила намеренно: их линтует
+      // src/lib/eslint-guards.test.ts, а обычный прогон обходит стороной.
+      'src/**/__fixtures__/**',
       'next-env.d.ts',
     ],
   },
