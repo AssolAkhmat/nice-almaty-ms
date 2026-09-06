@@ -70,6 +70,15 @@ export default async function SettingsPage() {
 
       <Card>
         <CardTitle>
+          <Link className="text-primary hover:underline" href="/profile">
+            {t('profile.title')}
+          </Link>
+        </CardTitle>
+        <p className="text-text-muted mt-1 text-[13px]">{t('profile.subtitle')}</p>
+      </Card>
+
+      <Card>
+        <CardTitle>
           <Link className="text-primary hover:underline" href="/settings/personal">
             {t('settings.personal.title')}
           </Link>

@@ -30,6 +30,7 @@ export const ACTIONS = [
   'user.moveAdmin',
   'user.archive',
   'user.allowPasswordReset',
+  'resident.revealSensitive',
   'settings.org.read',
   'settings.org.write',
   'settings.house.read',
@@ -62,6 +63,7 @@ export const PERMISSIONS: PermissionMatrix = {
     'user.moveAdmin': 'org',
     'user.archive': 'org',
     'user.allowPasswordReset': 'org',
+    'resident.revealSensitive': 'org',
     'settings.org.read': 'org',
     'settings.org.write': 'org',
     'settings.house.read': 'org',
@@ -84,6 +86,7 @@ export const PERMISSIONS: PermissionMatrix = {
     'user.moveAdmin': 'none',
     'user.archive': 'none',
     'user.allowPasswordReset': 'house',
+    'resident.revealSensitive': 'house',
     'settings.org.read': 'none',
     'settings.org.write': 'none',
     'settings.house.read': 'house',
@@ -105,6 +108,12 @@ export const PERMISSIONS: PermissionMatrix = {
     'user.moveAdmin': 'none',
     'user.archive': 'none',
     'user.allowPasswordReset': 'none',
+    /*
+     * Свои ИИН и УДЛ жилец вправе увидеть: он их и вводил, а вечная маска
+     * на собственных данных — дефект, а не защита. Раскрытие всё равно
+     * пишется в журнал, независимо от роли.
+     */
+    'resident.revealSensitive': 'self',
     'settings.org.read': 'none',
     'settings.org.write': 'none',
     'settings.house.read': 'none',

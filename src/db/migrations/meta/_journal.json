@@ -43,6 +43,13 @@
       "when": 1788711750000,
       "tag": "0005_fuzzy_ogun",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788712939376,
+      "tag": "0006_free_texas_twister",
+      "breakpoints": true
     }
   ]
 }

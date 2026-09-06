@@ -143,6 +143,67 @@
       "internal": "Something went wrong"
     }
   },
+  "profile": {
+    "title": "My profile",
+    "subtitle": "Room, bed and price are assigned by the admin. The rest is yours to fill in.",
+    "submit": "Save",
+    "reveal": "Show in full",
+    "revealed": "Revealed, written to the log",
+    "sections": {
+      "personal": "Personal data",
+      "documents": "Documents",
+      "study": "Study",
+      "emergency": "Emergency contact",
+      "other": "Other"
+    },
+    "placement": {
+      "title": "Room and bed",
+      "room": "Room",
+      "bed": "Bed",
+      "notAssigned": "Not assigned"
+    },
+    "fields": {
+      "lastName": "Last name",
+      "firstName": "First name",
+      "middleName": "Middle name",
+      "sex": "Sex",
+      "birthDate": "Date of birth",
+      "phone": "Phone",
+      "iin": "IIN",
+      "iinHint": "Twelve digits. Entered once, then shown masked.",
+      "idDocNumber": "ID document number",
+      "idDocHint": "Entered once, then shown masked.",
+      "university": "University",
+      "course": "Year",
+      "major": "Major",
+      "emergencyName": "Name",
+      "emergencyPhone": "Phone",
+      "emergencyRelation": "Relation",
+      "preferredPayment": "Preferred payment method",
+      "noEpilepsy": "I confirm: no epilepsy",
+      "noAsthma": "I confirm: no asthma",
+      "notChosen": "Not chosen"
+    },
+    "sex": {
+      "male": "Male",
+      "female": "Female"
+    },
+    "payment": {
+      "cash": "Cash"
+    },
+    "done": {
+      "saved": "Profile saved"
+    },
+    "errors": {
+      "unauthorized": "Sign-in required",
+      "forbidden": "Action not available",
+      "not_found": "Not found",
+      "validation_error": "Check the entered data",
+      "conflict": "Data changed, try again",
+      "rate_limited": "Too often",
+      "internal": "Something went wrong"
+    }
+  },
   "settings": {
     "personal": {
       "title": "Personal settings",
