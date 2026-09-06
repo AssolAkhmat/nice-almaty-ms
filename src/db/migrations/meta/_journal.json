@@ -64,6 +64,13 @@
       "when": 1788726130477,
       "tag": "0008_woozy_green_goblin",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788727434845,
+      "tag": "0009_left_forgotten_one",
+      "breakpoints": true
     }
   ]
 }

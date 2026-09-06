@@ -35,6 +35,9 @@ export const ACTIONS = [
   'file.read',
   'document.upload',
   'document.review',
+  'contract.generate',
+  'contract.sign',
+  'residency.issueKeys',
   'settings.org.read',
   'settings.org.write',
   'settings.house.read',
@@ -72,6 +75,10 @@ export const PERMISSIONS: PermissionMatrix = {
     'file.read': 'org',
     'document.upload': 'org',
     'document.review': 'org',
+    'contract.generate': 'org',
+    // Подпись личная: за жильца её не ставит никто, даже суперадмин.
+    'contract.sign': 'none',
+    'residency.issueKeys': 'org',
     'settings.org.read': 'org',
     'settings.org.write': 'org',
     'settings.house.read': 'org',
@@ -99,6 +106,9 @@ export const PERMISSIONS: PermissionMatrix = {
     'file.read': 'house',
     'document.upload': 'house',
     'document.review': 'house',
+    'contract.generate': 'house',
+    'contract.sign': 'none',
+    'residency.issueKeys': 'house',
     'settings.org.read': 'none',
     'settings.org.write': 'none',
     'settings.house.read': 'house',
@@ -139,6 +149,13 @@ export const PERMISSIONS: PermissionMatrix = {
      * может только админ дома или суперадмин (модуль 1, «Карточка жильца»).
      */
     'document.review': 'none',
+    /*
+     * Договор жильцу собирает админ (модуль 1: жилец видит PDF и подписывает),
+     * а подпись ставит только он сам и только свою.
+     */
+    'contract.generate': 'none',
+    'contract.sign': 'self',
+    'residency.issueKeys': 'none',
     'settings.org.read': 'none',
     'settings.org.write': 'none',
     'settings.house.read': 'none',

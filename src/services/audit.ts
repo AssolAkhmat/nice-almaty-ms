@@ -32,6 +32,9 @@ export const AUDIT_ACTIONS = {
   documentSubmitted: 'document.submitted',
   documentApproved: 'document.approved',
   documentRejected: 'document.rejected',
+  contractGenerated: 'contract.generated',
+  contractSigned: 'contract.signed',
+  keysIssued: 'residency.keys_issued',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

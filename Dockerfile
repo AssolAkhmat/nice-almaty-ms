@@ -20,9 +20,14 @@ RUN pnpm build
 
 # Рантайм приложения: только standalone-вывод, без исходников и devDependencies.
 FROM base AS runner
+# Печать договора идёт системным chromium: puppeteer-core своего браузера
+# не приносит (docs/01-ARCHITECTURE.md). Шрифты нужны отдельно, иначе
+# кириллица в PDF превращается в квадраты.
+RUN apk add --no-cache chromium font-noto font-noto-extra
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV DEPLOY_TARGET=docker
+ENV CHROMIUM_PATH=/usr/bin/chromium-browser
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 

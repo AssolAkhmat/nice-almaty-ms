@@ -50,6 +50,13 @@ export const envSchema = z.object({
   GDRIVE_ROOT_FOLDER_ID: z.string().min(1).optional(),
   LOCAL_STORAGE_PATH: z.string().min(1).default('./storage'),
 
+  /**
+   * Путь к chromium для печати договора. Пусто — ищет сам puppeteer:
+   * в образе браузер лежит по стандартному пути, на машине разработчика
+   * его может не быть вовсе, и тогда печать честно откажет (P2-15).
+   */
+  CHROMIUM_PATH: z.string().min(1).optional(),
+
   SUPABASE_URL: z.url().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
   SUPABASE_STORAGE_BUCKET: z.string().min(1).optional(),

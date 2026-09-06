@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -96,7 +97,12 @@ async function seed(tx: Transaction, suffix: string) {
     .returning();
   void types;
 
-  const typeRows = await tx.select().from(schema.documentTypes);
+  // Фильтр по своей организации обязателен: сид сети заводит типы с теми же
+  // кодами, и «первая строка с таким кодом» указала бы на чужую запись.
+  const typeRows = await tx
+    .select()
+    .from(schema.documentTypes)
+    .where(eq(schema.documentTypes.orgId, orgId));
   const typeId = (code: string) => typeRows.find((row) => row.code === code)?.id ?? '';
 
   async function resident(index: number, houseId: string) {

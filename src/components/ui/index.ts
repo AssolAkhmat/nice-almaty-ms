@@ -8,6 +8,7 @@ export { Field, Input, Select, Textarea } from './input';
 export { Modal } from './modal';
 export { Money } from './money';
 export { Pagination } from './pagination';
+export { SignaturePad, type SignaturePadProps } from './signature-pad';
 export { Skeleton } from './skeleton';
 export { Table, type TableColumn, type TableSort } from './table';
 export { Tabs, TabsContent, TabsList, TabsTrigger } from './tabs';

@@ -144,6 +144,8 @@ CRON_SECRET=
 DEFAULT_LOCALE=ru
 TZ=Asia/Almaty
 
+CHROMIUM_PATH=               # путь к chromium для печати договора, пусто — искать самому
+
 STORAGE_DRIVER=gdrive|local|supabase
 GDRIVE_CLIENT_ID=
 GDRIVE_CLIENT_SECRET=

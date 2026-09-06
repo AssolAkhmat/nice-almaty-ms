@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { generateTemporaryPassword, hashPassword } from '@/lib/password';
 
 import { getDb, type Executor } from './client';
-import { documentTypes, houses, organizations, users } from './schema';
+import { contractTemplates, documentTypes, houses, organizations, users } from './schema';
 
 /**
  * Сид сети (docs/07-ROADMAP.md, «Сид-данные»).
@@ -61,6 +61,22 @@ export const DOCUMENT_TYPE_SEED = [
     sortOrder: 30,
   },
 ] as const;
+
+/**
+ * Базовый шаблон договора. Суперадмин правит его в настройках сети;
+ * без активного шаблона договор не собрать вовсе, поэтому пустая установка
+ * получает рабочий минимум, а не отказ на первом же заселении (P2-18).
+ */
+export const CONTRACT_TEMPLATE_HTML = [
+  '<h1>Договор найма койко-места</h1>',
+  '<p>Дата: {{today}}</p>',
+  '<p>Наймодатель: {{house.name}}, адрес: {{house.address}}.</p>',
+  '<p>Наниматель: {{resident.full_name}}, ИИН {{resident.iin}}.</p>',
+  '<p>Предмет договора: {{bed.room}}, {{bed.label}}.</p>',
+  '<p>Плата за проживание: {{bed.price}} в месяц.</p>',
+  '<p>Срок: с {{residency.contract_start}} по {{residency.contract_end}}.</p>',
+  '<p>Подпись нанимателя:</p>',
+].join('');
 
 export interface SeedAccount {
   phone: string;
@@ -186,6 +202,28 @@ async function ensureDocumentTypes(executor: Executor, orgId: string): Promise<v
   }
 }
 
+/** Шаблон договора заводится один раз: правки суперадмина сид не откатывает. */
+async function ensureContractTemplate(executor: Executor, orgId: string): Promise<void> {
+  const [existing] = await executor
+    .select({ id: contractTemplates.id })
+    .from(contractTemplates)
+    .where(eq(contractTemplates.orgId, orgId))
+    .limit(1);
+
+  if (existing !== undefined) {
+    return;
+  }
+
+  await executor.insert(contractTemplates).values({
+    orgId,
+    name: 'Базовый договор найма',
+    version: 1,
+    bodyHtml: CONTRACT_TEMPLATE_HTML,
+    tokens: [],
+    isActive: true,
+  });
+}
+
 export async function seedNetwork(options: SeedOptions = {}): Promise<SeedResult> {
   const executor = options.executor ?? getDb();
   const passwordFor = options.passwordFor ?? (() => generateTemporaryPassword());
@@ -233,6 +271,7 @@ export async function seedNetwork(options: SeedOptions = {}): Promise<SeedResult
   }
 
   await ensureDocumentTypes(executor, orgId);
+  await ensureContractTemplate(executor, orgId);
 
   return { orgId, houseIds, accounts };
 }

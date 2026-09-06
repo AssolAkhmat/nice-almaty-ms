@@ -92,7 +92,8 @@
     "accounting": "Accounting",
     "inventory": "Inventory",
     "settings": "Settings",
-    "documents": "Documents"
+    "documents": "Documents",
+    "contract": "Contract"
   },
   "houses": {
     "title": "Houses",
@@ -360,6 +361,42 @@
       "unauthorized": "Sign-in required",
       "unknown": "The action could not be completed",
       "upload": "The file could not be uploaded"
+    }
+  },
+  "contract": {
+    "title": "Contract",
+    "subtitle": "Read the contract and sign it",
+    "adminSubtitle": "Contracts of residents in your house and key handover marks",
+    "open": "Open the contract",
+    "statusSigned": "Signed",
+    "statusUnsigned": "Not signed",
+    "keysIssued": "Keys handed over",
+    "keysNotIssued": "Keys not handed over",
+    "issueKeys": "Mark keys as handed over",
+    "build": "Build the contract",
+    "rebuild": "Build again",
+    "built": "The contract is built",
+    "signed": "The contract is signed",
+    "keysIssuedDone": "Keys are marked as handed over",
+    "sign": "Sign",
+    "prepare": "Save the signature",
+    "sending": "Sending",
+    "clear": "Clear",
+    "signHint": "Draw your signature in the field below, save it and sign the contract",
+    "signedHint": "The contract is signed. The PDF below contains your signature",
+    "notBuilt": "The contract is not built yet",
+    "notBuiltHint": "It appears here once the admin builds it from your data",
+    "noResidency": "Residency is not set up yet",
+    "noResidencyHint": "The contract appears once the admin sets up your move-in",
+    "listEmpty": "No residencies",
+    "listEmptyHint": "Contracts appear here once move-in is set up",
+    "unknownTokens": "The contract template contains unknown tokens",
+    "signatureMustBePng": "The signature must be a PNG image",
+    "errors": {
+      "unauthorized": "Sign-in required",
+      "unknown": "The action could not be completed",
+      "upload": "The signature could not be sent",
+      "emptySignature": "Draw your signature first"
     }
   }
 }

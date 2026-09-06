@@ -1,6 +1,7 @@
 export * from './areas';
 export * from './audit-log';
 export * from './beds';
+export * from './contract-templates';
 export * from './documents';
 export * from './enums';
 export * from './files';

@@ -5,7 +5,17 @@ import { now } from '@/lib/time';
 
 import { assertHouseVisible, visibleHouseIds, type AccessContext } from '../access';
 import { getDb, type Executor } from '../client';
-import { areas, beds, type Area, type Bed, type NewArea, type NewBed } from '../schema';
+import {
+  areas,
+  bedAssignments,
+  beds,
+  residencies,
+  type Area,
+  type Bed,
+  type NewArea,
+  type NewBed,
+} from '../schema';
+import { residencyVisibility } from './residencies';
 
 /**
  * Зоны и места. Оба списка фильтруются по дому: админ соседнего дома
@@ -167,4 +177,41 @@ export async function updateBed(
     .returning();
 
   return bed ?? null;
+}
+
+/**
+ * Место и зона действующего назначения проживания.
+ *
+ * Видимость идёт через проживание (P2-5): у жильца в контексте дома нет,
+ * поэтому обычная фильтрация мест по дому его собственное место скрывает.
+ * Это ровно тот же обход, что и для дома в `requireHouseOfResidency`, —
+ * область видимости роли не расширяется, видно лишь своё назначение.
+ */
+export interface Placement {
+  area: Area;
+  bed: Bed;
+  price: number;
+}
+
+export async function findPlacementOfResidency(
+  context: AccessContext,
+  residencyId: string,
+  executor: Executor = getDb(),
+): Promise<Placement | null> {
+  const [row] = await executor
+    .select({ area: areas, bed: beds, price: bedAssignments.price })
+    .from(bedAssignments)
+    .innerJoin(residencies, eq(residencies.id, bedAssignments.residencyId))
+    .innerJoin(beds, eq(beds.id, bedAssignments.bedId))
+    .innerJoin(areas, eq(areas.id, beds.areaId))
+    .where(
+      and(
+        residencyVisibility(context),
+        eq(bedAssignments.residencyId, residencyId),
+        sql`upper_inf(${bedAssignments.period})`,
+      ),
+    )
+    .limit(1);
+
+  return row ?? null;
 }
