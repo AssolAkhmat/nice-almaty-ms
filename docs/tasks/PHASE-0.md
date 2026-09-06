@@ -55,11 +55,11 @@
 - Коммит: `chore(setup): тулинг, tsconfig, eslint, prettier`
 
 ### T0.2 — Vitest и первые расчётные ядра (TDD)
-- [ ] `vitest.config.ts` (окружение `node`, алиасы, покрытие)
-- [ ] **Тесты вперёд**: `src/domain/money.test.ts` — пример §0.1 (`splitCeil(1800, 17×[1])` → 106 каждому, сумма 1802, `surplus = 2`), плюс граничные случаи из §0
-- [ ] `src/domain/money.ts` — `splitCeil(total, weights)`
-- [ ] **Тесты вперёд**: `src/lib/time.test.ts` — `Asia/Almaty`: границы суток, первый/последний день месяца, «сегодня», разбор и формат `date`
-- [ ] `src/lib/time.ts` — единственная точка входа во время (`now()`, `todayInAlmaty()`, `startOfMonth`, `endOfMonth`, `toAlmaty`, `parseBusinessDate`)
+- [x] `vitest.config.ts` (окружение `node`, алиасы, покрытие)
+- [x] **Тесты вперёд**: `src/domain/money.test.ts` — пример §0.1 (`splitCeil(1800, 17×[1])` → 106 каждому, сумма 1802, `surplus = 2`), плюс граничные случаи из §0
+- [x] `src/domain/money.ts` — `splitCeil(total, weights)`
+- [x] **Тесты вперёд**: `src/lib/time.test.ts` — `Asia/Almaty`: границы суток, первый/последний день месяца, «сегодня», разбор и формат `date`
+- [x] `src/lib/time.ts` — единственная точка входа во время (`now()`, `todayInAlmaty()`, `startOfMonth`, `endOfMonth`, `toAlmaty`, `parseBusinessDate`)
 - Коммит: `feat(domain): splitCeil и утилиты времени Asia/Almaty`
 
 ### T0.3 — Каркас Next.js 16 и токены дизайн-системы
