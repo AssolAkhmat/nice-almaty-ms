@@ -33,6 +33,18 @@ export default async function SettingsPage() {
           <p className="text-text-muted mt-1 text-[13px]">{t('users.subtitle')}</p>
         </Card>
       ) : null}
+
+      {can(session.context, 'house.read', { houseId: session.context.houseId }) ||
+      can(session.context, 'house.create') ? (
+        <Card>
+          <CardTitle>
+            <Link className="text-primary hover:underline" href="/settings/houses">
+              {t('houses.title')}
+            </Link>
+          </CardTitle>
+          <p className="text-text-muted mt-1 text-[13px]">{t('houses.subtitle')}</p>
+        </Card>
+      ) : null}
     </section>
   );
 }

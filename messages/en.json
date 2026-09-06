@@ -68,6 +68,56 @@
     "inventory": "Inventory",
     "settings": "Settings"
   },
+  "houses": {
+    "title": "Houses",
+    "subtitle": "Houses are created and archived by the superadmin. An admin sees only their own.",
+    "empty": "No houses yet",
+    "columns": {
+      "name": "Name",
+      "slug": "Slug",
+      "address": "Address",
+      "curfew": "Curfew",
+      "deposit": "Default deposit",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "statuses": {
+      "active": "Active",
+      "archived": "Archived"
+    },
+    "actions": {
+      "edit": "Edit",
+      "archive": "Archive"
+    },
+    "create": {
+      "title": "Add house",
+      "submit": "Add",
+      "curfewHint": "23:00 by default",
+      "depositHint": "Whole tenge, 45,000 by default"
+    },
+    "edit": {
+      "title": "House {name}",
+      "submit": "Save"
+    },
+    "archiveConfirm": {
+      "title": "Archive house {name}?",
+      "description": "The house disappears from lists. Its slug stays taken: documents are stored under it and it cannot be reused."
+    },
+    "done": {
+      "created": "House added",
+      "updated": "House saved",
+      "archived": "House archived"
+    },
+    "errors": {
+      "unauthorized": "Sign-in required",
+      "forbidden": "Action not available to this role",
+      "not_found": "Not found",
+      "validation_error": "Check the entered data",
+      "conflict": "Such a house already exists",
+      "rate_limited": "Too often, try later",
+      "internal": "Something went wrong"
+    }
+  },
   "users": {
     "title": "Users",
     "subtitle": "Accounts are created by the superadmin. There is no deletion, only archiving.",
