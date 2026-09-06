@@ -3,6 +3,18 @@
     "name": "Nice Almaty",
     "description": "Студенттік үйлер желісін басқару жүйесі"
   },
+  "common": {
+    "close": "Жабу",
+    "previous": "Артқа",
+    "next": "Алға",
+    "pagination": "Беттік навигация",
+    "pageOf": "{pageCount} ішінен {page}",
+    "sortAsc": "Өсу ретімен сұрыптау",
+    "sortDesc": "Кему ретімен сұрыптау",
+    "loading": "Жүктелуде",
+    "empty": "Әзірге бос",
+    "retry": "Қайталау"
+  },
   "theme": {
     "label": "Тақырып",
     "light": "Ашық",

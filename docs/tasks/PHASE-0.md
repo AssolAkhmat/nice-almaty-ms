@@ -112,14 +112,14 @@
 - Коммит: `feat(db): drizzle, клиент под оба окружения, первая миграция`
 
 ### T0.8 — Базовые компоненты `src/components/ui/*`
-- [ ] `Button` (primary / secondary / ghost / danger, sm / md), фокус-кольцо 2px
-- [ ] `Input`, `Textarea`, `Select`, `Checkbox`, `Switch` (Radix)
-- [ ] `Badge` (neutral / info / success / warning / danger / accent), `StatusPill`
-- [ ] `Card`, `Skeleton`, `EmptyState`, `Pagination`, `Avatar`, `Money` (tabular-nums, вправо)
-- [ ] `Modal` (Radix Dialog), `Tabs` (Radix), `Toast` (Radix)
-- [ ] `Table`: липкая шапка, сортировка, карточная раскладка < 768px
-- [ ] Тесты контраста токенов: `#FEE274` не используется как текст на светлом и как заливка кнопки
-- [ ] Отложено до своих фаз: `Combobox`, `DatePicker`, `Drawer`, `Calendar`, `SignaturePad`, `FileUpload`, `ChecklistEditor`
+- [x] `Button` (primary / secondary / ghost / danger, sm / md), фокус-кольцо 2px
+- [x] `Input`, `Textarea`, `Select`, `Checkbox`, `Switch` (Radix)
+- [x] `Badge` (neutral / info / success / warning / danger / accent), `StatusPill`
+- [x] `Card`, `Skeleton`, `EmptyState`, `Pagination`, `Avatar`, `Money` (tabular-nums, вправо)
+- [x] `Modal` (Radix Dialog), `Tabs` (Radix), `Toast` (Radix)
+- [x] `Table`: липкая шапка, сортировка, карточная раскладка < 768px
+- [x] Тесты контраста токенов: `#FEE274` не используется как текст на светлом и как заливка кнопки
+- [x] Отложено до своих фаз: `Combobox`, `DatePicker`, `Drawer`, `Calendar`, `SignaturePad`, `FileUpload`, `ChecklistEditor`
 - Коммит: `feat(ui): базовые компоненты дизайн-системы`
 - DoD: 375 / 768 / 1440, обе темы, цели нажатия ≥ 44×44 на мобильном
 

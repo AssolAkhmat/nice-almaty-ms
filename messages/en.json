@@ -3,6 +3,18 @@
     "name": "Nice Almaty",
     "description": "Student housing network administration system"
   },
+  "common": {
+    "close": "Close",
+    "previous": "Previous",
+    "next": "Next",
+    "pagination": "Pagination",
+    "pageOf": "{page} of {pageCount}",
+    "sortAsc": "Sort ascending",
+    "sortDesc": "Sort descending",
+    "loading": "Loading",
+    "empty": "Nothing here yet",
+    "retry": "Retry"
+  },
   "theme": {
     "label": "Theme",
     "light": "Light",
