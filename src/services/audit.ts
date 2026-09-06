@@ -53,6 +53,8 @@ export const AUDIT_ACTIONS = {
   depositRefundIssued: 'deposit.refund_issued',
   depositRefunded: 'deposit.refunded',
   depositBurned: 'deposit.burned',
+  ledgerEntryPosted: 'ledger.entry_posted',
+  ledgerEntryReversed: 'ledger.entry_reversed',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

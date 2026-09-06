@@ -45,6 +45,8 @@ export const ACTIONS = [
   'invoice.issue',
   'payment.record',
   'deposit.read',
+  'accounting.read',
+  'accounting.write',
   'settings.org.read',
   'settings.org.write',
   'settings.house.read',
@@ -93,6 +95,8 @@ export const PERMISSIONS: PermissionMatrix = {
     'invoice.issue': 'org',
     'payment.record': 'org',
     'deposit.read': 'org',
+    'accounting.read': 'org',
+    'accounting.write': 'org',
     'settings.org.read': 'org',
     'settings.org.write': 'org',
     'settings.house.read': 'org',
@@ -130,6 +134,13 @@ export const PERMISSIONS: PermissionMatrix = {
     'invoice.issue': 'house',
     'payment.record': 'house',
     'deposit.read': 'house',
+    /*
+     * Бухгалтерия — дело суперадмина (модуль 10): план счетов, проводки
+     * и отчёты по сети. Админ ведёт деньги дома через счета и депозиты,
+     * а не через книгу проводок, и в неё не смотрит.
+     */
+    'accounting.read': 'none',
+    'accounting.write': 'none',
     'settings.org.read': 'none',
     'settings.org.write': 'none',
     'settings.house.read': 'house',
@@ -198,6 +209,8 @@ export const PERMISSIONS: PermissionMatrix = {
     'invoice.issue': 'none',
     'payment.record': 'none',
     'deposit.read': 'self',
+    'accounting.read': 'none',
+    'accounting.write': 'none',
     'settings.org.read': 'none',
     'settings.org.write': 'none',
     'settings.house.read': 'none',

@@ -32,7 +32,8 @@
       "resident_profile": "Resident profile",
       "document": "Document",
       "file": "File",
-      "invoice": "Invoice"
+      "invoice": "Invoice",
+      "ledger_entry": "Ledger entry"
     }
   },
   "auth": {
@@ -676,6 +677,18 @@
       "bedDuplicate": "This room already has a bed with that number and tier",
       "bedOccupied": "An occupied bed cannot be archived",
       "areaHasBeds": "Remove the beds of this area first"
+    }
+  },
+  "accounting": {
+    "title": "Accounting",
+    "subtitle": "Chart of accounts, entries and reconciliation",
+    "errors": {
+      "unauthorized": "Sign-in required",
+      "unknown": "The action could not be completed",
+      "unbalanced": "Debit and credit of the entry are not equal",
+      "tooFewLines": "An entry needs at least two lines",
+      "amountInvalid": "A line amount is a positive whole number of tenge",
+      "alreadyReversed": "The entry has already been reversed"
     }
   }
 }

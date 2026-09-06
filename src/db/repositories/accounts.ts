@@ -194,6 +194,20 @@ export async function listLedgerEntries(
     .orderBy(desc(ledgerEntries.entryDate), desc(ledgerEntries.createdAt));
 }
 
+export async function findLedgerEntry(
+  context: AccessContext,
+  entryId: string,
+  executor: Executor = getDb(),
+): Promise<LedgerEntry | null> {
+  const [entry] = await executor
+    .select()
+    .from(ledgerEntries)
+    .where(and(eq(ledgerEntries.orgId, context.orgId), eq(ledgerEntries.id, entryId)))
+    .limit(1);
+
+  return entry ?? null;
+}
+
 export async function listLedgerLines(
   entryId: string,
   executor: Executor = getDb(),

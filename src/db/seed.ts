@@ -3,7 +3,14 @@ import { and, eq } from 'drizzle-orm';
 import { generateTemporaryPassword, hashPassword } from '@/lib/password';
 
 import { getDb, type Executor } from './client';
-import { contractTemplates, documentTypes, houses, organizations, users } from './schema';
+import {
+  accounts as accountsTable,
+  contractTemplates,
+  documentTypes,
+  houses,
+  organizations,
+  users,
+} from './schema';
 
 /**
  * Сид сети (docs/07-ROADMAP.md, «Сид-данные»).
@@ -202,6 +209,71 @@ async function ensureDocumentTypes(executor: Executor, orgId: string): Promise<v
   }
 }
 
+/**
+ * План счетов сети (§10.1). Счета системные: на них стоят типовые проводки,
+ * и удалить их нельзя. Фонд дома заводится по одному на дом — иначе деньги
+ * пяти домов слились бы в одну кучу, а §10.1 требует обратного.
+ */
+const NETWORK_ACCOUNTS = [
+  { code: 'deposit_fund', name: 'Депозитный фонд', type: 'deposit_fund' as const },
+  { code: 'utility_fund', name: 'Коммунальный фонд', type: 'utility_fund' as const },
+  { code: 'common_fund', name: 'Общий счёт', type: 'common_fund' as const },
+  { code: 'cash', name: 'Касса', type: 'cash' as const },
+  { code: 'kaspi', name: 'Kaspi', type: 'kaspi' as const },
+];
+
+async function ensureAccount(
+  executor: Executor,
+  input: {
+    orgId: string;
+    code: string;
+    name: string;
+    type: (typeof NETWORK_ACCOUNTS)[number]['type'] | 'house_fund';
+    houseId?: string | null;
+  },
+): Promise<void> {
+  const [existing] = await executor
+    .select({ id: accountsTable.id })
+    .from(accountsTable)
+    .where(and(eq(accountsTable.orgId, input.orgId), eq(accountsTable.code, input.code)))
+    .limit(1);
+
+  if (existing !== undefined) {
+    return;
+  }
+
+  await executor.insert(accountsTable).values({
+    orgId: input.orgId,
+    code: input.code,
+    name: input.name,
+    type: input.type,
+    houseId: input.houseId ?? null,
+    isSystem: true,
+  });
+}
+
+async function ensureAccounts(
+  executor: Executor,
+  orgId: string,
+  houseIds: readonly string[],
+): Promise<void> {
+  for (const account of NETWORK_ACCOUNTS) {
+    await ensureAccount(executor, { orgId, ...account });
+  }
+
+  for (const [index, houseId] of houseIds.entries()) {
+    const number = index + 1;
+
+    await ensureAccount(executor, {
+      orgId,
+      code: `house_fund:${houseSlug(number)}`,
+      name: `Фонд дома ${String(number)}`,
+      type: 'house_fund',
+      houseId,
+    });
+  }
+}
+
 /** Шаблон договора заводится один раз: правки суперадмина сид не откатывает. */
 async function ensureContractTemplate(executor: Executor, orgId: string): Promise<void> {
   const [existing] = await executor
@@ -272,6 +344,7 @@ export async function seedNetwork(options: SeedOptions = {}): Promise<SeedResult
 
   await ensureDocumentTypes(executor, orgId);
   await ensureContractTemplate(executor, orgId);
+  await ensureAccounts(executor, orgId, houseIds);
 
   return { orgId, houseIds, accounts };
 }
