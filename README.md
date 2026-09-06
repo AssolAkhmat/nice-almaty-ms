@@ -47,13 +47,52 @@
 
 ## Быстрый старт
 
+Нужны Node 24, pnpm 12 и Docker.
+
 ```bash
 cp .env.example .env
-docker compose up -d postgres
+# заполните SESSION_SECRET, FIELD_ENCRYPTION_KEY и CRON_SECRET
+# ключ шифрования: openssl rand -base64 32
+
+docker compose up -d          # postgres + миграции + приложение + worker
+curl http://localhost:3000/api/health
+```
+
+Приложение поднимается на `http://localhost:3000`, порт меняется переменной `APP_PORT`.
+Сервис `migrate` отрабатывает один раз и завершается — приложение стартует только после него.
+
+### Разработка без Docker
+
+```bash
 pnpm install
+docker compose up -d postgres
 pnpm db:migrate
-pnpm db:seed
 pnpm dev
 ```
 
-Демо-учётки после сида — в выводе `pnpm db:seed`.
+## Команды
+
+| Команда | Что делает |
+|---|---|
+| `pnpm dev` | режим разработки (Turbopack) |
+| `pnpm build` | production-сборка; при `DEPLOY_TARGET=docker` — standalone |
+| `pnpm verify` | `typecheck` + `lint` + `format:check` + `test` |
+| `pnpm test` | юнит-тесты (Vitest) |
+| `pnpm test:e2e` | e2e (Playwright) на ширинах 375 / 768 / 1440 |
+| `pnpm db:generate` | сгенерировать миграцию из схемы Drizzle |
+| `pnpm db:migrate` | применить миграции |
+| `pnpm db:studio` | Drizzle Studio |
+| `pnpm worker` | планировщик (в фазе 0 заданий нет) |
+
+## Развёртывание
+
+- **Docker/VPS** — `docker compose up -d`. Это основная цель разработки и первичного прода.
+- **Vercel + Supabase** — по инструкции `docs/DEPLOY-VERCEL.md`.
+  Локальная сборка с `DEPLOY_TARGET=vercel` подтверждает только сборку бандла;
+  пулер соединений, лимит тела запроса и serverless-рантайм проверяются
+  лишь настоящим превью-деплоем.
+
+## Состояние
+
+Текущая фаза и что уже сделано — в `PROGRESS.md`,
+пофазный чек-лист — в `docs/tasks/PHASE-N.md`.
