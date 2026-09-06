@@ -29,6 +29,13 @@
       "when": 1788698077076,
       "tag": "0003_aspiring_mathemanic",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788708555210,
+      "tag": "0004_lock_down_supabase_data_api",
+      "breakpoints": true
     }
   ]
 }
