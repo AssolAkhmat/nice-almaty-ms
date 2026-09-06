@@ -5,6 +5,7 @@ import { useFormatter, useTranslations } from 'next-intl';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { auditEntityLabel } from '@/lib/i18n/labels';
 import { parseInstant } from '@/lib/time';
 
 export interface AuditRow {
@@ -76,7 +77,10 @@ export function AuditList({ rows }: { rows: readonly AuditRow[] }) {
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone="info">{row.action}</Badge>
                 <span className="text-text-muted text-[13px]">
-                  {t(`audit.entities.${row.entityType}`, { fallback: row.entityType })}
+                  {auditEntityLabel(row.entityType, {
+                    has: (key) => t.has(key),
+                    get: (key) => t(key),
+                  })}
                 </span>
               </div>
               <span className="tabular text-text-muted text-[13px]">

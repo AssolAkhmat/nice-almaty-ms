@@ -23,9 +23,16 @@
       "apply": "Көрсету"
     },
     "entities": {
-      "user": "Аккаунт",
+      "user": "Есептік жазба",
       "house": "Үй",
-      "setting": "Баптау"
+      "setting": "Баптау",
+      "area": "Аймақ",
+      "bed": "Орын",
+      "residency": "Тұру",
+      "resident_profile": "Тұрғын профилі",
+      "document": "Құжат",
+      "file": "Файл",
+      "invoice": "Шот"
     }
   },
   "auth": {

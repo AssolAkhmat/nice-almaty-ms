@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import en from '../../../messages/en.json';
@@ -59,6 +62,52 @@ describe('локали', () => {
         expect(typeof value === 'string' && value.trim().length > 0, `${locale}: ${key}`).toBe(
           true,
         );
+      }
+    }
+  });
+
+  /**
+   * Журнал аудита показывает сущности словами. Каждая новая сущность
+   * приносит с собой запись в словаре: без неё экран показывал бы код,
+   * а до появления запасного варианта — падал целиком (P2-45).
+   */
+  it('в словаре есть каждая сущность, о которой пишется журнал', () => {
+    const types = new Set<string>();
+
+    function walk(directory: string): void {
+      for (const entry of readdirSync(directory, { withFileTypes: true })) {
+        const path = join(directory, entry.name);
+
+        if (entry.isDirectory()) {
+          walk(path);
+          continue;
+        }
+
+        if (!entry.name.endsWith('.ts') && !entry.name.endsWith('.tsx')) {
+          continue;
+        }
+
+        for (const match of readFileSync(path, 'utf8').matchAll(/entityType: '([a-z_]+)'/g)) {
+          const type = match[1];
+          if (type !== undefined) {
+            types.add(type);
+          }
+        }
+      }
+    }
+
+    walk(join(import.meta.dirname, '..', '..'));
+
+    expect(types.size).toBeGreaterThan(0);
+
+    for (const locale of LOCALES) {
+      const entities = (catalogues[locale]?.audit as MessageTree | undefined)?.entities;
+
+      for (const type of types) {
+        expect(
+          typeof (entities as MessageTree | undefined)?.[type],
+          `${locale}: audit.entities.${type}`,
+        ).toBe('string');
       }
     }
   });

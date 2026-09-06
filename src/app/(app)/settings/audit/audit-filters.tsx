@@ -65,7 +65,7 @@ export function AuditFilters({
           <option value="">{t('audit.filters.any')}</option>
           {entityTypes.map((type) => (
             <option key={type} value={type}>
-              {t(`audit.entities.${type}`)}
+              {t.has(`audit.entities.${type}`) ? t(`audit.entities.${type}`) : type}
             </option>
           ))}
         </Select>

@@ -25,7 +25,14 @@
     "entities": {
       "user": "Account",
       "house": "House",
-      "setting": "Setting"
+      "setting": "Setting",
+      "area": "Area",
+      "bed": "Bed",
+      "residency": "Residency",
+      "resident_profile": "Resident profile",
+      "document": "Document",
+      "file": "File",
+      "invoice": "Invoice"
     }
   },
   "auth": {

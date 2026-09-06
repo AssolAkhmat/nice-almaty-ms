@@ -25,7 +25,14 @@
     "entities": {
       "user": "Учётная запись",
       "house": "Дом",
-      "setting": "Настройка"
+      "setting": "Настройка",
+      "area": "Зона",
+      "bed": "Место",
+      "residency": "Проживание",
+      "resident_profile": "Профиль жильца",
+      "document": "Документ",
+      "file": "Файл",
+      "invoice": "Счёт"
     }
   },
   "auth": {
