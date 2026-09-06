@@ -56,7 +56,7 @@ export default tseslint.config(
    */
   {
     files: ['src/**/*.ts', 'src/**/*.tsx'],
-    ignores: ['src/lib/time.ts', 'src/**/*.test.ts', 'src/**/*.test.tsx'],
+    ignores: ['src/lib/time.ts', 'src/**/*.test.ts', 'src/**/*.test.tsx', 'src/**/*.db-test.ts'],
     rules: {
       'no-restricted-syntax': [
         'error',
