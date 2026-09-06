@@ -17,7 +17,7 @@ test.describe('экран депозита', () => {
 
     const main = page.locator('main');
     await expect(main).toContainText('Депозит');
-    await expect(main).toContainText('Проживаний нет');
+    await expect(main).toContainText('Депозиты жильцов вашего дома');
   });
 
   test('раздел доступен из навигации', async ({ page }) => {

@@ -18,7 +18,7 @@ test.describe('экран договора', () => {
 
     const main = page.locator('main');
     await expect(main).toContainText('Договор');
-    await expect(main).toContainText('Проживаний нет');
+    await expect(main).toContainText('Договоры жильцов вашего дома');
   });
 
   test('раздел доступен из навигации', async ({ page }) => {

@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { defineConfig, devices } from '@playwright/test';
+import { chromium, defineConfig, devices } from '@playwright/test';
 
 import { dotEnvFallback } from './scripts/read-dotenv';
 
@@ -63,6 +63,12 @@ export default defineConfig({
       FIELD_ENCRYPTION_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
       CRON_SECRET: 'e2e-cron-secret-16',
       STORAGE_DRIVER: 'local',
+      /*
+       * Печать договора идёт настоящим chromium — тем же, которым playwright
+       * открывает страницы. Без него шаг 5 §1.2 в приёмке не проходит,
+       * а системного браузера на машине разработчика может не быть.
+       */
+      CHROMIUM_PATH: chromium.executablePath(),
     },
   },
 });

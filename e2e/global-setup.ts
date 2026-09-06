@@ -45,6 +45,14 @@ export default async function globalSetup(): Promise<void> {
       passwordFor: () => E2E_PASSWORD,
     });
 
+    /*
+     * Счётчики попыток входа обнуляются перед прогоном: окно длится
+     * четверть часа и переживает предыдущий запуск, а тестов, которые
+     * входят по несколько раз, в наборе много. Это фикстура прогона,
+     * а не послабление защиты — правило и его окно остаются прежними.
+     */
+    await db.delete(schema.rateLimits);
+
     const phones = Object.values(E2E_ACCOUNTS);
 
     await db
