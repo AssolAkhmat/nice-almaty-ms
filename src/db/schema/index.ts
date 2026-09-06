@@ -1,7 +1,9 @@
+export * from './accounts';
 export * from './areas';
 export * from './audit-log';
 export * from './beds';
 export * from './contract-templates';
+export * from './damages';
 export * from './documents';
 export * from './enums';
 export * from './files';
@@ -15,3 +17,4 @@ export * from './resident-profiles';
 export * from './sessions';
 export * from './settings';
 export * from './users';
+export * from './utilities';

@@ -39,11 +39,11 @@
 - Коммит: `feat(domain): коммуналка, ущерб и месячный счёт по числовым примерам`
 
 ### T3.2 — Схема денег и коммуналки
-- [ ] `accounts`, `ledger_entries`, `ledger_lines` по `02-DATA-MODEL.md`
-- [ ] `utility_periods`, `utility_lines`, `utility_allocations`
-- [ ] `damages`, `damage_shares`
-- [ ] Уникальность `(house_id, month)` у периода коммуналки
-- [ ] Миграция применяется на чистой базе; репозитории фильтруют по `org_id` и дому
+- [x] `accounts`, `ledger_entries`, `ledger_lines` по `02-DATA-MODEL.md`
+- [x] `utility_periods`, `utility_lines`, `utility_allocations`
+- [x] `damages`, `damage_shares`
+- [x] Уникальность `(house_id, month)` у периода коммуналки
+- [x] Миграция применяется на чистой базе; репозитории фильтруют по `org_id` и дому
 - Коммит: `feat(db): счета бухгалтерии, коммуналка и ущерб`
 
 ### T3.3 — Двойная запись (инварианты 3 и 4)
