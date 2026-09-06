@@ -450,5 +450,34 @@
   "deposits": {
     "amountInvalid": "The amount must be a whole number of tenge",
     "overpayment": "The amount exceeds what is left on the invoice"
+  },
+  "beds": {
+    "title": "Beds",
+    "subtitle": "Your room and bed",
+    "adminSubtitle": "House layout: rooms, beds and occupancy",
+    "assign": "Assign a bed",
+    "assignHint": "Room, bed, price and start date",
+    "resident": "Resident",
+    "room": "Room",
+    "bed": "Bed",
+    "price": "Price",
+    "priceHint": "Defaults to the bed price; can be changed individually",
+    "priceInvalid": "The price must be a whole number of tenge",
+    "bedFromAnotherHouse": "This bed belongs to another house",
+    "from": "Start date",
+    "confirm": "Assign",
+    "assigned": "The bed is assigned",
+    "free": "free",
+    "occupancy": "{taken} of {total} taken",
+    "unplaced": "without a bed: {count}",
+    "empty": "No rooms yet",
+    "emptyHint": "Areas and beds are set up in the house settings",
+    "noPlacement": "No bed assigned yet",
+    "noPlacementHint": "The house admin assigns it",
+    "errors": {
+      "unauthorized": "Sign-in required",
+      "unknown": "The action could not be completed",
+      "date": "The date is invalid"
+    }
   }
 }

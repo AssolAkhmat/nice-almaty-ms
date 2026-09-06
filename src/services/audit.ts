@@ -39,6 +39,8 @@ export const AUDIT_ACTIONS = {
   paymentRecorded: 'payment.recorded',
   depositCharged: 'deposit.charged',
   residencyActivated: 'residency.activated',
+  bedAssigned: 'bed.assigned',
+  bedReleased: 'bed.released',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

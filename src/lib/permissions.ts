@@ -38,6 +38,8 @@ export const ACTIONS = [
   'contract.generate',
   'contract.sign',
   'residency.issueKeys',
+  'bed.read',
+  'bed.assign',
   'invoice.read',
   'invoice.issue',
   'payment.record',
@@ -83,6 +85,8 @@ export const PERMISSIONS: PermissionMatrix = {
     // Подпись личная: за жильца её не ставит никто, даже суперадмин.
     'contract.sign': 'none',
     'residency.issueKeys': 'org',
+    'bed.read': 'org',
+    'bed.assign': 'org',
     'invoice.read': 'org',
     'invoice.issue': 'org',
     'payment.record': 'org',
@@ -117,6 +121,8 @@ export const PERMISSIONS: PermissionMatrix = {
     'contract.generate': 'house',
     'contract.sign': 'none',
     'residency.issueKeys': 'house',
+    'bed.read': 'house',
+    'bed.assign': 'house',
     'invoice.read': 'house',
     'invoice.issue': 'house',
     'payment.record': 'house',
@@ -173,6 +179,12 @@ export const PERMISSIONS: PermissionMatrix = {
      * но выставляет счета и отмечает платежи только админ: деньги приходят
      * не через приложение, и подтверждает их получение тот, кто их получил.
      */
+    /*
+     * Своё место жилец видит, чужие — нет: схема дома с занятостью — рабочий
+     * инструмент админа (модуль 1). Назначает место тоже админ.
+     */
+    'bed.read': 'self',
+    'bed.assign': 'none',
     'invoice.read': 'self',
     'invoice.issue': 'none',
     'payment.record': 'none',
