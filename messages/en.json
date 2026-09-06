@@ -292,6 +292,14 @@
       "tooLong": "Password is longer than 128 characters",
       "sameAsPhone": "Password cannot match the phone number",
       "reused": "This password was already used"
+    },
+    "files": {
+      "mimeNotAllowed": "This file type cannot be uploaded: use JPEG, PNG, WebP or PDF",
+      "tooLarge": "The file is larger than 10 MB",
+      "empty": "The file is empty",
+      "sizeMismatch": "The file size did not match the declared one",
+      "mimeMismatch": "The file contents did not match the declared type",
+      "invalidBody": "The upload request is filled in incorrectly"
     }
   },
   "theme": {

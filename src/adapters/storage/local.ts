@@ -5,7 +5,7 @@ import { Readable } from 'node:stream';
 
 import { assertSafeKey, resolveWithinRoot } from './paths';
 
-import type { StorageHealth, StorageProvider, StoredObject } from './types';
+import type { StorageHealth, StorageProvider, StoredObject, UploadTarget } from './types';
 
 /**
  * Локальный диск: на нём идут тесты и работает разработка без доступа
@@ -59,6 +59,32 @@ export function createLocalStorage(rootPath: string): StorageProvider {
 
         throw error;
       }
+    },
+
+    async head(key: string): Promise<StoredObject | null> {
+      try {
+        const info = await stat(resolveWithinRoot(rootPath, key));
+
+        return { key: assertSafeKey(key), sizeBytes: info.size };
+      } catch (error) {
+        if (await isMissing(error)) {
+          return null;
+        }
+
+        throw error;
+      }
+    },
+
+    /**
+     * У локального диска адреса для прямой загрузки нет: байты принимает
+     * приложение. Ключ всё равно проверяется здесь — цель загрузки
+     * не должна выдаваться на путь, по которому потом нельзя записать.
+     */
+    async createUploadTarget(key: string): Promise<UploadTarget> {
+      await Promise.resolve();
+      resolveWithinRoot(rootPath, key);
+
+      return { kind: 'app' };
     },
 
     async stream(key: string): Promise<ReadableStream<Uint8Array> | null> {

@@ -27,6 +27,8 @@ export const AUDIT_ACTIONS = {
   houseArchived: 'house.archived',
   settingChanged: 'setting.changed',
   sensitiveFieldRevealed: 'resident.sensitive_field_revealed',
+  fileUploaded: 'file.uploaded',
+  fileRead: 'file.read',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

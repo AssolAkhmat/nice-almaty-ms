@@ -5,7 +5,9 @@ import { now } from '@/lib/time';
 
 import { assertHouseVisible, visibleHouseIds, type AccessContext } from '../access';
 import { getDb, type Executor } from '../client';
-import { houses, type House, type NewHouse } from '../schema';
+import { houses, residencies, type House, type NewHouse } from '../schema';
+
+import { residencyVisibility } from './residencies';
 
 /** Условие видимости домов для контекста доступа. */
 function scope(context: AccessContext) {
@@ -65,6 +67,41 @@ export async function requireHouse(
   }
 
   return house;
+}
+
+/**
+ * Дом, в котором идёт проживание.
+ *
+ * Область видимости роли этим не расширяется: жильцу по-прежнему не видны
+ * ни список домов, ни чужой дом по прямой ссылке. Видна ровно одна вещь —
+ * дом его собственного проживания, и видна она через то же условие
+ * `residencyVisibility`, на котором стоит видимость профиля и файлов.
+ * Без этого не построить путь хранения `/{house_slug}/{residency_id}/…`
+ * из docs/01-ARCHITECTURE.md: slug дома жильцу неоткуда взять.
+ */
+export async function requireHouseOfResidency(
+  context: AccessContext,
+  residencyId: string,
+  executor: Executor = getDb(),
+): Promise<House> {
+  const [row] = await executor
+    .select({ house: houses })
+    .from(residencies)
+    .innerJoin(houses, eq(houses.id, residencies.houseId))
+    .where(
+      and(
+        residencyVisibility(context),
+        eq(residencies.id, residencyId),
+        eq(houses.orgId, context.orgId),
+      ),
+    )
+    .limit(1);
+
+  if (row === undefined) {
+    throw new NotFoundError('Дом не найден');
+  }
+
+  return row.house;
 }
 
 export async function createHouse(

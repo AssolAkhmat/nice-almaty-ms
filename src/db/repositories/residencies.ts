@@ -30,8 +30,13 @@ function houseScope(context: AccessContext) {
   return visible.length === 0 ? sql`false` : inArray(residencies.houseId, [...visible]);
 }
 
-/** Жилец видит только своё проживание, админ — проживания своего дома. */
-function scope(context: AccessContext) {
+/**
+ * Жилец видит только своё проживание, админ — проживания своего дома.
+ * Правило вынесено наружу: на нём же стоит видимость файлов и всего,
+ * что прикрепляется к проживанию. Вторая копия правила однажды разойдётся
+ * с первой, и разойдётся молча.
+ */
+export function residencyVisibility(context: AccessContext) {
   const byOrg = eq(residencies.orgId, context.orgId);
 
   return context.role === 'resident'
@@ -44,7 +49,7 @@ export async function listResidencies(
   filter: { houseId?: string; status?: Residency['status'] } = {},
   executor: Executor = getDb(),
 ): Promise<Residency[]> {
-  const conditions = [scope(context)];
+  const conditions = [residencyVisibility(context)];
 
   if (filter.houseId !== undefined) {
     assertHouseVisible(context, filter.houseId);
@@ -69,7 +74,7 @@ export async function findResidency(
   const [residency] = await executor
     .select()
     .from(residencies)
-    .where(and(scope(context), eq(residencies.id, residencyId)))
+    .where(and(residencyVisibility(context), eq(residencies.id, residencyId)))
     .limit(1);
 
   return residency ?? null;
@@ -116,7 +121,7 @@ export async function updateResidency(
   const [residency] = await executor
     .update(residencies)
     .set({ ...patch, updatedAt: now() })
-    .where(and(scope(context), eq(residencies.id, residencyId)))
+    .where(and(residencyVisibility(context), eq(residencies.id, residencyId)))
     .returning();
 
   return residency ?? null;

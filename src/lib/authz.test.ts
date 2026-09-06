@@ -146,6 +146,40 @@ describe('следствия правила «роль и проживание �
   });
 });
 
+/**
+ * Файлы всегда приватны (docs/01-ARCHITECTURE.md): публичных ссылок нет,
+ * а отдача содержимого проходит ту же проверку, что и любое другое чтение.
+ * Цель действия — жилец, которому файл принадлежит, и его дом.
+ */
+describe('файлы', () => {
+  const foreignResident = { houseId: HOUSE_B, userId: 'u-someone-else' };
+
+  it('жилец работает только со своими файлами', () => {
+    expect(can(resident, 'file.upload', { userId: resident.userId, houseId: HOUSE_A })).toBe(true);
+    expect(can(resident, 'file.read', { userId: resident.userId, houseId: HOUSE_A })).toBe(true);
+  });
+
+  it('чужой файл для жильца — 404, а не 403', () => {
+    for (const action of ['file.upload', 'file.read'] as const) {
+      expect(() => {
+        assertCan(resident, action, foreignResident);
+      }).toThrow(NotFoundError);
+    }
+  });
+
+  it('админ работает с файлами своего дома и не видит чужой', () => {
+    expect(can(admin, 'file.read', { houseId: HOUSE_A, userId: 'u-resident' })).toBe(true);
+
+    expect(() => {
+      assertCan(admin, 'file.read', foreignResident);
+    }).toThrow(NotFoundError);
+  });
+
+  it('суперадмин видит файлы любого дома сети', () => {
+    expect(can(superadmin, 'file.read', foreignResident)).toBe(true);
+  });
+});
+
 describe('цель действия', () => {
   it('действие уровня сети цели не требует', () => {
     expect(can(superadmin, 'house.create')).toBe(true);

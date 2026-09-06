@@ -31,6 +31,8 @@ export const ACTIONS = [
   'user.archive',
   'user.allowPasswordReset',
   'resident.revealSensitive',
+  'file.upload',
+  'file.read',
   'settings.org.read',
   'settings.org.write',
   'settings.house.read',
@@ -64,6 +66,8 @@ export const PERMISSIONS: PermissionMatrix = {
     'user.archive': 'org',
     'user.allowPasswordReset': 'org',
     'resident.revealSensitive': 'org',
+    'file.upload': 'org',
+    'file.read': 'org',
     'settings.org.read': 'org',
     'settings.org.write': 'org',
     'settings.house.read': 'org',
@@ -87,6 +91,8 @@ export const PERMISSIONS: PermissionMatrix = {
     'user.archive': 'none',
     'user.allowPasswordReset': 'house',
     'resident.revealSensitive': 'house',
+    'file.upload': 'house',
+    'file.read': 'house',
     'settings.org.read': 'none',
     'settings.org.write': 'none',
     'settings.house.read': 'house',
@@ -114,6 +120,13 @@ export const PERMISSIONS: PermissionMatrix = {
      * пишется в журнал, независимо от роли.
      */
     'resident.revealSensitive': 'self',
+    /*
+     * Свои документы жилец и загружает, и открывает; чужие — нет.
+     * Публичных ссылок на файлы не бывает вовсе (docs/01-ARCHITECTURE.md),
+     * поэтому отдача содержимого — такое же проверяемое действие, как чтение.
+     */
+    'file.upload': 'self',
+    'file.read': 'self',
     'settings.org.read': 'none',
     'settings.org.write': 'none',
     'settings.house.read': 'none',

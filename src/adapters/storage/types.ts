@@ -20,6 +20,30 @@ export interface StoredObject {
   sizeBytes: number;
 }
 
+export interface UploadMeta {
+  mime: string;
+  /** Размер, заявленный клиентом. Сверяется с фактическим на шаге завершения. */
+  sizeBytes: number;
+}
+
+/**
+ * Куда клиент отправляет байты на втором шаге загрузки
+ * (docs/01-ARCHITECTURE.md). Форма ответа одна для всех драйверов:
+ * бизнес-код не должен знать, где он исполняется (CLAUDE.md §5).
+ */
+export type UploadTarget =
+  /** Хранилище принимает байты само: presigned PUT или resumable session. */
+  | {
+      kind: 'external';
+      url: string;
+      method: 'PUT' | 'POST';
+      headers: Record<string, string>;
+      /** Идентификатор объекта у провайдера, если он известен заранее. */
+      externalId: string | null;
+    }
+  /** Прямого адреса нет — байты принимает приложение (драйвер `local`). */
+  | { kind: 'app' };
+
 export interface StorageProvider {
   readonly driver: StorageDriver;
   checkHealth: () => Promise<StorageHealth>;
@@ -27,6 +51,10 @@ export interface StorageProvider {
   put: (key: string, data: Uint8Array) => Promise<StoredObject>;
   /** Читает объект целиком. `null` — объекта нет. */
   get: (key: string) => Promise<Uint8Array | null>;
+  /** Размер объекта без чтения содержимого. `null` — объекта нет. */
+  head: (key: string) => Promise<StoredObject | null>;
+  /** Открывает сессию прямой загрузки под уже известный ключ. */
+  createUploadTarget: (key: string, meta: UploadMeta) => Promise<UploadTarget>;
   /** Отдаёт объект потоком: файлы бывают крупнее, чем стоит держать в памяти. */
   stream: (key: string) => Promise<ReadableStream<Uint8Array> | null>;
   exists: (key: string) => Promise<boolean>;

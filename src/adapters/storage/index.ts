@@ -4,7 +4,14 @@ import { createLocalStorage } from './local';
 
 import type { StorageDriver, StorageHealth, StorageProvider } from './types';
 
-export type { StorageDriver, StorageHealth, StorageProvider, StoredObject } from './types';
+export type {
+  StorageDriver,
+  StorageHealth,
+  StorageProvider,
+  StoredObject,
+  UploadMeta,
+  UploadTarget,
+} from './types';
 export { UnsafeStorageKeyError, assertSafeKey } from './paths';
 
 /**
@@ -27,6 +34,8 @@ function createPendingStorage(driver: StorageDriver): StorageProvider {
       }),
     put: notImplemented,
     get: notImplemented,
+    head: notImplemented,
+    createUploadTarget: notImplemented,
     stream: notImplemented,
     exists: notImplemented,
     delete: notImplemented,

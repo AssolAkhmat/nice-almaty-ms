@@ -2,6 +2,7 @@ export * from './areas';
 export * from './audit-log';
 export * from './beds';
 export * from './enums';
+export * from './files';
 export * from './houses';
 export * from './job-runs';
 export * from './organizations';

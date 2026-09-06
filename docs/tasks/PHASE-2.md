@@ -76,10 +76,11 @@
 - Коммит: `ci: прогон интеграционных тестов на сервере`
 
 ### T2.6 — Файлы и двухшаговая загрузка
-- [ ] Таблица `files` со статусами `pending` / `ready` / `failed`
-- [ ] `POST /api/v1/files/upload-session`, прямая загрузка, `POST /api/v1/files/{id}/complete`
-- [ ] `GET /api/v1/files/{id}/content` проверяет права и стримит; публичных ссылок нет
-- [ ] Проверка размера и mime на шаге подтверждения
+- [x] Таблица `files` со статусами `pending` / `ready` / `failed`
+- [x] `POST /api/v1/files/upload-session`, прямая загрузка, `POST /api/v1/files/{id}/complete`
+- [x] `GET /api/v1/files/{id}/content` проверяет права и стримит; публичных ссылок нет
+- [x] Проверка размера и mime на шаге подтверждения
+- [x] Внешние ключи `contract_file_id` и `signature_file_id` поставлены (долг T2.2)
 - Коммит: `feat(files): двухшаговая загрузка и приватная отдача`
 
 ### T2.7 — Драйвер Google Drive

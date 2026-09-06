@@ -96,6 +96,52 @@ describe('локальное хранилище', () => {
   });
 
   /**
+   * Шаг «завершение» сверяет заявленный размер с тем, что действительно
+   * легло в хранилище (docs/01-ARCHITECTURE.md). Для этого нужен ответ
+   * о размере без чтения содержимого: файл бывает крупным.
+   */
+  describe('справка об объекте', () => {
+    it('отдаёт размер, не читая содержимое', async () => {
+      await storage.put('doc.bin', CONTENT);
+
+      await expect(storage.head('doc.bin')).resolves.toEqual({
+        key: 'doc.bin',
+        sizeBytes: CONTENT.byteLength,
+      });
+    });
+
+    it('об отсутствующем объекте — null', async () => {
+      await expect(storage.head('net-takogo.bin')).resolves.toBeNull();
+    });
+
+    it('наружу корня не заглядывает', async () => {
+      await expect(storage.head('../snaruzhi.bin')).rejects.toBeInstanceOf(UnsafeStorageKeyError);
+    });
+  });
+
+  /**
+   * Двухшаговая загрузка: у локального диска адреса для прямой загрузки нет,
+   * поэтому байты принимает само приложение. Форма ответа одна и та же
+   * для всех драйверов, чтобы клиент не знал, где он исполняется.
+   */
+  describe('цель прямой загрузки', () => {
+    it('у локального диска — само приложение', async () => {
+      await expect(
+        storage.createUploadTarget('dom-1/residency-1/photo/file.jpg', {
+          mime: 'image/jpeg',
+          sizeBytes: 1024,
+        }),
+      ).resolves.toEqual({ kind: 'app' });
+    });
+
+    it('небезопасный ключ отвергается до создания цели', async () => {
+      await expect(
+        storage.createUploadTarget('../snaruzhi.bin', { mime: 'image/jpeg', sizeBytes: 1024 }),
+      ).rejects.toBeInstanceOf(UnsafeStorageKeyError);
+    });
+  });
+
+  /**
    * Главное свойство: за пределы корня хранилище не выпускает.
    * Ключ приходит из данных, и однажды он окажется не таким, как ожидалось.
    */
