@@ -1,0 +1,28 @@
+{
+  "_комментарий": [
+    "Заготовка секции crons для vercel.json. Включается в фазе 6, когда появятся",
+    "обработчики /api/v1/cron/*. Сейчас эти пути не существуют, и включённое",
+    "расписание давало бы ежедневные 404.",
+    "",
+    "Vercel исполняет расписание в UTC, поэтому времена из docs/01-ARCHITECTURE.md",
+    "переведены из Asia/Almaty вычитанием пяти часов.",
+    "",
+    "Отдельно: у Vercel в cron-выражениях нет 'L' (последний день месяца).",
+    "Поэтому invoices-monthly запускается ежедневно в 19:05 UTC — это 00:05",
+    "следующих суток по Алматы, — а сам обработчик обязан завершиться без",
+    "действий, если по календарю Алматы сегодня не первое число.",
+    "Идемпотентность в любом случае обеспечивает таблица job_runs."
+  ],
+  "crons": [
+    { "path": "/api/v1/cron/rotations-close-day", "schedule": "55 18 * * *" },
+    { "path": "/api/v1/cron/rotations-remind", "schedule": "0 4,14 * * *" },
+    { "path": "/api/v1/cron/curfew-check", "schedule": "5 18 * * *" },
+    { "path": "/api/v1/cron/invoices-monthly", "schedule": "5 19 * * *" },
+    { "path": "/api/v1/cron/utilities-remind", "schedule": "0 5 25 * *" },
+    { "path": "/api/v1/cron/schedule-remind", "schedule": "0 5 25 * *" },
+    { "path": "/api/v1/cron/documents-expiry", "schedule": "0 4 * * *" },
+    { "path": "/api/v1/cron/deposit-refund-watch", "schedule": "0 4 * * *" },
+    { "path": "/api/v1/cron/rating-year-reset", "schedule": "10 19 30 6 *" },
+    { "path": "/api/v1/cron/notifications-dispatch", "schedule": "*/5 * * * *" }
+  ]
+}
