@@ -38,6 +38,10 @@ export const ACTIONS = [
   'contract.generate',
   'contract.sign',
   'residency.issueKeys',
+  'invoice.read',
+  'invoice.issue',
+  'payment.record',
+  'deposit.read',
   'settings.org.read',
   'settings.org.write',
   'settings.house.read',
@@ -79,6 +83,10 @@ export const PERMISSIONS: PermissionMatrix = {
     // Подпись личная: за жильца её не ставит никто, даже суперадмин.
     'contract.sign': 'none',
     'residency.issueKeys': 'org',
+    'invoice.read': 'org',
+    'invoice.issue': 'org',
+    'payment.record': 'org',
+    'deposit.read': 'org',
     'settings.org.read': 'org',
     'settings.org.write': 'org',
     'settings.house.read': 'org',
@@ -109,6 +117,10 @@ export const PERMISSIONS: PermissionMatrix = {
     'contract.generate': 'house',
     'contract.sign': 'none',
     'residency.issueKeys': 'house',
+    'invoice.read': 'house',
+    'invoice.issue': 'house',
+    'payment.record': 'house',
+    'deposit.read': 'house',
     'settings.org.read': 'none',
     'settings.org.write': 'none',
     'settings.house.read': 'house',
@@ -156,6 +168,15 @@ export const PERMISSIONS: PermissionMatrix = {
     'contract.generate': 'none',
     'contract.sign': 'self',
     'residency.issueKeys': 'none',
+    /*
+     * Свои счета и своё движение депозита жилец видит (модуль 1, «Депозит»),
+     * но выставляет счета и отмечает платежи только админ: деньги приходят
+     * не через приложение, и подтверждает их получение тот, кто их получил.
+     */
+    'invoice.read': 'self',
+    'invoice.issue': 'none',
+    'payment.record': 'none',
+    'deposit.read': 'self',
     'settings.org.read': 'none',
     'settings.org.write': 'none',
     'settings.house.read': 'none',

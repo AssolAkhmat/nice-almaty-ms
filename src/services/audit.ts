@@ -35,6 +35,10 @@ export const AUDIT_ACTIONS = {
   contractGenerated: 'contract.generated',
   contractSigned: 'contract.signed',
   keysIssued: 'residency.keys_issued',
+  invoiceIssued: 'invoice.issued',
+  paymentRecorded: 'payment.recorded',
+  depositCharged: 'deposit.charged',
+  residencyActivated: 'residency.activated',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

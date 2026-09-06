@@ -30,6 +30,18 @@ export const ORG_SETTINGS = {
   },
 } as const;
 
+/**
+ * Настройки дома. Первый ключ появляется здесь: размер депозита по умолчанию
+ * (§1.2 п.7 — 45 000 ₸, настраивается на уровне дома). Механизм со `scope=house`
+ * готов с фазы 1, ключей до сих пор не было.
+ */
+export const HOUSE_SETTINGS = {
+  depositDefault: {
+    key: 'deposit.default',
+    defaultValue: 45_000,
+  },
+} as const;
+
 export interface OrgSettings {
   ratingVisibleToResidents: boolean;
   defaultLocale: Locale;
@@ -60,6 +72,60 @@ export async function readOrgSettings(
       typeof visible === 'boolean' ? visible : ORG_SETTINGS.ratingVisibleToResidents.defaultValue,
     defaultLocale: isLocale(locale) ? locale : ORG_SETTINGS.defaultLocale.defaultValue,
   };
+}
+
+/**
+ * Размер депозита по умолчанию для дома. Деньги — целые тенге (D9):
+ * дробное или отрицательное значение из настроек не принимается,
+ * иначе счёт вышел бы с невозможной суммой.
+ */
+export async function readHouseDepositDefault(
+  actor: UserActor,
+  houseId: string,
+  executor: Executor = getDb(),
+): Promise<number> {
+  assertCan(actor.context, 'settings.house.read', { houseId });
+
+  const setting = await getSetting(
+    actor.context,
+    'house',
+    houseId,
+    HOUSE_SETTINGS.depositDefault.key,
+    executor,
+  );
+
+  const value = setting?.value;
+
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0
+    ? value
+    : HOUSE_SETTINGS.depositDefault.defaultValue;
+}
+
+export async function writeHouseSetting(
+  actor: UserActor,
+  houseId: string,
+  key: string,
+  value: unknown,
+  executor: Executor = getDb(),
+): Promise<void> {
+  assertCan(actor.context, 'settings.house.write', { houseId });
+
+  return executor.transaction(async (tx) => {
+    const before = await getSetting(actor.context, 'house', houseId, key, tx);
+    await putSetting(actor.context, 'house', houseId, key, value, tx);
+
+    await recordAudit(
+      { context: actor.context, ip: actor.ip, requestId: actor.requestId },
+      {
+        action: AUDIT_ACTIONS.settingChanged,
+        entityType: 'setting',
+        entityId: `house:${houseId}:${key}`,
+        before: { value: before?.value ?? null },
+        after: { value },
+      },
+      tx,
+    );
+  });
 }
 
 export async function writeOrgSetting(

@@ -6,6 +6,7 @@ export * from './documents';
 export * from './enums';
 export * from './files';
 export * from './houses';
+export * from './invoices';
 export * from './job-runs';
 export * from './organizations';
 export * from './rate-limits';

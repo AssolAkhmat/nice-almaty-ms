@@ -93,7 +93,8 @@
     "inventory": "Inventory",
     "settings": "Settings",
     "documents": "Documents",
-    "contract": "Contract"
+    "contract": "Contract",
+    "deposit": "Deposit"
   },
   "houses": {
     "title": "Houses",
@@ -398,5 +399,56 @@
       "upload": "The signature could not be sent",
       "emptySignature": "Draw your signature first"
     }
+  },
+  "deposit": {
+    "title": "Deposit",
+    "subtitle": "Deposit balance and its movement over the year",
+    "adminSubtitle": "Deposits of residents in your house: invoices and payments",
+    "invoice": "Deposit invoice",
+    "noInvoice": "The invoice is not issued yet",
+    "total": "Invoice total",
+    "paid": "Paid",
+    "remaining": "Left to pay",
+    "movements": "Movement in {year}",
+    "noMovements": "No movement yet",
+    "amount": "Deposit amount",
+    "amountHint": "Empty — the house default is used",
+    "issue": "Issue the invoice",
+    "paymentAmount": "Payment amount",
+    "method": "Payment method",
+    "cash": "Cash",
+    "record": "Record the payment",
+    "invoiceIssued": "The invoice is issued",
+    "paymentRecorded": "The payment is recorded",
+    "empty": "No residencies",
+    "emptyHint": "Deposits appear here once move-in is set up",
+    "noResidency": "Residency is not set up yet",
+    "noResidencyHint": "The deposit appears once the admin sets up your move-in",
+    "status": {
+      "pending": "Pending",
+      "issued": "Issued",
+      "partially_paid": "Partially paid",
+      "paid": "Paid",
+      "cancelled": "Cancelled",
+      "returned": "Returned",
+      "burned": "Burned"
+    },
+    "movement": {
+      "charge": "Deposit top-up",
+      "damage_share": "Damage deduction",
+      "damage_reversal": "Damage reversal",
+      "refund": "Deposit refund",
+      "burn": "Deposit burn",
+      "adjustment": "Adjustment"
+    },
+    "errors": {
+      "unauthorized": "Sign-in required",
+      "unknown": "The action could not be completed",
+      "method": "Choose a payment method"
+    }
+  },
+  "deposits": {
+    "amountInvalid": "The amount must be a whole number of tenge",
+    "overpayment": "The amount exceeds what is left on the invoice"
   }
 }
