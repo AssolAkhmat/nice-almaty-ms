@@ -20,8 +20,9 @@ test-results/
 .env.local
 .env.*.local
 
-# локальное хранилище файлов
-storage/
+# локальное хранилище файлов: якорь от корня обязателен, иначе шаблон
+# проглатывает и src/adapters/storage/
+/storage/
 
 # платформы
 .vercel/
