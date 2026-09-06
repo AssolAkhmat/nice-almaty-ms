@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -165,7 +166,10 @@ describe('сессия загрузки', () => {
       expect(session.upload.method).toBe('PUT');
       expect(session.upload.url).toBe(`/api/v1/files/${session.fileId}/blob`);
 
-      const [row] = await tx.select().from(schema.files);
+      const [row] = await tx
+        .select()
+        .from(schema.files)
+        .where(eq(schema.files.orgId, fixture.orgId));
       expect(row).toMatchObject({ status: 'pending', provider: 'local', mime: 'image/jpeg' });
     });
   });
@@ -185,7 +189,10 @@ describe('сессия загрузки', () => {
         },
       );
 
-      const [row] = await tx.select().from(schema.files);
+      const [row] = await tx
+        .select()
+        .from(schema.files)
+        .where(eq(schema.files.orgId, fixture.orgId));
       expect(row?.path).toBe(
         `${fixture.houseSlug}/${fixture.residencyA}/fluorography/${session.fileId}.jpg`,
       );
@@ -234,7 +241,9 @@ describe('сессия загрузки', () => {
         ),
       ).rejects.toBeInstanceOf(ValidationError);
 
-      expect(await tx.select().from(schema.files)).toHaveLength(0);
+      expect(
+        await tx.select().from(schema.files).where(eq(schema.files.orgId, fixture.orgId)),
+      ).toHaveLength(0);
     });
   });
 
@@ -254,7 +263,9 @@ describe('сессия загрузки', () => {
         ),
       ).rejects.toBeInstanceOf(ValidationError);
 
-      expect(await tx.select().from(schema.files)).toHaveLength(0);
+      expect(
+        await tx.select().from(schema.files).where(eq(schema.files.orgId, fixture.orgId)),
+      ).toHaveLength(0);
     });
   });
 });
@@ -310,7 +321,10 @@ describe('приём байтов и подтверждение', () => {
       });
       await completeUpload(fixture.residentA, session.fileId, { executor: tx, storage });
 
-      const entries = await tx.select().from(schema.auditLog);
+      const entries = await tx
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.orgId, fixture.orgId));
       expect(entries.map((entry) => entry.action)).toContain('file.uploaded');
     });
   });
@@ -339,7 +353,10 @@ describe('приём байтов и подтверждение', () => {
         ),
       ).rejects.toBeInstanceOf(ValidationError);
 
-      const [row] = await tx.select().from(schema.files);
+      const [row] = await tx
+        .select()
+        .from(schema.files)
+        .where(eq(schema.files.orgId, fixture.orgId));
       expect(row?.status).toBe('failed');
     });
   });
@@ -365,7 +382,10 @@ describe('приём байтов и подтверждение', () => {
         }),
       ).rejects.toBeInstanceOf(ValidationError);
 
-      const [row] = await tx.select().from(schema.files);
+      const [row] = await tx
+        .select()
+        .from(schema.files)
+        .where(eq(schema.files.orgId, fixture.orgId));
       expect(row?.status).toBe('failed');
     });
   });
@@ -388,7 +408,10 @@ describe('приём байтов и подтверждение', () => {
         completeUpload(fixture.residentA, session.fileId, { executor: tx, storage }),
       ).rejects.toBeInstanceOf(ConflictError);
 
-      const [row] = await tx.select().from(schema.files);
+      const [row] = await tx
+        .select()
+        .from(schema.files)
+        .where(eq(schema.files.orgId, fixture.orgId));
       expect(row?.status).toBe('failed');
     });
   });
@@ -494,7 +517,10 @@ describe('отдача содержимого', () => {
       const content = await readFileContent(fixture.adminA, fileId, { executor: tx, storage });
       await content.stream.cancel();
 
-      const entries = await tx.select().from(schema.auditLog);
+      const entries = await tx
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.orgId, fixture.orgId));
       expect(entries.map((entry) => entry.action)).toContain('file.read');
     });
   });
@@ -506,7 +532,10 @@ describe('отдача содержимого', () => {
       const content = await readFileContent(fixture.residentA, fileId, { executor: tx, storage });
       await content.stream.cancel();
 
-      const entries = await tx.select().from(schema.auditLog);
+      const entries = await tx
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.orgId, fixture.orgId));
       expect(entries.map((entry) => entry.action)).not.toContain('file.read');
     });
   });

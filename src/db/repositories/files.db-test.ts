@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -257,7 +258,7 @@ describe('файлы', () => {
         updateFile(fixture.adminA, foreign.id, { status: 'ready' }, tx),
       ).resolves.toBeNull();
 
-      const [row] = await tx.select().from(schema.files);
+      const [row] = await tx.select().from(schema.files).where(eq(schema.files.id, foreign.id));
       expect(row?.status).toBe('pending');
     });
   });

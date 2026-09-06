@@ -174,7 +174,10 @@ describe('счёт на депозит', () => {
 
       expect(invoice.total).toBe(57_000);
 
-      const lines = await tx.select().from(schema.invoiceLines);
+      const lines = await tx
+        .select()
+        .from(schema.invoiceLines)
+        .where(eq(schema.invoiceLines.invoiceId, invoice.id));
       expect(lines.map((line) => line.kind).sort()).toEqual(['deposit', 'extra']);
     });
   });
@@ -295,7 +298,10 @@ describe('оплата депозита', () => {
         { executor: tx, today: TODAY },
       );
 
-      const transactions = await tx.select().from(schema.depositTransactions);
+      const transactions = await tx
+        .select()
+        .from(schema.depositTransactions)
+        .where(eq(schema.depositTransactions.residencyId, fixture.residencyA));
       expect(transactions).toHaveLength(1);
       expect(transactions[0]).toMatchObject({ type: 'charge', amount: 45_000 });
     });
@@ -318,7 +324,10 @@ describe('оплата депозита', () => {
         { executor: tx, today: TODAY },
       );
 
-      const transactions = await tx.select().from(schema.depositTransactions);
+      const transactions = await tx
+        .select()
+        .from(schema.depositTransactions)
+        .where(eq(schema.depositTransactions.residencyId, fixture.residencyA));
       expect(transactions[0]?.amount).toBe(45_000);
     });
   });
@@ -364,7 +373,9 @@ describe('оплата депозита', () => {
         { executor: tx, today: TODAY },
       );
 
-      const actions = (await tx.select().from(schema.auditLog)).map((entry) => entry.action);
+      const actions = (
+        await tx.select().from(schema.auditLog).where(eq(schema.auditLog.orgId, fixture.orgId))
+      ).map((entry) => entry.action);
       expect(actions).toContain('payment.recorded');
       expect(actions).toContain('deposit.charged');
       expect(actions).toContain('residency.activated');

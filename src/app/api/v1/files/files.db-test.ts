@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -407,7 +408,7 @@ describe('POST /api/v1/files/{id}/complete', () => {
       const fixture = await seed(tx, '4030');
       const fileId = await uploadReadyFile(fixture.a.token, fixture.a.residencyId);
 
-      const [row] = await tx.select().from(schema.files);
+      const [row] = await tx.select().from(schema.files).where(eq(schema.files.id, fileId));
       expect(row).toMatchObject({ id: fileId, status: 'ready' });
     });
   });
