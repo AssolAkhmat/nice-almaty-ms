@@ -10,6 +10,12 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Код возврата конвейера берётся от упавшей команды, а не от последней:
+# без pipefail шаг с `... | grep` прошёл бы даже при упавшем psql.
+defaults:
+  run:
+    shell: bash
+
 env:
   # Тестовые, не секретные значения: escape-hatch вида SKIP_ENV_VALIDATION
   # мы намеренно не заводим (docs/08-DECISIONS.md, P0-6).
@@ -90,6 +96,7 @@ jobs:
 
       - name: Расширение btree_gist установлено
         run: |
+          set -euo pipefail
           PGPASSWORD=nice psql -h localhost -U nice -d nice_almaty \
             -tAc "select extname from pg_extension where extname = 'btree_gist'" | grep -q btree_gist
 
