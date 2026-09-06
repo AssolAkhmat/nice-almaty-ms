@@ -74,7 +74,12 @@ export function CreateAccountForm({ houses }: { houses: readonly HouseOption[] }
             role="status"
           >
             <p className="text-text-muted text-[13px]">{t('users.create.passwordOnce')}</p>
-            <p className="tabular mt-1 text-[15px] font-semibold">{state.temporaryPassword}</p>
+            <p
+              className="tabular mt-1 text-[15px] font-semibold"
+              data-testid="temporary-password-value"
+            >
+              {state.temporaryPassword}
+            </p>
             <p className="text-text-muted mt-1 text-[13px]">{state.createdPhone}</p>
           </div>
         ) : null}
