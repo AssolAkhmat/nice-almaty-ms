@@ -4,6 +4,7 @@ import { listDocuments, listDocumentTypes } from '@/db/repositories/documents';
 import { listResidencies } from '@/db/repositories/residencies';
 import { findProfile } from '@/db/repositories/resident-profiles';
 import { documentValidity } from '@/domain/documents';
+import { accessScopeOf, type ResidencyAccessScope } from '@/lib/residency-access';
 import { parseBusinessDate, todayInAlmaty, type BusinessDate } from '@/lib/time';
 
 import type { Residency, ResidentProfile } from '@/db/schema';
@@ -28,8 +29,11 @@ export interface OnboardingStep {
 export interface OnboardingView {
   residency: Residency | null;
   steps: OnboardingStep[];
-  /** Остальные модули закрыты, пока депозит не оплачен (§1.2). */
-  isBlocked: boolean;
+  /**
+   * Что открыто жильцу сейчас: до оплаты депозита закрыты почти все модули
+   * (§1.2), после расторжения — все, кроме профиля и депозита (§2.3 п.2).
+   */
+  scope: ResidencyAccessScope;
 }
 
 export interface OnboardingDeps {
@@ -85,7 +89,7 @@ export async function readOnboarding(
     return {
       residency: null,
       steps: ONBOARDING_STEPS.map((key) => ({ key, done: false })),
-      isBlocked: true,
+      scope: accessScopeOf(null),
     };
   }
 
@@ -123,6 +127,20 @@ export async function readOnboarding(
   return {
     residency,
     steps: ONBOARDING_STEPS.map((key) => ({ key, done: done[key] })),
-    isBlocked: residency.status !== 'active',
+    scope: accessScopeOf(residency.status),
   };
+}
+
+/**
+ * Только область доступа, без сборки всего мастера: защищённый layout
+ * спрашивает её на каждом запросе, а документы и профиль ему не нужны.
+ */
+export async function readAccessScope(
+  actor: UserActor,
+  deps: OnboardingDeps = {},
+): Promise<ResidencyAccessScope> {
+  const executor = deps.executor ?? getDb();
+  const [residency] = await listResidencies(actor.context, {}, executor);
+
+  return accessScopeOf(residency?.status ?? null);
 }

@@ -41,6 +41,11 @@ export const AUDIT_ACTIONS = {
   residencyActivated: 'residency.activated',
   bedAssigned: 'bed.assigned',
   bedReleased: 'bed.released',
+  residencyTerminated: 'residency.terminated',
+  residencyArchived: 'residency.archived',
+  depositRefundIssued: 'deposit.refund_issued',
+  depositRefunded: 'deposit.refunded',
+  depositBurned: 'deposit.burned',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

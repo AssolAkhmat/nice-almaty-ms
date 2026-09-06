@@ -546,5 +546,72 @@
       "unknown": "The action could not be completed",
       "role": "Choose a role"
     }
+  },
+  "terminations": {
+    "title": "Contract termination",
+    "hint": "Every module except the profile and the deposit closes immediately. Sign-in stays available.",
+    "terminate": "Terminate contract",
+    "modalTitle": "Contract termination",
+    "modalHint": "After confirmation the resident keeps only the profile and the deposit. The bed is freed from the move-out date.",
+    "moveOutDate": "Move-out date",
+    "moveOutHint": "Today by default. A future date is allowed: the bed is freed from it.",
+    "reason": "Reason",
+    "confirm": "Confirm termination",
+    "settlementTitle": "Move-out settlement",
+    "balance": "Deposit balance",
+    "damages": "Damages charged",
+    "fullMonths": "Full months",
+    "deadline": "Refund deadline",
+    "daysLeft": "Until refund",
+    "days": "{days, plural, one {# day} other {# days}}",
+    "overdue": "Overdue by {days, plural, one {# day} other {# days}}",
+    "outcome": "Deposit decision",
+    "outcomes": {
+      "refund": "Refund",
+      "burn": "Forfeited",
+      "nothing": "Nothing to refund",
+      "debt": "Resident owes"
+    },
+    "debt": "Debt",
+    "refundInvoice": "Refund invoice",
+    "refundStatus": {
+      "pending": "Pending",
+      "returned": "Returned",
+      "burned": "Forfeited",
+      "cancelled": "Cancelled"
+    },
+    "createRefund": "Create refund invoice",
+    "settle": "Mark as paid out",
+    "archive": "Finish move-out",
+    "terminated": "Contract terminated",
+    "refundIssued": "Refund invoice created",
+    "nothingToRefund": "Nothing to refund: the deposit balance is not positive",
+    "refunded": "Refund recorded",
+    "archived": "Residency archived",
+    "noticeTitle": "Contract is being terminated",
+    "noticeHint": "Only the profile and the deposit stay open. Other sections are closed until the settlement is done.",
+    "statusTerminating": "Terminating",
+    "links": {
+      "profile": "Profile",
+      "deposit": "Deposit"
+    },
+    "errors": {
+      "unauthorized": "Sign-in required",
+      "unknown": "The action could not be completed",
+      "notActive": "Only an active residency can be terminated",
+      "notTerminating": "Available only after termination",
+      "refundExists": "The refund invoice already exists",
+      "refundClosed": "The refund invoice is already closed",
+      "notRefundInvoice": "This is not a deposit refund invoice",
+      "moveOutNotReached": "The move-out date has not come yet",
+      "depositNotSettled": "The deposit has not been refunded yet",
+      "notUpdated": "The record was not updated",
+      "reasonRequired": "State the reason for termination",
+      "moveOutDate": {
+        "invalid": "Invalid move-out date",
+        "inPast": "The move-out date cannot be in the past",
+        "beforeMoveIn": "The move-out date cannot precede the move-in date"
+      }
+    }
   }
 }

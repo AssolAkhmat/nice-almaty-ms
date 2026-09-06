@@ -38,6 +38,7 @@ export const ACTIONS = [
   'contract.generate',
   'contract.sign',
   'residency.issueKeys',
+  'residency.terminate',
   'bed.read',
   'bed.assign',
   'invoice.read',
@@ -85,6 +86,7 @@ export const PERMISSIONS: PermissionMatrix = {
     // Подпись личная: за жильца её не ставит никто, даже суперадмин.
     'contract.sign': 'none',
     'residency.issueKeys': 'org',
+    'residency.terminate': 'org',
     'bed.read': 'org',
     'bed.assign': 'org',
     'invoice.read': 'org',
@@ -121,6 +123,7 @@ export const PERMISSIONS: PermissionMatrix = {
     'contract.generate': 'house',
     'contract.sign': 'none',
     'residency.issueKeys': 'house',
+    'residency.terminate': 'house',
     'bed.read': 'house',
     'bed.assign': 'house',
     'invoice.read': 'house',
@@ -174,6 +177,12 @@ export const PERMISSIONS: PermissionMatrix = {
     'contract.generate': 'none',
     'contract.sign': 'self',
     'residency.issueKeys': 'none',
+    /*
+     * Расторжение договора — действие администрации (§2.3 п.1). Жилец
+     * сообщает о выезде вне приложения: иначе он закрывал бы себе доступ
+     * сам и без разбора депозита.
+     */
+    'residency.terminate': 'none',
     /*
      * Свои счета и своё движение депозита жилец видит (модуль 1, «Депозит»),
      * но выставляет счета и отмечает платежи только админ: деньги приходят

@@ -2,10 +2,10 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 import { AppShell } from '@/components/layout/app-shell';
-import { isAllowedDuringOnboarding } from '@/lib/onboarding-access';
+import { isPathAllowed } from '@/lib/residency-access';
 import { getCurrentSession } from '@/lib/session';
 import { PATHNAME_HEADER } from '@/middleware';
-import { readOnboarding } from '@/services/onboarding';
+import { readAccessScope } from '@/services/onboarding';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,17 +26,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   /*
-   * Жёсткая блокировка §1.2: до оплаты депозита жильцу открыты только профиль,
-   * документы и свои счета. Проверка стоит здесь, а не в каждой странице:
-   * забытая страница означала бы дыру в правиле.
+   * Жёсткая блокировка §1.2 до оплаты депозита и §2.3 п.2 после расторжения.
+   * Проверка стоит здесь, а не в каждой странице: забытая страница означала
+   * бы дыру в правиле.
+   *
+   * В базу идём только за путями, закрытыми хотя бы в одной области:
+   * профиль и депозит открыты в любой, и статус для них спрашивать незачем.
    */
   if (session.context.role === 'resident') {
     const pathname = (await headers()).get(PATHNAME_HEADER) ?? '/';
 
-    if (!isAllowedDuringOnboarding(pathname)) {
-      const onboarding = await readOnboarding({ context: session.context });
+    if (!isPathAllowed('termination', pathname)) {
+      const scope = await readAccessScope({ context: session.context });
 
-      if (onboarding.isBlocked) {
+      if (!isPathAllowed(scope, pathname)) {
         redirect('/');
       }
     }

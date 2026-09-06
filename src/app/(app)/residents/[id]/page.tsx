@@ -6,10 +6,14 @@ import { listHouses } from '@/db/repositories/houses';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Money } from '@/components/ui/money';
+import { can } from '@/lib/authz';
 import { getCurrentSession } from '@/lib/session';
+import { todayInAlmaty } from '@/lib/time';
 import { readResidentCard } from '@/services/residents';
+import { readTerminationView } from '@/services/terminations';
 
 import { RoleForm } from './role-form';
+import { TerminationPanel } from './termination-panel';
 
 import type { UserActor } from '@/services/users';
 
@@ -35,6 +39,24 @@ export default async function ResidentCardPage({ params }: { params: Promise<{ i
   const { id } = await params;
   const card = await readResidentCard(actor, id);
   const houses = context.role === 'superadmin' ? await listHouses(context) : [];
+
+  /*
+   * Расторжение показывается только тому, кто вправе его выполнить. Роль
+   * здесь не спрашивается: право читается там же, где его проверяет сервис.
+   */
+  const canTerminate = can(context, 'residency.terminate', {
+    houseId: card.residency.houseId,
+    userId: card.row.userId,
+  });
+
+  /*
+   * Расчёт нужен действующему и расторгаемому проживанию. Незаселённому
+   * расторгать нечего, архивному — уже нечего считать.
+   */
+  const withTermination =
+    canTerminate && (card.residency.status === 'active' || card.residency.status === 'terminating');
+
+  const termination = withTermination ? await readTerminationView(actor, card.residency.id) : null;
 
   return (
     <section className="flex flex-col gap-6">
@@ -84,6 +106,33 @@ export default async function ResidentCardPage({ params }: { params: Promise<{ i
           </div>
         </div>
       </Card>
+
+      {termination !== null && (
+        <TerminationPanel
+          view={{
+            residencyId: termination.residency.id,
+            status: termination.residency.status,
+            today: todayInAlmaty(),
+            moveOutDate: termination.residency.moveOutDate,
+            balance: termination.balance,
+            damages: termination.damages,
+            fullMonths: termination.fullMonths,
+            deadline: termination.deadline,
+            daysLeft: termination.daysLeft,
+            outcome: termination.outcome.kind,
+            debt: termination.outcome.debt,
+            refundInvoice:
+              termination.refundInvoice === null
+                ? null
+                : {
+                    id: termination.refundInvoice.id,
+                    total: termination.refundInvoice.total,
+                    status: termination.refundInvoice.status,
+                  },
+            canArchive: termination.canArchive,
+          }}
+        />
+      )}
 
       {context.role === 'superadmin' && (
         <Card>

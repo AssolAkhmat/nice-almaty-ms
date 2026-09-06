@@ -129,7 +129,7 @@ describe('шаги заселения', () => {
       );
 
       expect(view.residency).toBeNull();
-      expect(view.isBlocked).toBe(true);
+      expect(view.scope).toBe('onboarding');
       expect(view.steps.every((step) => !step.done)).toBe(true);
     });
   });
@@ -311,7 +311,7 @@ describe('шаги заселения', () => {
       const view = await readOnboarding(fixture.actor, { executor: tx, today: TODAY });
 
       expect(stepDone(view.steps, 'deposit')).toBe(true);
-      expect(view.isBlocked).toBe(false);
+      expect(view.scope).toBe('full');
     });
   });
 
