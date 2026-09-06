@@ -9,7 +9,9 @@ import {
   daysInMonth,
   differenceInDays,
   endOfMonth,
+  minusMilliseconds,
   now,
+  plusMilliseconds,
   parseBusinessDate,
   startOfDayUtc,
   startOfMonth,
@@ -152,6 +154,29 @@ describe('арифметика дней', () => {
     expect(differenceInDays(businessDate(2026, 9, 1), businessDate(2026, 9, 30))).toBe(29);
     expect(differenceInDays(businessDate(2026, 9, 30), businessDate(2026, 9, 1))).toBe(-29);
     expect(differenceInDays(businessDate(2026, 9, 1), businessDate(2026, 9, 1))).toBe(0);
+  });
+});
+
+describe('сдвиг момента времени', () => {
+  it('вперёд и назад на миллисекунды', () => {
+    const instant = new Date('2026-09-06T12:00:00.000Z');
+
+    expect(plusMilliseconds(instant, 1000).toISOString()).toBe('2026-09-06T12:00:01.000Z');
+    expect(minusMilliseconds(instant, 1000).toISOString()).toBe('2026-09-06T11:59:59.000Z');
+  });
+
+  it('окно ограничения попыток входа — пятнадцать минут назад', () => {
+    const instant = new Date('2026-09-06T12:00:00.000Z');
+    const windowStart = minusMilliseconds(instant, 15 * 60 * 1000);
+
+    expect(windowStart.toISOString()).toBe('2026-09-06T11:45:00.000Z');
+  });
+
+  it('не меняет исходный момент', () => {
+    const instant = new Date('2026-09-06T12:00:00.000Z');
+    plusMilliseconds(instant, 5000);
+
+    expect(instant.toISOString()).toBe('2026-09-06T12:00:00.000Z');
   });
 });
 

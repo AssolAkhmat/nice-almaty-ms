@@ -135,6 +135,8 @@ src/
 DEPLOY_TARGET=docker|vercel
 DATABASE_URL=
 DIRECT_DATABASE_URL=          # для миграций на Supabase (порт 5432)
+POSTGRES_PORT=5432            # порт публикации postgres из compose наружу
+TEST_DATABASE_URL=            # только для pnpm test:db, приложение не читает
 APP_URL=
 SESSION_SECRET=
 FIELD_ENCRYPTION_KEY=         # 32 байта base64

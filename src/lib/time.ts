@@ -149,6 +149,16 @@ export function endOfMonth(date: BusinessDate): BusinessDate {
   return formatParts(year, month, daysInMonth(year, month));
 }
 
+/** Момент, сдвинутый вперёд на указанное число миллисекунд. */
+export function plusMilliseconds(instant: Date, milliseconds: number): Date {
+  return new Date(instant.getTime() + milliseconds);
+}
+
+/** Момент, сдвинутый назад: нужен скользящим окнам вроде ограничения попыток входа. */
+export function minusMilliseconds(instant: Date, milliseconds: number): Date {
+  return new Date(instant.getTime() - milliseconds);
+}
+
 /** Отрицательное — `a` раньше `b`; ноль — совпадают; положительное — `a` позже. */
 export function compareBusinessDates(a: BusinessDate, b: BusinessDate): number {
   return a < b ? -1 : a > b ? 1 : 0;

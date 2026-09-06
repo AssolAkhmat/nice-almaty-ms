@@ -7,6 +7,16 @@ import * as schema from './schema';
 
 export type Database = PostgresJsDatabase<typeof schema>;
 
+/** Транзакция drizzle: тот же интерфейс запросов, что и у базы. */
+export type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
+
+/**
+ * То, на чём выполняется запрос: база или открытая транзакция.
+ * Репозитории принимают это, чтобы сервисы могли собрать несколько
+ * изменений и запись в аудит в одну транзакцию.
+ */
+export type Executor = Database | Transaction;
+
 let sql: postgres.Sql | undefined;
 let database: Database | undefined;
 

@@ -51,8 +51,8 @@ jobs:
         env:
           DEPLOY_TARGET: vercel
 
-  migrations:
-    name: Миграции на чистой БД
+  database:
+    name: Миграции и интеграционные тесты
     runs-on: ubuntu-latest
     services:
       postgres:
