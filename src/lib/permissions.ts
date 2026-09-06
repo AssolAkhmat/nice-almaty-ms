@@ -1,0 +1,116 @@
+import type { AccessRole } from '@/db/access';
+
+/**
+ * Матрица прав — данные, а не код (docs/08-DECISIONS.md, P1-4).
+ * `authz.ts` собственной логики не содержит и читает только этот объект.
+ *
+ * Источник: docs/00-PRD.md (роли) и docs/04-MODULES/11-users-settings.md.
+ */
+
+/** Над каким множеством объектов роль вправе выполнять действие. */
+export type PermissionScope =
+  /** Запрещено. */
+  | 'none'
+  /** Только собственная запись. */
+  | 'self'
+  /** Объекты своего дома. */
+  | 'house'
+  /** Любые объекты своей сети. */
+  | 'org';
+
+export const ACTIONS = [
+  'house.read',
+  'house.create',
+  'house.update',
+  'house.archive',
+  'user.read',
+  'user.create',
+  'user.updateProfile',
+  'user.changeRole',
+  'user.moveAdmin',
+  'user.archive',
+  'user.allowPasswordReset',
+  'settings.org.read',
+  'settings.org.write',
+  'settings.house.read',
+  'settings.house.write',
+  'audit.read',
+  'self.changePassword',
+  'self.updatePreferences',
+] as const;
+
+export type Action = (typeof ACTIONS)[number];
+
+export type PermissionMatrix = Readonly<
+  Record<AccessRole, Readonly<Record<Action, PermissionScope>>>
+>;
+
+/**
+ * Жилец в фазе 1 не связан с домом: связь идёт через проживание,
+ * которое появится в фазе 2. Поэтому `house.read` у него пока `none`.
+ */
+export const PERMISSIONS: PermissionMatrix = {
+  superadmin: {
+    'house.read': 'org',
+    'house.create': 'org',
+    'house.update': 'org',
+    'house.archive': 'org',
+    'user.read': 'org',
+    'user.create': 'org',
+    'user.updateProfile': 'org',
+    'user.changeRole': 'org',
+    'user.moveAdmin': 'org',
+    'user.archive': 'org',
+    'user.allowPasswordReset': 'org',
+    'settings.org.read': 'org',
+    'settings.org.write': 'org',
+    'settings.house.read': 'org',
+    'settings.house.write': 'org',
+    'audit.read': 'org',
+    'self.changePassword': 'self',
+    'self.updatePreferences': 'self',
+  },
+  admin: {
+    'house.read': 'house',
+    // Дома заводит и архивирует только суперадмин (модуль 11, «Настройки сети»).
+    'house.create': 'none',
+    'house.update': 'none',
+    'house.archive': 'none',
+    'user.read': 'house',
+    'user.create': 'none',
+    // Админ вправе менять любой пункт профиля жильца своего дома (модуль 1).
+    'user.updateProfile': 'house',
+    'user.changeRole': 'none',
+    'user.moveAdmin': 'none',
+    'user.archive': 'none',
+    'user.allowPasswordReset': 'house',
+    'settings.org.read': 'none',
+    'settings.org.write': 'none',
+    'settings.house.read': 'house',
+    'settings.house.write': 'house',
+    // Журнал аудита читает только суперадмин (§11).
+    'audit.read': 'none',
+    'self.changePassword': 'self',
+    'self.updatePreferences': 'self',
+  },
+  resident: {
+    'house.read': 'none',
+    'house.create': 'none',
+    'house.update': 'none',
+    'house.archive': 'none',
+    'user.read': 'self',
+    'user.create': 'none',
+    'user.updateProfile': 'self',
+    'user.changeRole': 'none',
+    'user.moveAdmin': 'none',
+    'user.archive': 'none',
+    'user.allowPasswordReset': 'none',
+    'settings.org.read': 'none',
+    'settings.org.write': 'none',
+    'settings.house.read': 'none',
+    'settings.house.write': 'none',
+    'audit.read': 'none',
+    'self.changePassword': 'self',
+    'self.updatePreferences': 'self',
+  },
+};
