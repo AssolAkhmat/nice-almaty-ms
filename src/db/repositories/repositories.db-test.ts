@@ -2,6 +2,8 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { afterAll, describe, expect, it } from 'vitest';
 
+import { testDatabaseUrl } from '@/db/testing/database-url';
+
 import { ForbiddenError, NotFoundError } from '@/lib/errors';
 import { minusMilliseconds, now } from '@/lib/time';
 
@@ -20,7 +22,7 @@ import { createUser, findUserByPhone, listUsers, requireUser } from './users';
  * и фильтрация по org_id и house_id проверяются там, где они действуют,
  * а не в подделке. Запуск — `pnpm test:db`, в CI — в job с postgres.
  */
-const url = process.env.TEST_DATABASE_URL ?? 'postgres://nice:nice@localhost:5432/nice_almaty';
+const url = testDatabaseUrl();
 // Быстрый отказ: без этого каждый упавший тест ждал бы повторов подключения.
 const client = postgres(url, { max: 1, connect_timeout: 5, onnotice: () => undefined });
 const db = drizzle(client, { schema }) as unknown as Database;

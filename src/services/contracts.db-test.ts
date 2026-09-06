@@ -8,6 +8,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import { createLocalStorage } from '@/adapters/storage/local';
 import * as schema from '@/db/schema';
+import { testDatabaseUrl } from '@/db/testing/database-url';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { parseBusinessDate } from '@/lib/time';
 
@@ -28,7 +29,7 @@ import type { UserActor } from './users';
  * и что записано в проживании. Сам драйвер печати проверен отдельно
  * в `src/adapters/pdf/chromium.test.ts`.
  */
-const url = process.env.TEST_DATABASE_URL ?? 'postgres://nice:nice@localhost:5432/nice_almaty';
+const url = testDatabaseUrl();
 const client = postgres(url, { max: 1, connect_timeout: 5, onnotice: () => undefined });
 const db = drizzle(client, { schema }) as unknown as Database;
 

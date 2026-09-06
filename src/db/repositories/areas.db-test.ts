@@ -5,6 +5,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 
 import * as schema from '@/db/schema';
+import { testDatabaseUrl } from '@/db/testing/database-url';
 import { parseInstant } from '@/lib/time';
 import { NotFoundError } from '@/lib/errors';
 
@@ -13,7 +14,7 @@ import { createArea, createBed, listAreas, listBeds, requireBed, updateBed } fro
 import type { AccessContext } from '../access';
 import type { Database, Transaction } from '../client';
 
-const url = process.env.TEST_DATABASE_URL ?? 'postgres://nice:nice@localhost:5432/nice_almaty';
+const url = testDatabaseUrl();
 const client = postgres(url, { max: 1, connect_timeout: 5, onnotice: () => undefined });
 const db = drizzle(client, { schema }) as unknown as Database;
 

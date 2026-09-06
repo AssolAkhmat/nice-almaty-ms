@@ -4,6 +4,7 @@ import postgres from 'postgres';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import * as schema from '@/db/schema';
+import { testDatabaseUrl } from '@/db/testing/database-url';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { parseBusinessDate } from '@/lib/time';
 
@@ -19,7 +20,7 @@ import type { UserActor } from './users';
  * идёт через проживание, а не через `users.house_id`, поэтому у админа
  * наконец есть кого показывать (D11).
  */
-const url = process.env.TEST_DATABASE_URL ?? 'postgres://nice:nice@localhost:5432/nice_almaty';
+const url = testDatabaseUrl();
 const client = postgres(url, { max: 1, connect_timeout: 5, onnotice: () => undefined });
 const db = drizzle(client, { schema }) as unknown as Database;
 

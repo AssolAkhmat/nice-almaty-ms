@@ -4,6 +4,7 @@ import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import * as schema from '@/db/schema';
+import { testDatabaseUrl } from '@/db/testing/database-url';
 import { listAuditEntries } from '@/db/repositories/audit-log';
 import { NotFoundError } from '@/lib/errors';
 
@@ -13,7 +14,7 @@ import { readProfile, revealSensitiveField, saveProfile } from './resident-profi
 import type { AccessContext } from '@/db/access';
 import type { Database, Transaction } from '@/db/client';
 
-const url = process.env.TEST_DATABASE_URL ?? 'postgres://nice:nice@localhost:5432/nice_almaty';
+const url = testDatabaseUrl();
 const client = postgres(url, { max: 1, connect_timeout: 5, onnotice: () => undefined });
 const db = drizzle(client, { schema }) as unknown as Database;
 

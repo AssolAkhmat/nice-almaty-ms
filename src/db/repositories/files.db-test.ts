@@ -4,6 +4,7 @@ import postgres from 'postgres';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import * as schema from '@/db/schema';
+import { testDatabaseUrl } from '@/db/testing/database-url';
 import { NotFoundError } from '@/lib/errors';
 
 import { createFile, findFile, requireFile, updateFile } from './files';
@@ -16,7 +17,7 @@ import type { Database, Transaction } from '../client';
  * остальное в фазе 2. Своей копии правила у файлов нет: две копии
  * однажды разойдутся, и разойдутся молча.
  */
-const url = process.env.TEST_DATABASE_URL ?? 'postgres://nice:nice@localhost:5432/nice_almaty';
+const url = testDatabaseUrl();
 const client = postgres(url, { max: 1, connect_timeout: 5, onnotice: () => undefined });
 const db = drizzle(client, { schema }) as unknown as Database;
 

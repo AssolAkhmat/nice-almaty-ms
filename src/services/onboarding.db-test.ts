@@ -3,6 +3,7 @@ import postgres from 'postgres';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import * as schema from '@/db/schema';
+import { testDatabaseUrl } from '@/db/testing/database-url';
 import { parseBusinessDate } from '@/lib/time';
 
 import { readOnboarding, type OnboardingStepKey } from './onboarding';
@@ -16,7 +17,7 @@ import type { UserActor } from './users';
  * и ни один не закрывается сам по себе. Проверяется по состоянию базы,
  * а не по флагу: флаг однажды разойдётся с данными.
  */
-const url = process.env.TEST_DATABASE_URL ?? 'postgres://nice:nice@localhost:5432/nice_almaty';
+const url = testDatabaseUrl();
 const client = postgres(url, { max: 1, connect_timeout: 5, onnotice: () => undefined });
 const db = drizzle(client, { schema }) as unknown as Database;
 

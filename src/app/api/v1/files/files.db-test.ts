@@ -9,6 +9,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createLocalStorage } from '@/adapters/storage/local';
 import * as schema from '@/db/schema';
+import { testDatabaseUrl } from '@/db/testing/database-url';
 import { MAX_UPLOAD_BYTES } from '@/domain/files';
 import { hashSessionToken, SESSION_COOKIE_NAME } from '@/lib/session-token';
 
@@ -29,7 +30,7 @@ import type { Database, Transaction } from '@/db/client';
  * а тест обязан идти в транзакции с откатом — поэтому обе точки подменяются
  * на транзакцию теста и на временный каталог.
  */
-const url = process.env.TEST_DATABASE_URL ?? 'postgres://nice:nice@localhost:5432/nice_almaty';
+const url = testDatabaseUrl();
 const client = postgres(url, { max: 1, connect_timeout: 5, onnotice: () => undefined });
 const db = drizzle(client, { schema }) as unknown as Database;
 
