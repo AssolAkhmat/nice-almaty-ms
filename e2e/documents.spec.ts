@@ -25,6 +25,8 @@ async function createResident(page: Page): Promise<{ phone: string; password: st
   await page.goto('/settings/users');
   await page.getByTestId('new-phone').fill(phone);
   await page.getByTestId('new-role').selectOption('resident');
+  // Дом задаёт проживание жильца: без него аккаунт не создать (§1.2 п.1).
+  await page.getByTestId('new-house').selectOption({ label: 'Дом 1' });
   await page.getByTestId('create-submit').click();
 
   await expect(page.getByTestId('temporary-password')).toBeVisible();
@@ -59,19 +61,20 @@ test.describe('экран документов', () => {
 
     const main = page.locator('main');
     await expect(main).toContainText('Документы');
-    // Проверять нечего, и экран говорит об этом, а не показывает пустоту.
-    await expect(main).toContainText('Проверять нечего');
+    await expect(main).toContainText('Документы жильцов вашего дома');
   });
 
-  test('жилец без оформленного проживания видит объяснение, а не пустой экран', async ({
-    page,
-  }) => {
+  test('новый жилец сразу видит карточки обязательных документов', async ({ page }) => {
     await login(page, E2E_ACCOUNTS.superadmin);
     await createResident(page);
 
     await page.goto('/documents');
 
-    await expect(page.locator('main')).toContainText('Проживание ещё не оформлено');
+    // Проживание заводится вместе с аккаунтом (§1.2 п.1), поэтому загружать
+    // документы можно сразу — объяснять нечего.
+    const main = page.locator('main');
+    await expect(main).toContainText('Фото 3×4');
+    await expect(main).toContainText('Флюорография');
   });
 
   test('раздел доступен из навигации', async ({ page }) => {

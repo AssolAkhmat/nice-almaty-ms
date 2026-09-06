@@ -38,6 +38,7 @@ export const AUDIT_ACTIONS = {
   invoiceIssued: 'invoice.issued',
   paymentRecorded: 'payment.recorded',
   depositCharged: 'deposit.charged',
+  residencyCreated: 'residency.created',
   residencyActivated: 'residency.activated',
   areaCreated: 'area.created',
   areaUpdated: 'area.updated',

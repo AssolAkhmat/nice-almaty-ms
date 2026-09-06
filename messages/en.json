@@ -274,7 +274,7 @@
     "create": {
       "title": "Create account",
       "submit": "Create",
-      "houseHint": "Required for the Admin role",
+      "houseHint": "Required for an admin and for a resident: a resident's house comes from their residency",
       "noHouse": "No house",
       "passwordOnce": "Temporary password. Shown once, it cannot be recovered later."
     },

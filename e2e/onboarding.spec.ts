@@ -23,6 +23,8 @@ async function createResidentAndLogin(page: Page): Promise<void> {
   await page.goto('/settings/users');
   await page.getByTestId('new-phone').fill(phone);
   await page.getByTestId('new-role').selectOption('resident');
+  // Дом задаёт проживание жильца: без него аккаунт не создать (§1.2 п.1).
+  await page.getByTestId('new-house').selectOption({ label: 'Дом 1' });
   await page.getByTestId('create-submit').click();
 
   await expect(page.getByTestId('temporary-password')).toBeVisible();

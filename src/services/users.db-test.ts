@@ -11,7 +11,7 @@ import { minusMilliseconds, now, plusMilliseconds } from '@/lib/time';
 
 import { AUDIT_ACTIONS } from './audit';
 import { signIn } from './auth';
-import { allowPasswordReset, PASSWORD_RESET_TTL_MS } from './users';
+import { allowPasswordReset, createAccount, PASSWORD_RESET_TTL_MS } from './users';
 
 import type { AccessContext } from '@/db/access';
 import type { Database, Transaction } from '@/db/client';
@@ -103,8 +103,67 @@ async function seed(tx: Transaction, suffix: string) {
     adminA,
     adminBId: adminBUser?.id ?? '',
     adminAPhone: `+77052${suffix}`,
+    houseA: houseA?.id ?? '',
   };
 }
+
+describe('создание аккаунта жильца (§1.2 п.1)', () => {
+  it('заводит проживание в выбранном доме: без него заселять некого', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '100010');
+
+      const created = await createAccount(
+        { context: fixture.superadmin },
+        { phone: `+77054100010`, role: 'resident', houseId: fixture.houseA },
+        tx,
+      );
+
+      const residencies = await tx
+        .select()
+        .from(schema.residencies)
+        .where(eq(schema.residencies.userId, created.user.id));
+
+      expect(residencies).toHaveLength(1);
+      expect(residencies[0]?.houseId).toBe(fixture.houseA);
+      expect(residencies[0]?.status).toBe('created');
+      // Дом жильца живёт в проживании, а не в учётной записи (D11).
+      expect(created.user.houseId).toBeNull();
+    });
+  });
+
+  it('жилец без дома не создаётся: заселять его было бы некуда', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '100011');
+
+      await expect(
+        createAccount(
+          { context: fixture.superadmin },
+          { phone: `+77054100011`, role: 'resident' },
+          tx,
+        ),
+      ).rejects.toThrow();
+    });
+  });
+
+  it('аккаунт админа проживания не заводит: он не заселяется', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '100012');
+
+      const created = await createAccount(
+        { context: fixture.superadmin },
+        { phone: `+77054100012`, role: 'admin', houseId: fixture.houseA },
+        tx,
+      );
+
+      const residencies = await tx
+        .select()
+        .from(schema.residencies)
+        .where(eq(schema.residencies.userId, created.user.id));
+
+      expect(residencies).toHaveLength(0);
+    });
+  });
+});
 
 describe('разрешение сброса пароля', () => {
   it('суперадмин выдаёт разрешение на сутки', async () => {

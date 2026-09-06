@@ -22,15 +22,14 @@ async function createAccount(
   page: Page,
   phone: string,
   role: 'resident' | 'admin',
-  houseName?: string,
+  // Дом обязателен обоим: у админа он в учётной записи, у жильца — в проживании.
+  houseName = 'Дом 1',
 ): Promise<string> {
   await page.goto('/settings/users');
   await page.getByTestId('new-phone').fill(phone);
   await page.getByTestId('new-role').selectOption(role);
 
-  if (houseName !== undefined) {
-    await page.getByTestId('new-house').selectOption({ label: houseName });
-  }
+  await page.getByTestId('new-house').selectOption({ label: houseName });
 
   await page.getByTestId('create-submit').click();
 

@@ -8,6 +8,7 @@ import {
   updateUser,
   updateUserAuthState,
 } from '@/db/repositories/users';
+import { createResidency } from '@/db/repositories/residencies';
 import { revokeAllUserSessions } from '@/db/repositories/sessions';
 import { normalizePhone } from '@/domain/phone';
 import { assertCan } from '@/lib/authz';
@@ -116,15 +117,28 @@ export async function createAccount(
   assertCan(actor.context, 'user.create');
 
   const phone = normalizePhone(input.phone);
+
+  /*
+   * Дом админа лежит в учётной записи, дом жильца — в проживании (D11).
+   * Нужен он и там, и там: аккаунт жильца без дома некуда заселять,
+   * а §1.2 начинает заселение именно с создания аккаунта.
+   */
   const houseId = input.role === 'admin' ? (input.houseId ?? null) : null;
+  const residencyHouseId = input.role === 'resident' ? (input.houseId ?? null) : null;
 
   if (input.role === 'admin' && houseId === null) {
     throw new ValidationError('Админу нужен дом');
   }
 
-  if (houseId !== null) {
-    // Дом обязан быть видим создателю: иначе аккаунт уедет в чужой дом.
-    await requireHouse(actor.context, houseId, executor);
+  if (input.role === 'resident' && residencyHouseId === null) {
+    throw new ValidationError('Жильцу нужен дом');
+  }
+
+  for (const id of [houseId, residencyHouseId]) {
+    if (id !== null) {
+      // Дом обязан быть видим создателю: иначе аккаунт уедет в чужой дом.
+      await requireHouse(actor.context, id, executor);
+    }
   }
 
   if ((await findUserByPhone(phone, executor)) !== null) {
@@ -147,10 +161,34 @@ export async function createAccount(
         action: AUDIT_ACTIONS.userCreated,
         entityType: 'user',
         entityId: user.id,
-        after: { phone, role: input.role, houseId },
+        after: { phone, role: input.role, houseId: houseId ?? residencyHouseId },
       },
       tx,
     );
+
+    /*
+     * Проживание заводится сразу, шагом 1 из §1.2: мастер заселения, профиль
+     * и документы прикрепляются к нему, а до сих пор его нельзя было создать
+     * ничем, кроме прямой записи в базу (P2-42).
+     */
+    if (residencyHouseId !== null) {
+      const residency = await createResidency(
+        actor.context,
+        { userId: user.id, houseId: residencyHouseId, status: 'created' },
+        tx,
+      );
+
+      await recordAudit(
+        auditActor(actor),
+        {
+          action: AUDIT_ACTIONS.residencyCreated,
+          entityType: 'residency',
+          entityId: residency.id,
+          after: { userId: user.id, houseId: residencyHouseId, status: 'created' },
+        },
+        tx,
+      );
+    }
 
     return { user, temporaryPassword };
   });
