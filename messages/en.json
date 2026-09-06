@@ -479,5 +479,21 @@
       "unknown": "The action could not be completed",
       "date": "The date is invalid"
     }
+  },
+  "onboarding": {
+    "title": "Move-in",
+    "progress": "steps done: {done} of {total}",
+    "open": "Open",
+    "done": "Done",
+    "now": "Now",
+    "waiting": "Waiting",
+    "blockedHint": "Until the deposit is paid, only the profile, documents and your invoices are available",
+    "steps": {
+      "profile": "Profile filled in",
+      "bed": "Bed assigned",
+      "contract": "Contract signed",
+      "documents": "Documents accepted",
+      "deposit": "Deposit paid"
+    }
   }
 }

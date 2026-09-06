@@ -12,6 +12,9 @@ import { SESSION_COOKIE_NAME } from '@/lib/session-token';
  */
 const PUBLIC_PATHS = ['/login', '/change-password'];
 
+/** Заголовок с текущим путём: серверные компоненты его иначе не видят. */
+export const PATHNAME_HEADER = 'x-pathname';
+
 export function middleware(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
   const hasSessionCookie = request.cookies.has(SESSION_COOKIE_NAME);
@@ -19,6 +22,13 @@ export function middleware(request: NextRequest): NextResponse {
   if (PUBLIC_PATHS.some((path) => pathname.startsWith(path))) {
     return NextResponse.next();
   }
+
+  /*
+   * Путь передаётся дальше заголовком: layout защищённой зоны решает по нему,
+   * закрыт ли раздел до оплаты депозита (§1.2), а своего пути он не знает.
+   */
+  const headers = new Headers(request.headers);
+  headers.set(PATHNAME_HEADER, pathname);
 
   if (!hasSessionCookie) {
     const url = request.nextUrl.clone();
@@ -28,7 +38,7 @@ export function middleware(request: NextRequest): NextResponse {
     return NextResponse.redirect(url);
   }
 
-  return NextResponse.next();
+  return NextResponse.next({ request: { headers } });
 }
 
 export const config = {
