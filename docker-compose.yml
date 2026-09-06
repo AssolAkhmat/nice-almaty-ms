@@ -23,7 +23,9 @@ services:
     build:
       context: .
       target: tooling
-    command: pnpm db:migrate
+    # Хост `postgres` — не localhost, поэтому цель подтверждается явно
+    # (CLAUDE.md §5): страж пропускает только тот хост, который назван в команде.
+    command: pnpm db:migrate --allow-remote=postgres
     env_file:
       - .env
     environment:

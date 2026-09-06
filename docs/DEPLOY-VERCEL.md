@@ -78,8 +78,14 @@ curl -s "https://<ref>.supabase.co/rest/v1/users?select=*"   -H "apikey: <пуб
 Прогоните их со своей машины перед первым деплоем:
 
 ```bash
-DIRECT_DATABASE_URL='postgres://postgres.<ref>:<пароль>@...:5432/postgres' pnpm db:migrate
+DIRECT_DATABASE_URL='postgres://postgres.<ref>:<пароль>@<хост>:5432/postgres' \
+  pnpm db:migrate --allow-remote=<хост>
 ```
+
+Перед запуском команда печатает цель и то, откуда взята строка подключения.
+Без `--allow-remote=<хост>` она остановится: нелокальная база требует явного
+подтверждения в самой команде (`CLAUDE.md` §5). Имя хоста в флаге должно совпадать
+с фактическим — иначе подтверждение не принимается.
 
 Затем проверьте, что расширение `btree_gist` действительно установилось:
 
