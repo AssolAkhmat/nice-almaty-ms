@@ -1,0 +1,12 @@
+node_modules/
+.next/
+out/
+coverage/
+playwright-report/
+test-results/
+pnpm-lock.yaml
+src/db/migrations/
+
+# Документация — источник истины, механически не переформатируется
+*.md
+docs/

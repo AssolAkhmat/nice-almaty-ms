@@ -1,0 +1,33 @@
+# зависимости
+node_modules/
+.pnpm-store/
+
+# сборка
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+
+# тесты
+coverage/
+playwright-report/
+test-results/
+.playwright/
+
+# окружение
+.env
+.env.local
+.env.*.local
+
+# локальное хранилище файлов
+storage/
+
+# платформы
+.vercel/
+.turbo/
+
+# ОС и редакторы
+.DS_Store
+Thumbs.db
+*.log
