@@ -8,6 +8,13 @@
       "when": 1788680671875,
       "tag": "0000_giant_korg",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788686026463,
+      "tag": "0001_productive_paper_doll",
+      "breakpoints": true
     }
   ]
 }

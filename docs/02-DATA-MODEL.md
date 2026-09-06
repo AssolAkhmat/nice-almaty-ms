@@ -202,6 +202,13 @@ PostgreSQL 16. Все таблицы: `id uuid pk default gen_random_uuid()`, `c
 **job_runs** — `job`, `period_key`, `started_at`, `finished_at`, `status`, `result jsonb`.
 Уникальность `(job, period_key)` — идемпотентность cron.
 
+**rate_limits** — `key text primary key`, `window_start timestamptz`, `count int`.
+Счётчик попыток входа. Ключи `login:phone:+7XXXXXXXXXX` и `login:ip:X.X.X.X`,
+окно 15 минут, порог 10 попыток. Хранится в базе, а не в памяти: на serverless
+процессы не разделяют состояние. Просроченные строки удаляются лениво при записи,
+отдельное задание на очистку — фаза 6. Общих колонок `id`/`created_at`/`updated_at`
+у таблицы нет: ключ и есть первичный ключ. Решение P1-5 в `docs/08-DECISIONS.md`.
+
 ## Ключевые инварианты (обязательные тесты)
 
 1. Одно место не занято двумя проживаниями в пересекающиеся периоды.

@@ -17,14 +17,17 @@
 ## Таски
 
 ### T1.1 — Схема: организации, дома, пользователи, сессии, настройки, аудит
-- [ ] `organizations`, `houses`, `users`, `sessions`, `settings`, `audit_log` по `02-DATA-MODEL.md`
-- [ ] `rate_limits(key text primary key, window_start timestamptz, count int)` — таблицы
+- [x] `organizations`, `houses`, `users`, `sessions`, `settings`, `audit_log` по `02-DATA-MODEL.md`
+- [x] `rate_limits(key text primary key, window_start timestamptz, count int)` — таблицы
       не было в модели данных, вносится в `docs/02-DATA-MODEL.md` этим же таском (P1-2)
-- [ ] Enum-типы: `user_role`, `user_status`, `locale`, `settings_scope`
-- [ ] Индексы: `users.phone` уникальный, `audit_log (entity_type, entity_id)` и `created_at`,
+- [x] Enum-типы: `user_role`, `user_status`, `locale`, `settings_scope`
+- [x] Индексы: `users.phone` уникальный, `audit_log (entity_type, entity_id)` и `created_at`,
       `settings (scope, scope_id, key)` уникальный
-- [ ] Ограничение: `house_id` обязателен для роли `admin` и пуст для остальных
-- [ ] Миграция генерируется и применяется на чистой БД
+- [x] Ограничение: `house_id` обязателен для роли `admin` и пуст для остальных
+- [x] Миграция генерируется и применяется на чистой БД
+- [x] Инвариант `house_id` проверен на живой БД: админ без дома и жилец с домом
+      отвергаются, админ с домом проходит. Автоматизация — в T1.3, вместе
+      с интеграционными тестами репозиториев
 - Коммит: `feat(db): организации, дома, пользователи, сессии, аудит`
 
 ### T1.2 — Телефон и пароли (TDD)
@@ -42,6 +45,8 @@
 - [ ] Каждый запрос принимает контекст доступа и фильтруется по `org_id`,
       для роли `admin` — дополнительно по `house_id`
 - [ ] Тест: запрос без контекста доступа не компилируется либо падает
+- [ ] Интеграционные тесты на настоящей БД: инварианты схемы из T1.1,
+      включая `users_admin_has_house` и уникальность телефона
 - Коммит: `feat(db): репозитории с фильтрацией по org_id и house_id`
 
 ### T1.4 — Матрица прав и `authz.ts`
