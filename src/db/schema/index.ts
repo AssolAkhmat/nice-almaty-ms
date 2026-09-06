@@ -1,4 +1,6 @@
+export * from './areas';
 export * from './audit-log';
+export * from './beds';
 export * from './enums';
 export * from './houses';
 export * from './job-runs';

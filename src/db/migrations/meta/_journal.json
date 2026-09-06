@@ -22,6 +22,13 @@
       "when": 1788696616403,
       "tag": "0002_parched_hannibal_king",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788698077076,
+      "tag": "0003_aspiring_mathemanic",
+      "breakpoints": true
     }
   ]
 }
