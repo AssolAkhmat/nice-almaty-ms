@@ -92,6 +92,12 @@ export const ledgerEntries = pgTable(
     /** Откуда проводка: `invoice`, `deposit`, `damage`, `manual`, `expense`. */
     sourceType: text('source_type').notNull(),
     sourceId: uuid('source_id'),
+    /**
+     * Категория расхода (модуль 10): аренда, оборудование, химия, износ,
+     * ремонт, прочее. Заполняется только у `source_type = 'expense'` —
+     * у прочих проводок категории нет, и колонка остаётся пустой.
+     */
+    category: text('category'),
     /** Сторно не удаляет оригинал, а ссылается на обратную проводку. */
     reversedByEntryId: uuid('reversed_by_entry_id'),
     createdBy: uuid('created_by').references(() => users.id),

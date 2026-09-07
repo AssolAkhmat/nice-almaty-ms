@@ -468,6 +468,14 @@ export function PaymentForm({ invoiceId, remaining }: { invoiceId: string; remai
         </Select>
       </Field>
 
+      <Field
+        hint={t('invoices.paidAtHint')}
+        htmlFor={`paid-at-${invoiceId}`}
+        label={t('invoices.paidAt')}
+      >
+        <Input id={`paid-at-${invoiceId}`} name="paidAt" type="date" />
+      </Field>
+
       <Button disabled={isPending} type="submit">
         {t('invoices.record')}
       </Button>

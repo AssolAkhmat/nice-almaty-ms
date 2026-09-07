@@ -214,6 +214,45 @@ export async function paidTotals(
   return new Map(rows.map((row) => [row.invoiceId, row.paid]));
 }
 
+export interface KaspiTotals {
+  houseId: string;
+  /** Оборот эквайринга: всё, что прошло через Kaspi (§10.2). */
+  turnover: number;
+  /** Доход: то же без депозитов — они обязательство сети, а не выручка. */
+  income: number;
+}
+
+/**
+ * Деньги, прошедшие через Kaspi за период, в разрезе домов (§10.2).
+ * Считает база: платежей со временем становится больше, чем разумно
+ * тянуть в память ради одного отчёта.
+ */
+export async function kaspiTotals(
+  context: AccessContext,
+  period: { from: Date; to: Date },
+  executor: Executor = getDb(),
+): Promise<KaspiTotals[]> {
+  const rows = await executor
+    .select({
+      houseId: invoices.houseId,
+      turnover: sql<number>`coalesce(sum(${payments.amount}), 0)::int`,
+      income: sql<number>`coalesce(sum(case when ${invoices.type} = 'deposit' then 0 else ${payments.amount} end), 0)::int`,
+    })
+    .from(payments)
+    .innerJoin(invoices, eq(invoices.id, payments.invoiceId))
+    .where(
+      and(
+        invoiceScope(context, executor),
+        eq(payments.method, 'kaspi'),
+        gte(payments.paidAt, period.from),
+        lt(payments.paidAt, period.to),
+      ),
+    )
+    .groupBy(invoices.houseId);
+
+  return rows;
+}
+
 export async function listPayments(
   invoiceId: string,
   executor: Executor = getDb(),

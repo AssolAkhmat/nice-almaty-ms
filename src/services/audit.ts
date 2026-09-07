@@ -60,6 +60,7 @@ export const AUDIT_ACTIONS = {
   damageReversed: 'damage.reversed',
   utilityPeriodClosed: 'utility_period.closed',
   utilityPeriodReopened: 'utility_period.reopened',
+  expenseRecorded: 'expense.recorded',
   ledgerEntryPosted: 'ledger.entry_posted',
   ledgerEntryReversed: 'ledger.entry_reversed',
 } as const;

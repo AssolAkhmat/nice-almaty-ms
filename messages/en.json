@@ -685,14 +685,86 @@
   },
   "accounting": {
     "title": "Accounting",
-    "subtitle": "Chart of accounts, entries and reconciliation",
+    "subtitle": "Chart of accounts, ledger entries and network reports",
     "errors": {
       "unauthorized": "Sign-in required",
       "unknown": "The action could not be completed",
       "unbalanced": "Debit and credit of the entry are not equal",
       "tooFewLines": "An entry needs at least two lines",
       "amountInvalid": "A line amount is a positive whole number of tenge",
-      "alreadyReversed": "The entry has already been reversed"
+      "alreadyReversed": "The entry has already been reversed",
+      "forbidden": "This action is not available to your role",
+      "not_found": "Not found",
+      "category": "Choose an expense category from the list",
+      "descriptionRequired": "Enter an expense description"
+    },
+    "trialBalance": "Trial balance",
+    "account": "Account",
+    "code": "Code",
+    "balance": "Balance",
+    "noAccounts": "No accounts",
+    "noAccountsHint": "The chart of accounts is seeded at installation",
+    "reconciliation": "Deposit fund reconciliation",
+    "matches": "Matches",
+    "mismatch": "Mismatch",
+    "fundBalance": "Fund balance",
+    "depositsTotal": "Deposits total",
+    "difference": "Difference",
+    "journal": "Ledger journal",
+    "noEntries": "No entries",
+    "noEntriesHint": "There were no entries in the selected period",
+    "reverse": "Reverse",
+    "reversed": "Reversed",
+    "expense": "Expense",
+    "recordExpense": "Record expense",
+    "categoryField": "Category",
+    "amount": "Amount",
+    "writeOffAccount": "Write-off account",
+    "paidFrom": "Paid from",
+    "cash": "Cash",
+    "date": "Date",
+    "description": "Description",
+    "tax": "Tax calculator",
+    "from": "From",
+    "to": "To",
+    "taxRate": "Tax, %",
+    "acquiringRate": "Acquiring, %",
+    "percentHint": "Defaults are 3% and 0.95%",
+    "recalculate": "Recalculate",
+    "kaspiIncome": "Income via Kaspi",
+    "kaspiTurnover": "Turnover via Kaspi",
+    "taxAmount": "Tax",
+    "acquiringAmount": "Acquiring fee",
+    "deduction": "Total deduction",
+    "net": "Net",
+    "byHouse": "By house",
+    "house": "House",
+    "taxDisclaimer": "The calculation is for reference only, creates no entries and is not tax advice",
+    "closed": "Superadmin section",
+    "closedHint": "The ledger is kept for the whole network, not for one house",
+    "direction": {
+      "debit": "debit",
+      "credit": "credit"
+    },
+    "source": {
+      "invoice": "Invoice",
+      "deposit": "Deposit",
+      "damage": "Damage",
+      "utilities": "Utilities",
+      "expense": "Expense",
+      "manual": "Manual"
+    },
+    "category": {
+      "rent": "Rent",
+      "equipment": "Equipment",
+      "chemicals": "Cleaning supplies",
+      "depreciation": "Depreciation",
+      "repair": "Repair",
+      "other": "Other"
+    },
+    "done": {
+      "expense": "Expense recorded",
+      "reversed": "Entry reversed"
     }
   },
   "damages": {
@@ -864,7 +936,9 @@
         "sent": "Marked as sent",
         "received": "Payment recorded"
       }
-    }
+    },
+    "paidAt": "Payment date",
+    "paidAtHint": "Empty means today"
   },
   "utilities": {
     "title": "Utilities",

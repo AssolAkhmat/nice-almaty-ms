@@ -188,9 +188,18 @@ export async function createLedgerEntry(
   return { entry, lines: inserted };
 }
 
+export interface LedgerFilter {
+  from?: BusinessDate;
+  to?: BusinessDate;
+  sourceType?: string;
+  accountId?: string;
+  /** Проводки, задевшие любой счёт этого дома (модуль 10, фильтры журнала). */
+  houseId?: string;
+}
+
 export async function listLedgerEntries(
   context: AccessContext,
-  filter: { from?: BusinessDate; to?: BusinessDate; sourceType?: string; accountId?: string } = {},
+  filter: LedgerFilter = {},
   executor: Executor = getDb(),
 ): Promise<LedgerEntry[]> {
   const conditions = [eq(ledgerEntries.orgId, context.orgId)];
@@ -212,6 +221,19 @@ export async function listLedgerEntries(
           .select({ id: ledgerLines.entryId })
           .from(ledgerLines)
           .where(eq(ledgerLines.accountId, filter.accountId)),
+      ),
+    );
+  }
+  if (filter.houseId !== undefined) {
+    assertHouseVisible(context, filter.houseId);
+    conditions.push(
+      inArray(
+        ledgerEntries.id,
+        executor
+          .select({ id: ledgerLines.entryId })
+          .from(ledgerLines)
+          .innerJoin(accounts, eq(accounts.id, ledgerLines.accountId))
+          .where(eq(accounts.houseId, filter.houseId)),
       ),
     );
   }
@@ -273,6 +295,22 @@ export async function listLedgerLines(
     .select()
     .from(ledgerLines)
     .where(eq(ledgerLines.entryId, entryId))
+    .orderBy(asc(ledgerLines.createdAt));
+}
+
+/** Строки нескольких проводок разом: журнал иначе бил бы базу по разу на строку. */
+export async function listLinesOfEntries(
+  entryIds: readonly string[],
+  executor: Executor = getDb(),
+): Promise<LedgerLine[]> {
+  if (entryIds.length === 0) {
+    return [];
+  }
+
+  return executor
+    .select()
+    .from(ledgerLines)
+    .where(inArray(ledgerLines.entryId, [...entryIds]))
     .orderBy(asc(ledgerLines.createdAt));
 }
 

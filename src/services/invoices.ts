@@ -60,10 +60,22 @@ import type { UserActor } from './users';
 export interface InvoiceDeps {
   executor?: Executor;
   today?: BusinessDate;
+  /** Момент действия; из него выводится и «сегодня», и дата платежа. */
+  instant?: Date;
 }
 
-function resolve(deps: InvoiceDeps): { executor: Executor; today: BusinessDate } {
-  return { executor: deps.executor ?? getDb(), today: deps.today ?? todayInAlmaty() };
+function resolve(deps: InvoiceDeps): {
+  executor: Executor;
+  today: BusinessDate;
+  instant: Date;
+} {
+  const instant = deps.instant ?? now();
+
+  return {
+    executor: deps.executor ?? getDb(),
+    today: deps.today ?? todayInAlmaty(instant),
+    instant,
+  };
 }
 
 export interface InvoiceLineInput {
@@ -88,6 +100,12 @@ export interface CreateInvoiceInput {
 export interface PaymentInput {
   amount: number;
   method: Payment['method'];
+  /**
+   * Когда деньги получены (модуль 2, «Отметка оплаты: сумма, способ, дата»).
+   * Пусто — момент отметки. Дата платежа — данные, а не отпечаток часов
+   * базы: по ней считается и оборот эквайринга за период (§10.2).
+   */
+  paidAt?: Date | undefined;
   note?: string | undefined;
 }
 
@@ -472,7 +490,7 @@ export async function recordPayment(
   input: PaymentInput,
   deps: InvoiceDeps = {},
 ): Promise<Invoice> {
-  const { executor, today } = resolve(deps);
+  const { executor, today, instant } = resolve(deps);
 
   const { invoice, residency } = await invoiceWithResidency(
     actor,
@@ -514,6 +532,7 @@ export async function recordPayment(
         invoiceId: invoice.id,
         amount: input.amount,
         method: input.method,
+        paidAt: input.paidAt ?? instant,
         recordedBy: actor.context.userId,
         note: input.note ?? null,
       },
@@ -559,7 +578,7 @@ export async function recordPayment(
         invoiceId: invoice.id,
         method: input.method,
         allocation,
-        date: today,
+        date: todayInAlmaty(input.paidAt ?? instant),
       },
       { executor: tx, today },
     );

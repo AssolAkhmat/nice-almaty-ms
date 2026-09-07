@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 
 import { AppError, ConflictError, ValidationError } from '@/lib/errors';
 import { getCurrentSession } from '@/lib/session';
-import { tryParseBusinessDate } from '@/lib/time';
+import { startOfDayUtc, tryParseBusinessDate } from '@/lib/time';
 import {
   cancelInvoice,
   createInvoice,
@@ -190,11 +190,14 @@ export async function recordInvoicePaymentAction(
   }
 
   const note = text(formData, 'note');
+  const paidAt = tryParseBusinessDate(text(formData, 'paidAt'));
 
   try {
     await recordPayment(current, text(formData, 'invoiceId'), {
       amount: Number(text(formData, 'amount')),
       method,
+      // Пустая дата — момент отметки: деньги обычно принимают тем же днём.
+      ...(paidAt === null ? {} : { paidAt: startOfDayUtc(paidAt) }),
       ...(note === '' ? {} : { note }),
     });
   } catch (error) {
