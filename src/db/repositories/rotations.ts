@@ -133,10 +133,16 @@ export async function createRotationDebt(
   });
 }
 
-/** Непогашенные долги жильцов: видимость идёт через проживание. */
+/**
+ * Непогашенные долги жильцов на дату: видимость идёт через проживание.
+ *
+ * Долг не сгорает от времени, но живёт до 1 июля (§7): дата записана
+ * в самом долге, поэтому год сбрасывается без переписывания строк —
+ * они просто перестают попадать в выборку.
+ */
 export async function listRotationDebts(
   context: AccessContext,
-  filter: { userIds: readonly string[] },
+  filter: { userIds: readonly string[]; on: BusinessDate },
   executor: Executor = getDb(),
 ): Promise<RotationDebt[]> {
   if (filter.userIds.length === 0) {
@@ -148,7 +154,13 @@ export async function listRotationDebts(
   return executor
     .select()
     .from(rotationDebts)
-    .where(and(inArray(rotationDebts.userId, own), isNull(rotationDebts.resolvedByAssignmentId)))
+    .where(
+      and(
+        inArray(rotationDebts.userId, own),
+        isNull(rotationDebts.resolvedByAssignmentId),
+        sql`${rotationDebts.expiresAt} > ${filter.on}::date`,
+      ),
+    )
     .orderBy(asc(rotationDebts.expiresAt), asc(rotationDebts.id));
 }
 

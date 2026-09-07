@@ -102,7 +102,7 @@ export async function readHouseRating(
   const userIds = dictionaries.members.map((member) => member.userId);
 
   const [debts, fines] = await Promise.all([
-    listRotationDebts(actor.context, { userIds }, executor),
+    listRotationDebts(actor.context, { userIds, on: today }, executor),
     listFines(actor.context, { houseId, status: 'pending' }, executor),
   ]);
 
@@ -170,7 +170,7 @@ export async function readResidentRating(
     resolveRatingRules(actor.context, houseId, executor),
     readThresholdStates(actor.context, userId, executor),
     readRuleIdsByCode(actor.context, houseId, executor),
-    listRotationDebts(actor.context, { userIds: [userId] }, executor),
+    listRotationDebts(actor.context, { userIds: [userId], on: today }, executor),
     listFines(actor.context, { userId }, executor),
   ]);
 

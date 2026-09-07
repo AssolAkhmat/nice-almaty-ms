@@ -28,6 +28,8 @@ export const JOBS: readonly ScheduledJob[] = [
   { job: 'invoices-monthly', schedule: '5 0 1 * *' },
   // Каждый день в 23:55 по Алматы (§7): закрывается вчерашний день ротаций.
   { job: 'rotations-close-day', schedule: '55 23 * * *' },
+  // 1 июля в 00:10 по Алматы (§5.1): открывается новый год рейтинга.
+  { job: 'rating-year-reset', schedule: '10 0 1 7 *' },
 ];
 
 export function start(): void {
