@@ -2,6 +2,7 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 import { AppShell } from '@/components/layout/app-shell';
+import { assertSchemaCurrent } from '@/db/schema-version';
 import { isPathAllowed } from '@/lib/residency-access';
 import { getCurrentSession } from '@/lib/session';
 import { PATHNAME_HEADER } from '@/middleware';
@@ -15,6 +16,13 @@ export const dynamic = 'force-dynamic';
  * там edge-рантайм без доступа к базе.
  */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  /*
+   * Схема проверяется до первого запроса к данным: приложение на отставшей
+   * базе ломается вразнобой, и случайные ошибки на случайных экранах хуже
+   * одного понятного отказа (P7-16).
+   */
+  await assertSchemaCurrent();
+
   const session = await getCurrentSession();
 
   if (session === null) {

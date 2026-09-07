@@ -20,7 +20,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "verify": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test",
-    "db:generate": "node scripts/db-guard.mjs drizzle-kit generate",
+    "db:generate": "node scripts/db-guard.mjs drizzle-kit generate && node scripts/write-migrations-manifest.mjs",
     "db:migrate": "node scripts/db-guard.mjs drizzle-kit migrate",
     "db:studio": "node scripts/db-guard.mjs drizzle-kit studio",
     "test:e2e": "playwright test",

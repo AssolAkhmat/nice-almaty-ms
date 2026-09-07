@@ -1,3 +1,4 @@
+import { assertSchemaCurrent } from '@/db/schema-version';
 import { getSession } from '@/services/auth';
 
 import { AppError, UnauthorizedError, type AppErrorCode } from '../errors';
@@ -130,6 +131,13 @@ export async function requireApiActor(
   requestId: string,
   executor?: Executor,
 ): Promise<UserActor> {
+  /*
+   * Схема проверяется здесь, а не в обёртке маршрута: спецификация
+   * и страница документации базы не касаются, и падать вместе с ней
+   * им незачем. Всё, что работает с данными, проходит через актёра.
+   */
+  await assertSchemaCurrent(executor);
+
   const identity = await identifyByToken(request, executor);
 
   if (identity !== null) {
