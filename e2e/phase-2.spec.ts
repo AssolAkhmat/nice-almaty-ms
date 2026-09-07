@@ -1,7 +1,16 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { E2E_ACCOUNTS, E2E_PASSWORD } from './global-setup';
-import { login } from './support/login';
+import {
+  assignBed,
+  createResident,
+  createRoomWithBed,
+  fillProfile,
+  payDeposit,
+  RESIDENT_PASSWORD,
+  signInAs,
+  unique,
+} from './support/onboarding';
 
 /**
  * Приёмка фазы 2 (docs/07-ROADMAP.md).
@@ -16,128 +25,11 @@ import { login } from './support/login';
  * в `src/domain/deposit.test.ts` и на живой базе в
  * `src/services/terminations.db-test.ts`.
  */
-const RESIDENT_PASSWORD = 'parol-zhiltsa-priemka';
-
 /** Прозрачный PNG 1×1: содержимое документа для проверки роли не важно. */
 const PNG_1X1 = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
   'base64',
 );
-
-function unique(prefix: string): string {
-  return `${prefix}-${String(Math.floor(Math.random() * 1_000_000)).padStart(6, '0')}`;
-}
-
-function uniquePhone(): string {
-  return `+7707${String(Math.floor(Math.random() * 10_000_000)).padStart(7, '0')}`;
-}
-
-async function signInAs(
-  page: Page,
-  phone: string,
-  password: string,
-  options: { temporary?: boolean } = {},
-): Promise<void> {
-  await page.context().clearCookies();
-  await page.goto('/login');
-  await page.getByTestId('phone').fill(phone);
-  await page.getByTestId('password').fill(password);
-  await page.getByTestId('submit').click();
-
-  // С временным паролем открыт только экран смены: там нет ни меню, ни модулей.
-  if (options.temporary === true) {
-    await expect(page).toHaveURL(/\/change-password$/);
-    return;
-  }
-
-  await expect(page.getByTestId('sidebar')).toBeAttached();
-}
-
-/** Шаг 1–2 §1.2: суперадмин заводит аккаунт, жилец меняет временный пароль. */
-async function createResident(page: Page, houseName: string): Promise<string> {
-  const phone = uniquePhone();
-
-  await login(page, E2E_ACCOUNTS.superadmin);
-  await page.goto('/settings/users');
-  await page.getByTestId('new-phone').fill(phone);
-  await page.getByTestId('new-role').selectOption('resident');
-  await page.getByTestId('new-house').selectOption({ label: houseName });
-  await page.getByTestId('create-submit').click();
-
-  await expect(page.getByTestId('temporary-password')).toBeVisible();
-  const temporary = (await page.getByTestId('temporary-password-value').innerText()).trim();
-
-  await signInAs(page, phone, temporary, { temporary: true });
-
-  await page.getByTestId('new-password').fill(RESIDENT_PASSWORD);
-  await page.getByTestId('confirmation').fill(RESIDENT_PASSWORD);
-  await page.getByTestId('submit').click();
-  await expect(page).toHaveURL(/\/login/);
-
-  return phone;
-}
-
-/** Шаг 3 §1.2: профиль заполняет сам жилец; комнату и цену он не трогает. */
-async function fillProfile(page: Page, lastName: string): Promise<void> {
-  await page.goto('/profile');
-
-  await page.locator('#lastName').fill(lastName);
-  await page.locator('#firstName').fill('Тест');
-  await page.locator('#sex').selectOption('male');
-  await page.locator('#birthDate').fill('2005-05-05');
-  await page.locator('#phone').fill('+77010000001');
-  await page.locator('#iin').fill('050505500505');
-  await page.locator('#idDocNumber').fill('N01234567');
-  await page.locator('#university').fill('КазНУ');
-  await page.locator('#course').fill('2');
-  await page.locator('#major').fill('Информатика');
-  await page.locator('#emergencyName').fill('Тестова Мать');
-  await page.locator('#emergencyPhone').fill('+77010000002');
-  await page.locator('#preferredPayment').selectOption('kaspi');
-
-  await page.getByTestId('profile-submit').click();
-  await expect(page.getByTestId('profile-saved')).toBeVisible();
-}
-
-/** Комната и место заводятся настройкой дома — тем же экраном, что у админа. */
-async function createRoomWithBed(page: Page): Promise<{ room: string; bed: string }> {
-  const room = unique('Комната приёмки');
-  const bed = unique('Место приёмки');
-
-  await page.goto('/settings/house');
-  await page.locator('#new-area-name').fill(room);
-  await page.locator('#new-area-order').fill('999');
-  await page.getByTestId('add-area').click();
-
-  const card = page.locator('.rounded-card').filter({ hasText: room });
-  await expect(card).toBeVisible();
-
-  await card.locator('input[name="label"]').fill(bed);
-  await card.locator('input[name="defaultPrice"]').fill('70000');
-  await card.getByTestId('add-bed').click();
-  await expect(page.locator('li').filter({ hasText: bed })).toBeVisible();
-
-  return { room, bed };
-}
-
-/**
- * Шаг 4 §1.2: место и цену назначает админ.
- *
- * Жилец, комната и место выбираются поимённо: на одном доме одновременно
- * идут три прогона — по одному на ширину, — и «первая строка списка»
- * означала бы чужого жильца.
- */
-async function assignBed(page: Page, resident: string, room: string, bed: string): Promise<void> {
-  await page.goto('/beds');
-  await page.getByRole('button', { name: 'Назначить место' }).click();
-
-  await page.locator('#assign-resident').selectOption({ label: resident });
-  await page.locator('#assign-room').selectOption({ label: room });
-  await page.locator('#assign-bed').selectOption({ label: bed });
-  await page.getByRole('button', { name: 'Назначить', exact: true }).click();
-
-  await expect(page.getByText('Место назначено')).toBeVisible();
-}
 
 /**
  * Шаг 5 §1.2: договор собирает админ, подписывает жилец — и только он.
@@ -215,19 +107,6 @@ async function approveDocuments(page: Page, resident: string): Promise<void> {
     await items.first().getByRole('button', { name: 'Принять' }).click();
     await expect(items).toHaveCount(left - 1);
   }
-}
-
-/** Шаги 7–8 §1.2: счёт на депозит и оплата, которая и есть заселение. */
-async function payDeposit(page: Page, residentName: string): Promise<void> {
-  await page.goto('/deposit');
-
-  const card = page.getByTestId('deposit-card').filter({ hasText: residentName });
-  await card.getByRole('button', { name: 'Выставить счёт' }).click();
-  await expect(card).toContainText('Выставлен');
-
-  await card.getByTestId('payment-amount').fill('45000');
-  await card.getByRole('button', { name: 'Отметить оплату' }).click();
-  await expect(card).toContainText('Оплачен');
 }
 
 test.describe('приёмка фазы 2', () => {

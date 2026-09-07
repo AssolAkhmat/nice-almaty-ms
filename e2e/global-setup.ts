@@ -6,7 +6,7 @@ import postgres from 'postgres';
 import { dotEnvFallback } from '../scripts/read-dotenv';
 import * as schema from '../src/db/schema';
 import { hashPassword } from '../src/lib/password';
-import { adminPhone, seedNetwork, SUPERADMIN_PHONE } from '../src/db/seed';
+import { adminPhone, houseSlug, seedNetwork, SUPERADMIN_PHONE } from '../src/db/seed';
 
 import type { Executor } from '../src/db/client';
 
@@ -24,6 +24,14 @@ export const E2E_ACCOUNTS = {
   superadmin: SUPERADMIN_PHONE,
   adminHouse1: adminPhone(1),
   adminHouse2: adminPhone(2),
+  /*
+   * Дома приёмки фазы 3 — по одному на ширину. Коммунальный период у дома
+   * один на месяц: три копии приёмки в общем доме отбирали бы его друг
+   * у друга, и побеждала бы та, что успела закрыть его первой.
+   */
+  adminHouse3: adminPhone(3),
+  adminHouse4: adminPhone(4),
+  adminHouse5: adminPhone(5),
 } as const;
 
 /**
@@ -76,6 +84,19 @@ async function removeLeftoverAccounts(db: ReturnType<typeof drizzle>): Promise<v
 
   if (invoiceIds.length > 0) {
     await db.delete(schema.payments).where(inArray(schema.payments.invoiceId, invoiceIds));
+    // Доля коммуналки ссылается на строку счёта: связь снимается до удаления.
+    await db
+      .update(schema.utilityAllocations)
+      .set({ invoiceLineId: null })
+      .where(
+        inArray(
+          schema.utilityAllocations.invoiceLineId,
+          db
+            .select({ id: schema.invoiceLines.id })
+            .from(schema.invoiceLines)
+            .where(inArray(schema.invoiceLines.invoiceId, invoiceIds)),
+        ),
+      );
     await db.delete(schema.invoiceLines).where(inArray(schema.invoiceLines.invoiceId, invoiceIds));
   }
 
@@ -119,6 +140,54 @@ async function removeLeftoverAccounts(db: ReturnType<typeof drizzle>): Promise<v
   await db.delete(schema.users).where(inArray(schema.users.id, ids));
 }
 
+/**
+ * Дома приёмки фазы 3 отданы ей целиком: коммунальный период дома заводится
+ * один на месяц, и закрытый прошлым прогоном он не даёт следующему дойти
+ * до строки. Убирается всё, что прогон в этих домах заводит: периоды
+ * с их строками и снимками распределения и ущербы с долями.
+ */
+export const ACCEPTANCE_HOUSES = [3, 4, 5] as const;
+
+async function removeAcceptanceHouseData(db: ReturnType<typeof drizzle>): Promise<void> {
+  const houses = await db
+    .select({ id: schema.houses.id })
+    .from(schema.houses)
+    .where(inArray(schema.houses.slug, ACCEPTANCE_HOUSES.map(houseSlug)));
+
+  if (houses.length === 0) {
+    return;
+  }
+
+  const houseIds = houses.map((row) => row.id);
+
+  const periodIds = (
+    await db
+      .select({ id: schema.utilityPeriods.id })
+      .from(schema.utilityPeriods)
+      .where(inArray(schema.utilityPeriods.houseId, houseIds))
+  ).map((row) => row.id);
+
+  if (periodIds.length > 0) {
+    await db
+      .delete(schema.utilityAllocations)
+      .where(inArray(schema.utilityAllocations.periodId, periodIds));
+    await db.delete(schema.utilityLines).where(inArray(schema.utilityLines.periodId, periodIds));
+    await db.delete(schema.utilityPeriods).where(inArray(schema.utilityPeriods.id, periodIds));
+  }
+
+  const damageIds = (
+    await db
+      .select({ id: schema.damages.id })
+      .from(schema.damages)
+      .where(inArray(schema.damages.houseId, houseIds))
+  ).map((row) => row.id);
+
+  if (damageIds.length > 0) {
+    await db.delete(schema.damageShares).where(inArray(schema.damageShares.damageId, damageIds));
+    await db.delete(schema.damages).where(inArray(schema.damages.id, damageIds));
+  }
+}
+
 export default async function globalSetup(): Promise<void> {
   const fileEnv = dotEnvFallback(fileURLToPath(new URL('../.env', import.meta.url)));
 
@@ -147,6 +216,7 @@ export default async function globalSetup(): Promise<void> {
     await db.delete(schema.rateLimits);
 
     await removeLeftoverAccounts(db);
+    await removeAcceptanceHouseData(db);
 
     const phones = Object.values(E2E_ACCOUNTS);
 
