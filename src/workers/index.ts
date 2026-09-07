@@ -9,8 +9,12 @@ import { ALMATY_TIME_ZONE } from '@/lib/time';
  * Дёргает HTTP-эндпоинты /api/v1/cron/{job} с заголовком x-cron-secret;
  * идемпотентность обеспечивает таблица job_runs.
  *
- * В фазе 0 заданий нет: они появляются вместе с обработчиками в фазе 6.
- * На Vercel этот процесс не запускается — там расписание задаёт vercel.json.
+ * Задания появляются вместе со своими обработчиками: первым — генерация
+ * месячных счетов (фаза 3). На Vercel этот процесс не запускается: там
+ * расписание задаёт `vercel.json`, и оно идёт в UTC без указания зоны,
+ * поэтому «1 числа в 00:05 по Алматы» там выражено ежедневным запуском
+ * в 19:05 UTC. Лишние запуски безвредны: `job_runs` пропускает уже
+ * отработанный месяц (P3-17).
  */
 export interface ScheduledJob {
   /** Имя задания: совпадает с сегментом пути /api/v1/cron/{job}. */
@@ -19,7 +23,10 @@ export interface ScheduledJob {
   schedule: string;
 }
 
-export const JOBS: readonly ScheduledJob[] = [];
+export const JOBS: readonly ScheduledJob[] = [
+  // 1 числа в 00:05 по Алматы (docs/01-ARCHITECTURE.md, §3).
+  { job: 'invoices-monthly', schedule: '5 0 1 * *' },
+];
 
 export function start(): void {
   const env = loadEnv();

@@ -77,6 +77,8 @@ export interface CreateInvoiceInput {
   periodMonth?: BusinessDate | undefined;
   dueDate?: BusinessDate | undefined;
   note?: string | null | undefined;
+  /** Кто выставил. `null` — счёт создан расписанием, а не человеком (§3). */
+  createdBy?: string | null | undefined;
   lines: readonly InvoiceLineInput[];
 }
 
@@ -210,12 +212,13 @@ export async function createInvoice(
         residencyId: residency.id,
         type: input.type,
         periodMonth: input.periodMonth ?? null,
-        status: 'issued',
+        // Счёт на ноль тенге закрыт сразу: платить по нему нечего.
+        status: invoiceStatus(total, 0),
         total,
         issuedAt: now(),
         dueDate: input.dueDate ?? input.periodMonth ?? today,
         note: input.note ?? null,
-        createdBy: actor.context.userId,
+        createdBy: input.createdBy === undefined ? actor.context.userId : input.createdBy,
       },
       tx,
     );
