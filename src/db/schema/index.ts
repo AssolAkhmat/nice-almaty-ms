@@ -11,6 +11,7 @@ export * from './files';
 export * from './houses';
 export * from './invoices';
 export * from './job-runs';
+export * from './notifications';
 export * from './organizations';
 export * from './rate-limits';
 export * from './rating';
