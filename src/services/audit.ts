@@ -74,6 +74,7 @@ export const AUDIT_ACTIONS = {
   rotationReassigned: 'rotation.reassigned',
   rotationExtraCreated: 'rotation.extra_created',
   rotationRangeCancelled: 'rotation.range_cancelled',
+  generalCleaningPlanned: 'rotation.general_cleaning_planned',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

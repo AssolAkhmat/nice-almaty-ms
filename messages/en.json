@@ -1167,5 +1167,19 @@
       "checklistArea": "The checklist belongs to another zone",
       "unknown": "Could not complete"
     }
+  },
+  "generalCleaning": {
+    "title": "Deep cleaning",
+    "date": "Date",
+    "dateHint": "Defaults to the last Sunday of the month",
+    "plan": "Distribute randomly",
+    "planned": "Deep cleaning distributed",
+    "nothingNew": "Cleaning for this date is already distributed",
+    "cancelRegular": "Cancel the regular Sunday rotation",
+    "save": "Save",
+    "settingSaved": "Setting saved",
+    "errors": {
+      "dateInvalid": "Set the cleaning date"
+    }
   }
 }

@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 
 import { AppError } from '@/lib/errors';
 import { getCurrentSession } from '@/lib/session';
+import { generateGeneralCleaning, setCancelRegularOnGeneral } from '@/services/general-cleaning';
 import { archiveRow, saveRow } from '@/services/rotation-rows';
 import { generateSchedule } from '@/services/rotation-schedule';
 import {
@@ -324,4 +325,55 @@ export async function generateScheduleAction(
   refresh();
 
   return { done: created === 0 ? 'rotationSchedule.nothingNew' : 'rotationSchedule.generated' };
+}
+
+export async function planGeneralCleaningAction(
+  _previous: RotationSetupActionState,
+  formData: FormData,
+): Promise<RotationSetupActionState> {
+  const user = await actor();
+  if (user === null) {
+    return { error: 'rotationSetup.errors.unknown' };
+  }
+
+  const date = tryParseBusinessDate(text(formData, 'date'));
+  if (date === null) {
+    return { error: 'generalCleaning.errors.dateInvalid' };
+  }
+
+  let created = 0;
+
+  try {
+    ({ created } = await generateGeneralCleaning(user, text(formData, 'houseId'), date));
+  } catch (error) {
+    return failure(error);
+  }
+
+  refresh();
+
+  return { done: created === 0 ? 'generalCleaning.nothingNew' : 'generalCleaning.planned' };
+}
+
+export async function setCancelRegularAction(
+  _previous: RotationSetupActionState,
+  formData: FormData,
+): Promise<RotationSetupActionState> {
+  const user = await actor();
+  if (user === null) {
+    return { error: 'rotationSetup.errors.unknown' };
+  }
+
+  try {
+    await setCancelRegularOnGeneral(
+      user,
+      text(formData, 'houseId'),
+      text(formData, 'cancelRegular') === 'on',
+    );
+  } catch (error) {
+    return failure(error);
+  }
+
+  refresh();
+
+  return { done: 'generalCleaning.settingSaved' };
 }

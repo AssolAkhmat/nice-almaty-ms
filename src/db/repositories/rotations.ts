@@ -870,6 +870,46 @@ export async function listAssignmentsById(
     .where(inArray(rotationAssignments.id, [...ids]));
 }
 
+/**
+ * Кто участвует в генеральной уборке дома (§6.5): жильцы и админ дома.
+ *
+ * Админа не селят, проживания у него нет, но убирает он наравне со всеми —
+ * §6.5 называет его прямо. Берётся он из базы, а не из вызывающего: уборку
+ * может запустить и суперадмин, а убирать будет всё равно админ дома.
+ */
+export async function listGeneralCleaningParticipants(
+  context: AccessContext,
+  houseId: string,
+  executor: Executor = getDb(),
+): Promise<string[]> {
+  assertHouseReadable(context, houseId);
+
+  const residents = await executor
+    .select({ userId: residencies.userId })
+    .from(residencies)
+    .where(
+      and(
+        eq(residencies.houseId, houseId),
+        houseScope(context, residencies.houseId),
+        inArray(residencies.status, ['active', 'terminating']),
+      ),
+    );
+
+  const admins = await executor
+    .select({ userId: users.id })
+    .from(users)
+    .where(
+      and(
+        eq(users.orgId, context.orgId),
+        eq(users.houseId, houseId),
+        eq(users.role, 'admin'),
+        eq(users.status, 'active'),
+      ),
+    );
+
+  return Array.from(new Set([...residents, ...admins].map((row) => row.userId)));
+}
+
 export interface CalendarDictionaries {
   areas: { id: string; name: string }[];
   checklists: { id: string; areaId: string; title: string; peopleNeeded: number }[];

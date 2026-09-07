@@ -9,6 +9,7 @@ import { parseEligibilityRule } from '@/domain/eligibility';
 import { can } from '@/lib/authz';
 import { getCurrentSession } from '@/lib/session';
 import { addDays, todayInAlmaty } from '@/lib/time';
+import { generalCleaningDate, readGeneralCleaningSettings } from '@/services/general-cleaning';
 import { readRows } from '@/services/rotation-rows';
 import { readSchedule } from '@/services/rotation-schedule';
 import { readRotationSetup } from '@/services/rotation-setup';
@@ -20,6 +21,7 @@ import {
   type ZoneOption,
 } from './rotation-rows-manager';
 import { RotationSetupManager, type AreaBlock, type GroupRow } from './rotation-setup-manager';
+import { GeneralCleaningPanel } from './general-cleaning-panel';
 import { ScheduleGenerator } from './schedule-generator';
 
 import type { UserActor } from '@/services/users';
@@ -71,10 +73,11 @@ export default async function RotationSetupPage({
   // Горизонт по умолчанию — месяц вперёд: §6.6 требует расписание на месяц.
   const defaultUntil = addDays(today, 30);
 
-  const [setup, rows, scheduled] = await Promise.all([
+  const [setup, rows, scheduled, generalSettings] = await Promise.all([
     readRotationSetup(actor, houseId),
     readRows(actor, houseId),
     readSchedule(actor, houseId, { from: today, to: defaultUntil }),
+    readGeneralCleaningSettings(actor, houseId),
   ]);
 
   const areas: AreaBlock[] = setup.areas.map((area) => ({
@@ -181,6 +184,12 @@ export default async function RotationSetupPage({
         defaultUntil={defaultUntil}
         houseId={houseId}
         scheduledCount={scheduled.length}
+      />
+
+      <GeneralCleaningPanel
+        cancelRegular={generalSettings.cancelRegular}
+        defaultDate={generalCleaningDate(today)}
+        houseId={houseId}
       />
     </section>
   );

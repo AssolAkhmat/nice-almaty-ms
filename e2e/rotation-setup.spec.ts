@@ -136,6 +136,22 @@ test.describe('настройка ротаций', () => {
     await expect(page.getByTestId('schedule-done')).toBeVisible();
   });
 
+  test('генеральная уборка распределяется на последнее воскресенье месяца', async ({ page }) => {
+    await login(page, E2E_ACCOUNTS.adminHouse1);
+    await page.goto('/settings/house/rotations');
+
+    const date = page.getByTestId('general-date');
+    await expect(date).toBeVisible();
+
+    // Дата по умолчанию — воскресенье. День недели берётся у самой даты,
+    // а не у момента: полночь по Алматы — это ещё вчерашний день в UTC.
+    const value = await date.inputValue();
+    expect(new Date(`${value}T00:00:00Z`).getUTCDay()).toBe(0);
+
+    await page.getByTestId('general-plan').click();
+    await expect(page.getByTestId('general-done')).toBeVisible();
+  });
+
   test('суперадмин открывает настройку и выбирает дом', async ({ page }) => {
     await login(page, E2E_ACCOUNTS.superadmin);
     await page.goto('/settings/house/rotations');
