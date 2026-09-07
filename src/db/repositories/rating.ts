@@ -13,6 +13,7 @@ import {
   ratingRules,
   ratingThresholdStates,
   residencies,
+  users,
   type Absence,
   type Discount,
   type Fine,
@@ -339,7 +340,7 @@ export async function listRatingRules(
     .select()
     .from(ratingRules)
     .where(and(...conditions))
-    .orderBy(asc(ratingRules.kind), asc(ratingRules.code));
+    .orderBy(asc(ratingRules.kind), asc(ratingRules.code), asc(ratingRules.id));
 }
 
 export interface CreateRatingEventInput {
@@ -484,6 +485,21 @@ function userVisibility(context: AccessContext) {
   )`;
 }
 
+/**
+ * Состояния порогов лежат в таблице без `org_id`: ключ там — пара
+ * «жилец и правило». Сеть у них всё равно есть — та, в которой числится
+ * жилец, — и запрос обязан её проверять (CLAUDE.md §3). Без этого пороги
+ * читались бы по одному лишь идентификатору человека из чужой сети:
+ * тот же класс дефекта, что инцидент I6.
+ */
+function inNetwork(context: AccessContext) {
+  return sql`exists (
+    select 1 from ${users}
+    where ${users.id} = ${ratingThresholdStates.userId}
+      and ${users.orgId} = ${context.orgId}
+  )`;
+}
+
 export interface ThresholdStateInput {
   ruleId: string;
   armed: boolean;
@@ -500,7 +516,15 @@ export async function writeThresholdStates(
     return;
   }
 
-  void context;
+  const [addressee] = await executor
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.id, userId), eq(users.orgId, context.orgId)))
+    .limit(1);
+
+  if (addressee === undefined) {
+    throw new NotFoundError('Жилец не найден');
+  }
 
   for (const state of states) {
     await executor
@@ -529,13 +553,11 @@ export async function readThresholdStates(
   userId: string,
   executor: Executor = getDb(),
 ): Promise<RatingThresholdState[]> {
-  void context;
-
   return executor
     .select()
     .from(ratingThresholdStates)
-    .where(eq(ratingThresholdStates.userId, userId))
-    .orderBy(asc(ratingThresholdStates.ruleId));
+    .where(and(eq(ratingThresholdStates.userId, userId), inNetwork(context)))
+    .orderBy(asc(ratingThresholdStates.ruleId), asc(ratingThresholdStates.id));
 }
 
 export interface CreateFineInput {

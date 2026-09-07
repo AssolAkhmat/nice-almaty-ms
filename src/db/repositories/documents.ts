@@ -52,7 +52,7 @@ export async function listDocumentTypes(
     .select()
     .from(documentTypes)
     .where(and(...conditions))
-    .orderBy(asc(documentTypes.sortOrder), asc(documentTypes.code));
+    .orderBy(asc(documentTypes.sortOrder), asc(documentTypes.code), asc(documentTypes.id));
 }
 
 export async function findDocumentTypeByCode(
@@ -145,7 +145,7 @@ export async function listDocuments(
     .select()
     .from(documents)
     .where(and(...conditions))
-    .orderBy(asc(documents.createdAt));
+    .orderBy(asc(documents.createdAt), asc(documents.id));
 }
 
 export async function findDocument(

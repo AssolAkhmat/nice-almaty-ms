@@ -72,8 +72,8 @@ export async function listUsers(
   const query = executor.select().from(users).where(scope(context));
 
   return options.order === 'newest'
-    ? query.orderBy(desc(users.createdAt), asc(users.phone))
-    : query.orderBy(asc(users.phone));
+    ? query.orderBy(desc(users.createdAt), asc(users.phone), asc(users.id))
+    : query.orderBy(asc(users.phone), asc(users.id));
 }
 
 export async function findUser(

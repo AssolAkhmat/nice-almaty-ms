@@ -48,7 +48,7 @@ export async function listDamages(
     .select()
     .from(damages)
     .where(and(...conditions))
-    .orderBy(desc(damages.createdAt));
+    .orderBy(desc(damages.createdAt), desc(damages.id));
 }
 
 export async function requireDamage(
@@ -150,5 +150,5 @@ export async function listDamageShares(
     .select()
     .from(damageShares)
     .where(eq(damageShares.damageId, damageId))
-    .orderBy(asc(damageShares.createdAt));
+    .orderBy(asc(damageShares.createdAt), asc(damageShares.id));
 }

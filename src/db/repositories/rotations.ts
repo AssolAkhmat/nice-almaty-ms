@@ -216,7 +216,12 @@ export async function listChecklists(
     .from(areaChecklists)
     .innerJoin(areas, eq(areas.id, areaChecklists.areaId))
     .where(and(...conditions))
-    .orderBy(asc(areas.sortOrder), asc(areas.name), asc(areaChecklists.type));
+    .orderBy(
+      asc(areas.sortOrder),
+      asc(areas.name),
+      asc(areaChecklists.type),
+      asc(areaChecklists.id),
+    );
 
   return rows.map((row) => row.checklist);
 }
@@ -320,7 +325,7 @@ export async function listEligibilityGroups(
         houseScope(context, eligibilityGroups.houseId),
       ),
     )
-    .orderBy(asc(eligibilityGroups.name));
+    .orderBy(asc(eligibilityGroups.name), asc(eligibilityGroups.id));
 }
 
 export async function requireEligibilityGroup(
@@ -390,7 +395,7 @@ export async function listAreaEligibility(
     .from(areaEligibility)
     .innerJoin(areas, eq(areas.id, areaEligibility.areaId))
     .where(and(eq(areas.houseId, houseId), houseScope(context, areas.houseId)))
-    .orderBy(asc(areaEligibility.checklistType));
+    .orderBy(asc(areaEligibility.checklistType), asc(areaEligibility.id));
 
   return rows.map((row) => row.link);
 }
@@ -472,7 +477,12 @@ export async function listEligibilityMembers(
      * транзакцией, время совпадает, и порядок становится случайным —
      * от него зависят и состав группы, и раздача генеральной уборки.
      */
-    .orderBy(asc(residentProfiles.lastName), asc(residentProfiles.firstName), asc(users.phone));
+    .orderBy(
+      asc(residentProfiles.lastName),
+      asc(residentProfiles.firstName),
+      asc(users.phone),
+      asc(users.id),
+    );
 
   return rows.map((row) => {
     const name = [row.lastName, row.firstName]
@@ -547,7 +557,7 @@ export async function listRotationRows(
     .select()
     .from(rotationRows)
     .where(and(...conditions))
-    .orderBy(asc(rotationRows.sortOrder), asc(rotationRows.name));
+    .orderBy(asc(rotationRows.sortOrder), asc(rotationRows.name), asc(rotationRows.id));
 }
 
 export async function requireRotationRow(
@@ -644,7 +654,7 @@ export async function listRowSlots(
     .select()
     .from(rotationRowSlots)
     .where(eq(rotationRowSlots.rowId, rowId))
-    .orderBy(asc(rotationRowSlots.position));
+    .orderBy(asc(rotationRowSlots.position), asc(rotationRowSlots.id));
 }
 
 export interface RowZoneInput {
@@ -693,7 +703,7 @@ export async function listRowZones(
     .select()
     .from(rotationRowZones)
     .where(eq(rotationRowZones.rowId, rowId))
-    .orderBy(asc(rotationRowZones.position));
+    .orderBy(asc(rotationRowZones.position), asc(rotationRowZones.id));
 }
 
 export interface CreateOccurrenceInput {
@@ -1034,7 +1044,7 @@ export async function listCalendarDictionaries(
     .select({ id: areas.id, name: areas.name })
     .from(areas)
     .where(and(eq(areas.houseId, houseId), houseScope(context, areas.houseId)))
-    .orderBy(asc(areas.sortOrder), asc(areas.name));
+    .orderBy(asc(areas.sortOrder), asc(areas.name), asc(areas.id));
 
   const checklistRows = await executor
     .select({
@@ -1072,7 +1082,12 @@ export async function listCalendarDictionaries(
         inArray(residencies.status, ['active', 'terminating']),
       ),
     )
-    .orderBy(asc(residentProfiles.lastName), asc(residentProfiles.firstName), asc(users.phone));
+    .orderBy(
+      asc(residentProfiles.lastName),
+      asc(residentProfiles.firstName),
+      asc(users.phone),
+      asc(users.id),
+    );
 
   return {
     areas: areaRows,

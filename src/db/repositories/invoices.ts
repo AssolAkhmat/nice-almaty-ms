@@ -119,7 +119,7 @@ export async function listInvoices(
     .select()
     .from(invoices)
     .where(and(...conditions))
-    .orderBy(desc(invoices.periodMonth), desc(invoices.createdAt));
+    .orderBy(desc(invoices.periodMonth), desc(invoices.createdAt), desc(invoices.id));
 }
 
 export async function findInvoice(
@@ -172,7 +172,7 @@ export async function listInvoiceLines(
     .select()
     .from(invoiceLines)
     .where(eq(invoiceLines.invoiceId, invoiceId))
-    .orderBy(asc(invoiceLines.createdAt));
+    .orderBy(asc(invoiceLines.createdAt), asc(invoiceLines.id));
 }
 
 /**
@@ -261,7 +261,7 @@ export async function listPayments(
     .select()
     .from(payments)
     .where(eq(payments.invoiceId, invoiceId))
-    .orderBy(asc(payments.paidAt));
+    .orderBy(asc(payments.paidAt), asc(payments.id));
 }
 
 export async function createPayment(
@@ -320,5 +320,5 @@ export async function listDepositTransactions(
     .select()
     .from(depositTransactions)
     .where(and(...conditions))
-    .orderBy(asc(depositTransactions.createdAt));
+    .orderBy(asc(depositTransactions.createdAt), asc(depositTransactions.id));
 }

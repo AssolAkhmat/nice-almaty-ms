@@ -140,6 +140,22 @@ async function seed(tx: Transaction, suffix: string) {
   };
 }
 
+/** Чужая сеть: жилец существует, но числится в другой организации. */
+async function seedOtherOrg(tx: Transaction, suffix: string) {
+  const [org] = await tx
+    .insert(schema.organizations)
+    .values({ name: 'Другая сеть', slug: `rat-x-${suffix}` })
+    .returning();
+  const orgId = org?.id ?? '';
+
+  const [user] = await tx
+    .insert(schema.users)
+    .values({ orgId, phone: `+77772${suffix}`, passwordHash: 'x', role: 'resident' })
+    .returning();
+
+  return { orgId, userId: user?.id ?? '' };
+}
+
 describe('отсутствия', () => {
   it('заводятся жильцом и видны его дому', async () => {
     await inRollback(async (tx) => {
@@ -444,6 +460,41 @@ describe('состояние порогов', () => {
 
       expect(states).toHaveLength(1);
       expect(states[0]?.armed).toBe(true);
+    });
+  });
+
+  /*
+   * Таблица порогов без `org_id`, ключ в ней — «жилец и правило».
+   * Сеть проверяется через самого жильца: иначе состояния читались бы
+   * по одному лишь идентификатору человека из чужой сети — тот же класс
+   * дефекта, что инцидент I6.
+   */
+  it('пороги жильца чужой сети не читаются и не пишутся', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '5232');
+      const stranger = await seedOtherOrg(tx, '5232');
+
+      const rule = await putRatingRule(
+        fixture.superadmin,
+        { houseId: null, kind: 'threshold_down', code: 'down:20', config: { threshold: 20 } },
+        tx,
+      );
+
+      await tx.insert(schema.ratingThresholdStates).values({
+        userId: stranger.userId,
+        ruleId: rule.id,
+        armed: false,
+      });
+
+      expect(await readThresholdStates(fixture.superadmin, stranger.userId, tx)).toEqual([]);
+      await expect(
+        writeThresholdStates(
+          fixture.superadmin,
+          stranger.userId,
+          [{ ruleId: rule.id, armed: true }],
+          tx,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundError);
     });
   });
 });

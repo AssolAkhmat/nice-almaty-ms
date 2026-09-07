@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 
 import { NotFoundError } from '@/lib/errors';
 import { now, type BusinessDate } from '@/lib/time';
@@ -67,7 +67,7 @@ export async function listResidencies(
     .select()
     .from(residencies)
     .where(and(...conditions))
-    .orderBy(desc(residencies.createdAt));
+    .orderBy(desc(residencies.createdAt), desc(residencies.id));
 }
 
 export interface HouseRosterEntry {
@@ -110,7 +110,7 @@ export async function listHouseRoster(
         inArray(residencies.status, ['active', 'terminating']),
       ),
     )
-    .orderBy(residencies.createdAt);
+    .orderBy(asc(residencies.createdAt), asc(residencies.id));
 
   return rows.map((row) => ({
     residencyId: row.residencyId,
@@ -236,7 +236,7 @@ export async function listAssignments(
     .select()
     .from(bedAssignments)
     .where(eq(bedAssignments.residencyId, residencyId))
-    .orderBy(desc(bedAssignments.createdAt));
+    .orderBy(desc(bedAssignments.createdAt), desc(bedAssignments.id));
 }
 
 /**

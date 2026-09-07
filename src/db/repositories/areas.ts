@@ -48,7 +48,7 @@ export async function listAreas(
     .select()
     .from(areas)
     .where(and(...conditions))
-    .orderBy(asc(areas.sortOrder), asc(areas.name));
+    .orderBy(asc(areas.sortOrder), asc(areas.name), asc(areas.id));
 }
 
 export async function requireArea(
@@ -119,7 +119,7 @@ export async function listBeds(
     .select()
     .from(beds)
     .where(and(...conditions))
-    .orderBy(asc(beds.number), asc(beds.tier));
+    .orderBy(asc(beds.number), asc(beds.tier), asc(beds.id));
 }
 
 export async function requireBed(

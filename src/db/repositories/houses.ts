@@ -36,7 +36,7 @@ export async function listHouses(
     .select()
     .from(houses)
     .where(and(...conditions))
-    .orderBy(asc(houses.name));
+    .orderBy(asc(houses.name), asc(houses.id));
 }
 
 export async function findHouse(

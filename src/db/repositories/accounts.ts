@@ -60,7 +60,7 @@ export async function listAccounts(
     .select()
     .from(accounts)
     .where(and(...conditions))
-    .orderBy(asc(accounts.code));
+    .orderBy(asc(accounts.code), asc(accounts.id));
 }
 
 export async function findAccountByCode(
@@ -242,7 +242,7 @@ export async function listLedgerEntries(
     .select()
     .from(ledgerEntries)
     .where(and(...conditions))
-    .orderBy(desc(ledgerEntries.entryDate), desc(ledgerEntries.createdAt));
+    .orderBy(desc(ledgerEntries.entryDate), desc(ledgerEntries.createdAt), desc(ledgerEntries.id));
 }
 
 export async function findLedgerEntry(
@@ -281,7 +281,7 @@ export async function findLedgerEntryBySource(
         isNull(ledgerEntries.reversedByEntryId),
       ),
     )
-    .orderBy(asc(ledgerEntries.createdAt))
+    .orderBy(asc(ledgerEntries.createdAt), asc(ledgerEntries.id))
     .limit(1);
 
   return entry ?? null;
@@ -295,7 +295,7 @@ export async function listLedgerLines(
     .select()
     .from(ledgerLines)
     .where(eq(ledgerLines.entryId, entryId))
-    .orderBy(asc(ledgerLines.createdAt));
+    .orderBy(asc(ledgerLines.createdAt), asc(ledgerLines.id));
 }
 
 /** Строки нескольких проводок разом: журнал иначе бил бы базу по разу на строку. */
@@ -311,7 +311,7 @@ export async function listLinesOfEntries(
     .select()
     .from(ledgerLines)
     .where(inArray(ledgerLines.entryId, [...entryIds]))
-    .orderBy(asc(ledgerLines.createdAt));
+    .orderBy(asc(ledgerLines.createdAt), asc(ledgerLines.id));
 }
 
 export async function markEntryReversed(

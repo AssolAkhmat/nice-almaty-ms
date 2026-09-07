@@ -55,7 +55,7 @@ export async function listUtilityPeriods(
     .select()
     .from(utilityPeriods)
     .where(and(...conditions))
-    .orderBy(desc(utilityPeriods.month));
+    .orderBy(desc(utilityPeriods.month), desc(utilityPeriods.id));
 }
 
 export async function findUtilityPeriod(
@@ -141,7 +141,7 @@ export async function listUtilityLines(
     .select()
     .from(utilityLines)
     .where(eq(utilityLines.periodId, periodId))
-    .orderBy(asc(utilityLines.createdAt));
+    .orderBy(asc(utilityLines.createdAt), asc(utilityLines.id));
 }
 
 export async function addUtilityLine(
@@ -206,7 +206,11 @@ export async function listUtilityAllocations(
     .select()
     .from(utilityAllocations)
     .where(eq(utilityAllocations.periodId, periodId))
-    .orderBy(asc(utilityAllocations.days), asc(utilityAllocations.userId));
+    .orderBy(
+      asc(utilityAllocations.days),
+      asc(utilityAllocations.userId),
+      asc(utilityAllocations.id),
+    );
 }
 
 /**
@@ -253,7 +257,7 @@ export async function listUtilityHistory(
       ),
     )
     .groupBy(utilityPeriods.id, utilityPeriods.month)
-    .orderBy(desc(utilityPeriods.month));
+    .orderBy(desc(utilityPeriods.month), desc(utilityPeriods.id));
 }
 
 export async function findClosedAllocation(
