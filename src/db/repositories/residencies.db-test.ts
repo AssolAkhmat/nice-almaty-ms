@@ -440,6 +440,25 @@ describe('видимость проживаний', () => {
     });
   });
 
+  it('фильтр по жильцу отсекает чужие проживания дома', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '300004');
+      await createResidency(
+        fixture.superadmin,
+        { userId: fixture.firstUser, houseId: fixture.houseA },
+        tx,
+      );
+
+      // «Моё проживание» у админа своё, а не первое попавшееся в доме:
+      // без фильтра экран отсутствий предлагал ему подать заявку за жильца.
+      const own = await listResidencies(fixture.adminA, { userId: fixture.adminA.userId }, tx);
+      const foreign = await listResidencies(fixture.adminA, { userId: fixture.firstUser }, tx);
+
+      expect(own).toHaveLength(0);
+      expect(foreign).toHaveLength(1);
+    });
+  });
+
   it('жилец видит только своё проживание', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '300003');

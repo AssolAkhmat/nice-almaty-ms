@@ -40,7 +40,7 @@ export default async function AbsencesPage() {
    * кто в доме живёт. У админа без проживания форма не показывается — ему
    * нечего сообщать о возвращении в дом, где он не живёт.
    */
-  const [residency] = await listResidencies(context, {});
+  const [residency] = await listResidencies(context, { userId: context.userId });
   const canSubmit =
     residency !== undefined &&
     can(context, 'absence.create', { houseId: residency.houseId, userId: context.userId });
@@ -52,7 +52,11 @@ export default async function AbsencesPage() {
   const mine = canSubmit ? await listMyAbsences(actor) : [];
 
   // Дом админа — свой; суперадмин смотрит тот, где есть проживания.
-  const houseId = context.houseId ?? residency?.houseId ?? null;
+  const houseId =
+    context.houseId ??
+    residency?.houseId ??
+    (await listResidencies(context, {}))[0]?.houseId ??
+    null;
 
   const houseRows =
     canReview && houseId !== null ? await listHouseAbsences(actor, houseId, {}) : [];

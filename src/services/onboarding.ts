@@ -83,7 +83,11 @@ export async function readOnboarding(
   const executor = deps.executor ?? getDb();
   const today = deps.today ?? todayInAlmaty();
 
-  const [residency] = await listResidencies(actor.context, {}, executor);
+  const [residency] = await listResidencies(
+    actor.context,
+    { userId: actor.context.userId },
+    executor,
+  );
 
   if (residency === undefined) {
     return {
@@ -140,7 +144,11 @@ export async function readAccessScope(
   deps: OnboardingDeps = {},
 ): Promise<ResidencyAccessScope> {
   const executor = deps.executor ?? getDb();
-  const [residency] = await listResidencies(actor.context, {}, executor);
+  const [residency] = await listResidencies(
+    actor.context,
+    { userId: actor.context.userId },
+    executor,
+  );
 
   return accessScopeOf(residency?.status ?? null);
 }

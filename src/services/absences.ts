@@ -45,12 +45,21 @@ export interface SubmitAbsenceInput {
   docFileId?: string | null;
 }
 
-/** Дом жильца берётся из проживания: колонки дома у него нет (D11). */
+/**
+ * Дом жильца берётся из проживания: колонки дома у него нет (D11).
+ *
+ * Проживание — своё: у админа видимость на весь дом, и без фильтра по
+ * пользователю первым попадалось чужое, а заявка записывалась бы на него.
+ */
 async function houseOfResident(
   actor: UserActor,
   executor: Executor,
 ): Promise<{ houseId: string; userId: string }> {
-  const [residency] = await listResidencies(actor.context, {}, executor);
+  const [residency] = await listResidencies(
+    actor.context,
+    { userId: actor.context.userId },
+    executor,
+  );
 
   if (residency === undefined) {
     throw new NotFoundError('Проживание не найдено');

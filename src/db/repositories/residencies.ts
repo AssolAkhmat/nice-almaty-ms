@@ -47,7 +47,7 @@ export function residencyVisibility(context: AccessContext) {
 
 export async function listResidencies(
   context: AccessContext,
-  filter: { houseId?: string; status?: Residency['status'] } = {},
+  filter: { houseId?: string; status?: Residency['status']; userId?: string } = {},
   executor: Executor = getDb(),
 ): Promise<Residency[]> {
   const conditions = [residencyVisibility(context)];
@@ -55,6 +55,9 @@ export async function listResidencies(
   if (filter.houseId !== undefined) {
     assertHouseVisible(context, filter.houseId);
     conditions.push(eq(residencies.houseId, filter.houseId));
+  }
+  if (filter.userId !== undefined) {
+    conditions.push(eq(residencies.userId, filter.userId));
   }
   if (filter.status !== undefined) {
     conditions.push(eq(residencies.status, filter.status));

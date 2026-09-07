@@ -141,6 +141,25 @@ describe('подача отсутствия', () => {
     });
   });
 
+  it('админ без проживания подаёт не за жильца, а никак', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '5311');
+
+      /*
+       * Дом жильца берётся из проживания, и до фильтра по пользователю
+       * первым попадалось проживание любого жильца дома: заявка админа
+       * записалась бы на него.
+       */
+      await expect(
+        submitAbsence(
+          fixture.admin,
+          { type: 'long', startDate: TOMORROW, endDate: NEXT_WEEK, reason: 'Уезжаю' },
+          { executor: tx, today: TODAY, instant: NOW },
+        ),
+      ).rejects.toBeInstanceOf(NotFoundError);
+    });
+  });
+
   it('долгосрочное и болезнь ждут решения админа', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '5302');
