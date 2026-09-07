@@ -98,6 +98,8 @@ export const ledgerEntries = pgTable(
      * у прочих проводок категории нет, и колонка остаётся пустой.
      */
     category: text('category'),
+    /** Чек к расходу (модуль 10). У прочих проводок чека нет. */
+    receiptFileId: uuid('receipt_file_id'),
     /** Сторно не удаляет оригинал, а ссылается на обратную проводку. */
     reversedByEntryId: uuid('reversed_by_entry_id'),
     createdBy: uuid('created_by').references(() => users.id),

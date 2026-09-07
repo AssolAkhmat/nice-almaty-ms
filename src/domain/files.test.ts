@@ -6,6 +6,7 @@ import {
   checkUpload,
   documentStorageKey,
   extensionForMime,
+  houseFileStorageKey,
   sniffMime,
 } from './files';
 
@@ -148,5 +149,45 @@ describe('ключ хранения документа', () => {
 
   it('неразрешённый тип не доходит до ключа', () => {
     expect(() => documentStorageKey({ ...key, mime: 'text/html' })).toThrow(RangeError);
+  });
+});
+
+/**
+ * Путь чека дома (T3.12). У чека к ущербу, расходу и строке коммуналки
+ * проживания нет: он принадлежит дому. Поэтому и путь другой — без сегмента
+ * проживания, иначе чек лёг бы в чужую папку и попал бы под видимость,
+ * которая к нему не относится.
+ */
+describe('путь хранения файла дома', () => {
+  it('складывается из дома, назначения и идентификатора записи', () => {
+    expect(
+      houseFileStorageKey({
+        houseSlug: 'dom-1',
+        purpose: 'damage-receipt',
+        fileId: 'aaaabbbb-cccc-dddd-eeee-ffff00001111',
+        mime: 'image/jpeg',
+      }),
+    ).toBe('dom-1/damage-receipt/aaaabbbb-cccc-dddd-eeee-ffff00001111.jpg');
+  });
+
+  it('имя от пользователя в путь не попадает: расширение из типа', () => {
+    expect(
+      houseFileStorageKey({
+        houseSlug: 'dom-1',
+        purpose: 'expense-receipt',
+        fileId: 'file-1',
+        mime: 'application/pdf',
+      }),
+    ).toBe('dom-1/expense-receipt/file-1.pdf');
+  });
+
+  it('обход каталога отвергается сегмент за сегментом', () => {
+    for (const parts of [
+      { houseSlug: '../etc', purpose: 'damage-receipt', fileId: 'f', mime: 'image/png' },
+      { houseSlug: 'dom-1', purpose: '..', fileId: 'f', mime: 'image/png' },
+      { houseSlug: 'dom-1', purpose: 'damage-receipt', fileId: 'a/b', mime: 'image/png' },
+    ]) {
+      expect(() => houseFileStorageKey(parts)).toThrow(RangeError);
+    }
   });
 });

@@ -95,9 +95,12 @@ export async function addLineAction(
   }
 
   try {
+    const receiptFileId = text(formData, 'receiptFileId');
+
     await addPeriodLine(current, text(formData, 'periodId'), {
       title: text(formData, 'title'),
       amount: Number(text(formData, 'amount')),
+      receiptFileId: receiptFileId === '' ? null : receiptFileId,
     });
   } catch (error) {
     return failure(error);

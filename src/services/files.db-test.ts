@@ -15,6 +15,7 @@ import { ConflictError, NotFoundError, ValidationError } from '@/lib/errors';
 
 import {
   completeUpload,
+  createHouseUploadSession,
   createUploadSession,
   readFileContent,
   receiveUploadedBytes,
@@ -128,13 +129,22 @@ async function seed(tx: Transaction, suffix: string) {
 
   const actor = (ctx: AccessContext): UserActor => ({ context: ctx, requestId: `req-${suffix}` });
 
+  const [superUser] = await tx
+    .insert(schema.users)
+    .values({ orgId, phone: `+77094${suffix}`, passwordHash: 'x', role: 'superadmin' })
+    .returning();
+
   return {
     orgId,
+    houseA: houseA?.id ?? '',
+    houseB: houseB?.id ?? '',
     residencyA: residencyA?.id ?? '',
     residencyB: residencyB?.id ?? '',
     residentA: actor(context('resident', userA?.id ?? '', null)),
     residentB: actor(context('resident', userB?.id ?? '', null)),
     adminA: actor(context('admin', adminUser?.id ?? '', houseA?.id ?? null)),
+    adminB: actor(context('admin', adminUser?.id ?? '', houseB?.id ?? null)),
+    superadmin: actor(context('superadmin', superUser?.id ?? '', null)),
     houseSlug: `svc-a-${suffix}`,
   };
 }
@@ -559,6 +569,146 @@ describe('отдача содержимого', () => {
       await expect(
         readFileContent(fixture.residentA, session.fileId, { executor: tx, storage }),
       ).rejects.toBeInstanceOf(NotFoundError);
+    });
+  });
+});
+
+/**
+ * Чек к ущербу, расходу и строке коммуналки (T3.12). У него нет проживания:
+ * он принадлежит дому, и видимость идёт по дому, а не по жильцу. Проверяется
+ * именно это — иначе чек оказался бы у того, кому его никто не показывал.
+ */
+describe('чек дома', () => {
+  async function uploadReceipt(
+    tx: Transaction,
+    fixture: Awaited<ReturnType<typeof seed>>,
+    houseId: string | null,
+  ) {
+    const storage = freshStorage();
+    const deps = { executor: tx, storage };
+
+    const session = await createHouseUploadSession(
+      fixture.adminA,
+      {
+        houseId,
+        purpose: 'damage-receipt',
+        mime: 'image/jpeg',
+        sizeBytes: 4,
+        originalName: 'чек.jpg',
+      },
+      deps,
+    );
+
+    await receiveUploadedBytes(fixture.adminA, session.fileId, new Uint8Array(JPEG_HEAD), deps);
+    await completeUpload(fixture.adminA, session.fileId, deps);
+
+    return { fileId: session.fileId, deps };
+  }
+
+  it('ложится в папку дома, без сегмента проживания', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '4801');
+      const { fileId } = await uploadReceipt(tx, fixture, fixture.houseA);
+
+      const [file] = await tx.select().from(schema.files).where(eq(schema.files.id, fileId));
+
+      expect(file?.residencyId).toBeNull();
+      expect(file?.houseId).toBe(fixture.houseA);
+      expect(file?.path).toBe(`${fixture.houseSlug}/damage-receipt/${fileId}.jpg`);
+    });
+  });
+
+  it('читается админом своего дома и суперадмином', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '4802');
+      const { fileId, deps } = await uploadReceipt(tx, fixture, fixture.houseA);
+
+      await expect(readFileContent(fixture.adminA, fileId, deps)).resolves.toBeDefined();
+      await expect(readFileContent(fixture.superadmin, fileId, deps)).resolves.toBeDefined();
+    });
+  });
+
+  it('жильцу не показывается', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '4803');
+      const { fileId, deps } = await uploadReceipt(tx, fixture, fixture.houseA);
+
+      await expect(readFileContent(fixture.residentA, fileId, deps)).rejects.toBeInstanceOf(
+        NotFoundError,
+      );
+    });
+  });
+
+  it('админу чужого дома тоже не показывается', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '4804');
+      const { fileId, deps } = await uploadReceipt(tx, fixture, fixture.houseA);
+
+      await expect(readFileContent(fixture.adminB, fileId, deps)).rejects.toBeInstanceOf(
+        NotFoundError,
+      );
+    });
+  });
+
+  it('чек уровня сети виден суперадмину и закрыт админу дома', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '4805');
+      const storage = freshStorage();
+      const deps = { executor: tx, storage };
+
+      const session = await createHouseUploadSession(
+        fixture.superadmin,
+        {
+          houseId: null,
+          purpose: 'expense-receipt',
+          mime: 'image/jpeg',
+          sizeBytes: 4,
+          originalName: 'чек.jpg',
+        },
+        deps,
+      );
+
+      await receiveUploadedBytes(
+        fixture.superadmin,
+        session.fileId,
+        new Uint8Array(JPEG_HEAD),
+        deps,
+      );
+      await completeUpload(fixture.superadmin, session.fileId, deps);
+
+      const [file] = await tx
+        .select()
+        .from(schema.files)
+        .where(eq(schema.files.id, session.fileId));
+      expect(file?.path).toBe(`_network/expense-receipt/${session.fileId}.jpg`);
+
+      await expect(
+        readFileContent(fixture.superadmin, session.fileId, deps),
+      ).resolves.toBeDefined();
+      await expect(readFileContent(fixture.adminA, session.fileId, deps)).rejects.toBeInstanceOf(
+        NotFoundError,
+      );
+    });
+  });
+
+  it('неизвестное назначение файла не принимается: перечень закрыт', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '4806');
+      const storage = freshStorage();
+
+      await expect(
+        createHouseUploadSession(
+          fixture.adminA,
+          {
+            houseId: fixture.houseA,
+            purpose: 'что-угодно',
+            mime: 'image/jpeg',
+            sizeBytes: 4,
+            originalName: 'чек.jpg',
+          },
+          { executor: tx, storage },
+        ),
+      ).rejects.toBeInstanceOf(ValidationError);
     });
   });
 });

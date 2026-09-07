@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Field, Input } from '@/components/ui/input';
 import { Money } from '@/components/ui/money';
 import { Table } from '@/components/ui/table';
+import { ReceiptUpload } from '@/components/upload/receipt-upload';
 
 import {
   addLineAction,
@@ -23,6 +24,7 @@ export interface PeriodLineView {
   id: string;
   title: string;
   amount: number;
+  receiptFileId: string | null;
 }
 
 export interface AllocationRowView {
@@ -34,6 +36,7 @@ export interface AllocationRowView {
 
 export interface PeriodScreenProps {
   periodId: string;
+  houseId: string;
   month: string;
   closed: boolean;
   lines: readonly PeriodLineView[];
@@ -48,16 +51,16 @@ export interface PeriodScreenProps {
 
 const INITIAL: UtilityActionState = {};
 
-function LineForm({ periodId }: { periodId: string }) {
+function LineForm({ houseId, periodId }: { houseId: string; periodId: string }) {
   const t = useTranslations();
   const [state, action, isPending] = useActionState(addLineAction, INITIAL);
 
   return (
-    <form action={action} className="grid items-end gap-3 md:grid-cols-[2fr_1fr_auto]">
+    <form action={action} className="grid items-end gap-3 md:grid-cols-[2fr_1fr_1fr_auto]">
       <input name="periodId" type="hidden" value={periodId} />
 
       {state.error !== undefined && (
-        <p className="text-danger text-[13px] md:col-span-3" role="alert">
+        <p className="text-danger text-[13px] md:col-span-4" role="alert">
           {t(state.error)}
         </p>
       )}
@@ -76,6 +79,13 @@ function LineForm({ periodId }: { periodId: string }) {
           type="number"
         />
       </Field>
+
+      <ReceiptUpload
+        houseId={houseId}
+        id="utility-receipt"
+        name="receiptFileId"
+        purpose="utility-receipt"
+      />
 
       <Button disabled={isPending} size="sm" type="submit">
         {t('utilities.addLine')}
@@ -102,6 +112,7 @@ export function PeriodScreen({
   canManage,
   canReopen,
   closed,
+  houseId,
   lines,
   periodId,
   rows,
@@ -134,6 +145,16 @@ export function PeriodScreen({
                 <li className="flex items-center justify-between gap-4" key={line.id}>
                   <span>{line.title}</span>
                   <span className="flex items-center gap-3">
+                    {line.receiptFileId !== null && (
+                      <a
+                        className="text-text-muted hover:text-text underline-offset-2 hover:underline"
+                        href={`/api/v1/files/${line.receiptFileId}/content`}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        {t('files.receipt')}
+                      </a>
+                    )}
                     <Money amount={line.amount} />
                     {canManage && !closed && <RemoveLine lineId={line.id} />}
                   </span>
@@ -142,7 +163,7 @@ export function PeriodScreen({
             </ul>
           )}
 
-          {canManage && !closed && <LineForm periodId={periodId} />}
+          {canManage && !closed && <LineForm houseId={houseId} periodId={periodId} />}
         </div>
       </Card>
 

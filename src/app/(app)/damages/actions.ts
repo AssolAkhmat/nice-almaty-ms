@@ -72,6 +72,7 @@ export async function createDamageAction(
   const amount = Number(text(formData, 'amount'));
   const areaId = text(formData, 'areaId');
   const description = text(formData, 'description');
+  const receiptFileId = text(formData, 'receiptFileId');
 
   const userIds = formData
     .getAll('userIds')
@@ -86,6 +87,7 @@ export async function createDamageAction(
       splitMode: text(formData, 'splitMode') as DamageSplitMode,
       userIds,
       areaId: areaId === '' ? null : areaId,
+      receiptFileId: receiptFileId === '' ? null : receiptFileId,
     });
   } catch (error) {
     return failure(error);

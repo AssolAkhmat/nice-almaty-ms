@@ -92,6 +92,13 @@
       "when": 1788742758842,
       "tag": "0012_ledger_expense_category",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1788743735781,
+      "tag": "0013_house_files_and_expense_receipt",
+      "breakpoints": true
     }
   ]
 }

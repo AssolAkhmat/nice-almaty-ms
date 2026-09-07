@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { inArray } from 'drizzle-orm';
+import { inArray, like, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 
@@ -25,6 +25,99 @@ export const E2E_ACCOUNTS = {
   adminHouse1: adminPhone(1),
   adminHouse2: adminPhone(2),
 } as const;
+
+/**
+ * Номера, которые заводит сам прогон: `+7708…` — приёмка фазы 1,
+ * `+7707…` — приёмка фазы 2. Сид пользуется `+7701…` и не трогается.
+ */
+const RUN_CREATED_PHONES = ['+7708%', '+7707%'] as const;
+
+/**
+ * Учётные записи, оставшиеся от прошлых прогонов.
+ *
+ * Прогон их не убирал, и база росла от запуска к запуску: через несколько
+ * сотен жильцов список пользователей и схема мест перестали укладываться
+ * в ожидание, и приёмки фаз 1 и 2 начали падать на ровном месте, без единой
+ * правки кода. Набор тестов, зелёный сегодня и красный завтра, хуже
+ * отсутствующего, поэтому прогон начинается с уборки за собой.
+ *
+ * Порядок удаления идёт от зависимых записей к самой учётной записи.
+ * Журнал аудита переживает её: действие остаётся, автор обезличивается —
+ * иначе уборка стирала бы историю, которой этот прогон уже не касается.
+ */
+async function removeLeftoverAccounts(db: ReturnType<typeof drizzle>): Promise<void> {
+  const leftovers = await db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(or(...RUN_CREATED_PHONES.map((pattern) => like(schema.users.phone, pattern))));
+
+  if (leftovers.length === 0) {
+    return;
+  }
+
+  const ids = leftovers.map((row) => row.id);
+
+  const residencyIds = (
+    await db
+      .select({ id: schema.residencies.id })
+      .from(schema.residencies)
+      .where(inArray(schema.residencies.userId, ids))
+  ).map((row) => row.id);
+
+  const invoiceIds =
+    residencyIds.length === 0
+      ? []
+      : (
+          await db
+            .select({ id: schema.invoices.id })
+            .from(schema.invoices)
+            .where(inArray(schema.invoices.residencyId, residencyIds))
+        ).map((row) => row.id);
+
+  if (invoiceIds.length > 0) {
+    await db.delete(schema.payments).where(inArray(schema.payments.invoiceId, invoiceIds));
+    await db.delete(schema.invoiceLines).where(inArray(schema.invoiceLines.invoiceId, invoiceIds));
+  }
+
+  if (residencyIds.length > 0) {
+    // Договор и подпись — файлы, на которые ссылается само проживание.
+    await db
+      .update(schema.residencies)
+      .set({ contractFileId: null, signatureFileId: null })
+      .where(inArray(schema.residencies.id, residencyIds));
+
+    await db
+      .delete(schema.damageShares)
+      .where(inArray(schema.damageShares.residencyId, residencyIds));
+    await db
+      .delete(schema.depositTransactions)
+      .where(inArray(schema.depositTransactions.residencyId, residencyIds));
+    await db.delete(schema.documents).where(inArray(schema.documents.residencyId, residencyIds));
+    await db.delete(schema.files).where(inArray(schema.files.residencyId, residencyIds));
+    await db.delete(schema.invoices).where(inArray(schema.invoices.residencyId, residencyIds));
+    await db
+      .delete(schema.bedAssignments)
+      .where(inArray(schema.bedAssignments.residencyId, residencyIds));
+  }
+
+  await db.delete(schema.files).where(inArray(schema.files.uploadedBy, ids));
+  await db.delete(schema.utilityAllocations).where(inArray(schema.utilityAllocations.userId, ids));
+
+  // Ссылки «кто сделал» обнуляются: сама операция к прогону отношения не имеет.
+  await db
+    .update(schema.ledgerEntries)
+    .set({ createdBy: null })
+    .where(inArray(schema.ledgerEntries.createdBy, ids));
+  await db
+    .update(schema.auditLog)
+    .set({ actorUserId: null })
+    .where(inArray(schema.auditLog.actorUserId, ids));
+
+  await db.delete(schema.residencies).where(inArray(schema.residencies.userId, ids));
+  await db.delete(schema.sessions).where(inArray(schema.sessions.userId, ids));
+  await db.delete(schema.residentProfiles).where(inArray(schema.residentProfiles.userId, ids));
+  await db.delete(schema.users).where(inArray(schema.users.id, ids));
+}
 
 export default async function globalSetup(): Promise<void> {
   const fileEnv = dotEnvFallback(fileURLToPath(new URL('../.env', import.meta.url)));
@@ -52,6 +145,8 @@ export default async function globalSetup(): Promise<void> {
      * а не послабление защиты — правило и его окно остаются прежними.
      */
     await db.delete(schema.rateLimits);
+
+    await removeLeftoverAccounts(db);
 
     const phones = Object.values(E2E_ACCOUNTS);
 

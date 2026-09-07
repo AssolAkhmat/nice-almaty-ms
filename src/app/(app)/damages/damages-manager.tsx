@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Field, Input, Select, Textarea } from '@/components/ui/input';
 import { Money } from '@/components/ui/money';
+import { ReceiptUpload } from '@/components/upload/receipt-upload';
 import { resolveDamageParticipants, splitDamage, type DamageSplitMode } from '@/domain/damage';
 import { parseInstant } from '@/lib/time';
 
@@ -41,6 +42,7 @@ export interface DamageView {
   splitMode: string;
   createdAt: string;
   reversed: boolean;
+  receiptFileId: string | null;
   shares: DamageShareView[];
 }
 
@@ -171,6 +173,13 @@ function DamageForm({
           <Textarea id="damage-description" name="description" rows={2} />
         </Field>
 
+        <ReceiptUpload
+          houseId={houseId}
+          id="damage-receipt"
+          name="receiptFileId"
+          purpose="damage-receipt"
+        />
+
         <Field htmlFor="damage-mode" label={t('damages.mode')}>
           <Select
             data-testid="damage-mode"
@@ -288,6 +297,17 @@ function DamageCard({ canReverse, damage }: { canReverse: boolean; damage: Damag
         </div>
 
         {damage.description !== null && <p>{damage.description}</p>}
+
+        {damage.receiptFileId !== null && (
+          <a
+            className="text-text-muted hover:text-text underline-offset-2 hover:underline"
+            href={`/api/v1/files/${damage.receiptFileId}/content`}
+            rel="noreferrer"
+            target="_blank"
+          >
+            {t('files.receipt')}
+          </a>
+        )}
 
         <ul className="flex flex-col gap-1">
           {damage.shares.map((share) => (

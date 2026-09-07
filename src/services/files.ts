@@ -1,12 +1,14 @@
 import { getStorageProvider } from '@/adapters/storage';
 import { getDb, type Executor } from '@/db/client';
 import { createFile, requireFile, updateFile } from '@/db/repositories/files';
-import { requireHouseOfResidency } from '@/db/repositories/houses';
+import { requireHouse, requireHouseOfResidency } from '@/db/repositories/houses';
 import { requireResidency } from '@/db/repositories/residencies';
 import {
   asAllowedMime,
   checkUpload,
   documentStorageKey,
+  houseFileStorageKey,
+  NETWORK_STORAGE_SEGMENT,
   sniffMime,
   MAX_UPLOAD_BYTES,
 } from '@/domain/files';
@@ -71,22 +73,40 @@ export interface FileContent {
 }
 
 /** Права на файл берутся у проживания, к которому он прикреплён. */
+/**
+ * Права на файл — права на его владельца: у документа жильца это проживание,
+ * у чека — дом (T3.12). Файл без владельца не отдаётся никому: правило
+ * видимости для него вывести неоткуда.
+ */
 async function assertFileAccess(
   actor: UserActor,
   action: 'file.upload' | 'file.read',
-  residencyId: string | null,
+  owner: { residencyId: string | null; houseId: string | null },
   executor: Executor,
 ): Promise<void> {
-  if (residencyId === null) {
-    throw new NotFoundError('Файл не найден');
+  if (owner.residencyId !== null) {
+    const residency = await requireResidency(actor.context, owner.residencyId, executor);
+
+    assertCan(actor.context, action, {
+      houseId: residency.houseId,
+      userId: residency.userId,
+    });
+
+    return;
   }
 
-  const residency = await requireResidency(actor.context, residencyId, executor);
+  /*
+   * Ни проживания, ни дома — файл уровня сети (чек к расходу с общего
+   * счёта). Цели у проверки нет: право уровня сети есть только у роли,
+   * которой сеть видна целиком.
+   */
+  if (owner.houseId === null) {
+    assertCan(actor.context, action);
 
-  assertCan(actor.context, action, {
-    houseId: residency.houseId,
-    userId: residency.userId,
-  });
+    return;
+  }
+
+  assertCan(actor.context, action, { houseId: owner.houseId });
 }
 
 function rejectUpload(input: { mime: string; sizeBytes: number }): void {
@@ -166,6 +186,102 @@ export async function createUploadSession(
   };
 }
 
+export interface HouseUploadInput {
+  /** Дом, которому принадлежит чек; `null` — расход уровня сети. */
+  houseId: string | null;
+  /** Назначение: `damage-receipt`, `expense-receipt`, `utility-receipt`. */
+  purpose: string;
+  mime: string;
+  sizeBytes: number;
+  originalName: string;
+}
+
+/** Назначения файлов дома. Перечень закрыт: путь хранения из него собирается. */
+export const HOUSE_FILE_PURPOSES = [
+  'damage-receipt',
+  'expense-receipt',
+  'utility-receipt',
+] as const;
+
+export type HouseFilePurpose = (typeof HOUSE_FILE_PURPOSES)[number];
+
+/**
+ * Сессия загрузки чека — файла, принадлежащего дому, а не проживанию
+ * (T3.12). Чек к ущербу, расходу и строке коммуналки жильцу не принадлежит,
+ * и привязывать его к чьему-то проживанию значило бы отдать его этому
+ * жильцу вместе с правом чтения.
+ */
+export async function createHouseUploadSession(
+  actor: UserActor,
+  input: HouseUploadInput,
+  deps: FileDeps = {},
+): Promise<UploadSessionResult> {
+  const { executor, storage } = resolve(deps);
+
+  if (!(HOUSE_FILE_PURPOSES as readonly string[]).includes(input.purpose)) {
+    throw new ValidationError('files.unknownPurpose');
+  }
+
+  const house =
+    input.houseId === null ? null : await requireHouse(actor.context, input.houseId, executor);
+
+  if (house === null) {
+    assertCan(actor.context, 'file.upload');
+  } else {
+    assertCan(actor.context, 'file.upload', { houseId: house.id });
+  }
+
+  // Тип и размер проверяются до записи: отказ не должен оставлять следов.
+  rejectUpload(input);
+
+  const fileId = crypto.randomUUID();
+  const path = houseFileStorageKey({
+    houseSlug: house?.slug ?? NETWORK_STORAGE_SEGMENT,
+    purpose: input.purpose,
+    fileId,
+    mime: input.mime,
+  });
+
+  const file = await createFile(
+    actor.context,
+    {
+      id: fileId,
+      houseId: house?.id ?? null,
+      provider: storage.driver,
+      path,
+      mime: input.mime,
+      sizeBytes: input.sizeBytes,
+      originalName: input.originalName,
+      uploadedBy: actor.context.userId,
+      scope: { purpose: input.purpose },
+    },
+    executor,
+  );
+
+  const target = await storage
+    .createUploadTarget(path, { mime: input.mime, sizeBytes: input.sizeBytes })
+    .catch(async (error: unknown) => {
+      await updateFile(actor.context, file.id, { status: 'failed' }, executor);
+      throw error;
+    });
+
+  if (target.kind === 'external') {
+    await updateFile(actor.context, file.id, { externalId: target.externalId }, executor);
+
+    return {
+      fileId: file.id,
+      upload: { url: target.url, method: target.method, headers: target.headers },
+      maxBytes: MAX_UPLOAD_BYTES,
+    };
+  }
+
+  return {
+    fileId: file.id,
+    upload: { url: `/api/v1/files/${file.id}/blob`, method: 'PUT', headers: {} },
+    maxBytes: MAX_UPLOAD_BYTES,
+  };
+}
+
 async function sha256(bytes: Uint8Array): Promise<string> {
   // WebCrypto, а не node:crypto: тот же код работает и в edge-рантайме.
   const digest = await crypto.subtle.digest('SHA-256', bytes as BufferSource);
@@ -187,7 +303,7 @@ export async function receiveUploadedBytes(
   const { executor, storage } = resolve(deps);
 
   const file = await requireFile(actor.context, fileId, executor);
-  await assertFileAccess(actor, 'file.upload', file.residencyId, executor);
+  await assertFileAccess(actor, 'file.upload', file, executor);
 
   if (file.status !== 'pending') {
     throw new ConflictError('Файл уже принят: повторная загрузка невозможна');
@@ -240,7 +356,7 @@ export async function completeUpload(
   const { executor, storage } = resolve(deps);
 
   const file = await requireFile(actor.context, fileId, executor);
-  await assertFileAccess(actor, 'file.upload', file.residencyId, executor);
+  await assertFileAccess(actor, 'file.upload', file, executor);
 
   if (file.status === 'ready') {
     return file;
@@ -307,7 +423,7 @@ export async function readFileContent(
   const { executor, storage } = resolve(deps);
 
   const file = await requireFile(actor.context, fileId, executor);
-  await assertFileAccess(actor, 'file.read', file.residencyId, executor);
+  await assertFileAccess(actor, 'file.read', file, executor);
 
   // Незавершённая загрузка содержимым не является.
   if (file.status !== 'ready') {

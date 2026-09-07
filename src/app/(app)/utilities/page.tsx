@@ -146,10 +146,12 @@ export default async function UtilitiesPage({
         canManage={can(context, 'utility.manage', { houseId })}
         canReopen={can(context, 'utility.reopen', { houseId })}
         closed={closed}
+        houseId={houseId}
         lines={view.lines.map((line) => ({
           id: line.id,
           title: line.title,
           amount: line.amount,
+          receiptFileId: line.receiptFileId,
         }))}
         month={view.period.month}
         periodId={view.period.id}

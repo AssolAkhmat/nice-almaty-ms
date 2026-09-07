@@ -2,20 +2,37 @@ import { z } from 'zod';
 
 import { ValidationError } from '@/lib/errors';
 import { apiJson, apiRoute, requireApiActor } from '@/lib/api/route';
-import { createUploadSession } from '@/services/files';
+import { createHouseUploadSession, createUploadSession } from '@/services/files';
 
 /**
  * Первый шаг двухшаговой загрузки (D4): права, тип и размер проверяются
  * до того, как байты куда-либо пойдут. Ответ содержит адрес, по которому
  * их ждут, — свой у каждого драйвера хранилища.
  */
-const bodySchema = z.object({
-  residency_id: z.uuid(),
-  document_type: z.string().min(1).max(64),
+const commonSchema = {
   mime: z.string().min(1).max(128),
   size_bytes: z.number().int().positive(),
   original_name: z.string().min(1).max(255),
-});
+};
+
+/**
+ * Владелец файла — либо проживание (документ жильца), либо дом (чек
+ * к ущербу, расходу, коммуналке). Два разных владельца — две разные
+ * проверки прав, поэтому и тело запроса разное, а не «одно с пустыми полями».
+ */
+const bodySchema = z.union([
+  z.object({
+    residency_id: z.uuid(),
+    document_type: z.string().min(1).max(64),
+    ...commonSchema,
+  }),
+  z.object({
+    /** `null` — чек уровня сети: у расхода с общего счёта дома нет. */
+    house_id: z.uuid().nullable(),
+    purpose: z.string().min(1).max(64),
+    ...commonSchema,
+  }),
+]);
 
 export const POST = apiRoute(async (request, { requestId }) => {
   const actor = await requireApiActor(request, requestId);
@@ -30,13 +47,24 @@ export const POST = apiRoute(async (request, { requestId }) => {
     });
   }
 
-  const session = await createUploadSession(actor, {
-    residencyId: parsed.data.residency_id,
-    documentType: parsed.data.document_type,
-    mime: parsed.data.mime,
-    sizeBytes: parsed.data.size_bytes,
-    originalName: parsed.data.original_name,
-  });
+  const body = parsed.data;
+
+  const session =
+    'residency_id' in body
+      ? await createUploadSession(actor, {
+          residencyId: body.residency_id,
+          documentType: body.document_type,
+          mime: body.mime,
+          sizeBytes: body.size_bytes,
+          originalName: body.original_name,
+        })
+      : await createHouseUploadSession(actor, {
+          houseId: body.house_id,
+          purpose: body.purpose,
+          mime: body.mime,
+          sizeBytes: body.size_bytes,
+          originalName: body.original_name,
+        });
 
   return apiJson(
     {

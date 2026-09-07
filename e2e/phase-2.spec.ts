@@ -139,14 +139,23 @@ async function assignBed(page: Page, resident: string, room: string, bed: string
   await expect(page.getByText('Место назначено')).toBeVisible();
 }
 
-/** Шаг 5 §1.2: договор собирает админ, подписывает жилец — и только он. */
+/**
+ * Шаг 5 §1.2: договор собирает админ, подписывает жилец — и только он.
+ *
+ * Ожидание здесь длиннее общего: сборка договора поднимает chromium
+ * и печатает PDF (P2-46), а в полном прогоне это делают три копии сразу
+ * на той же машине, где идут ещё девять наборов. Пятнадцати секунд шагу
+ * иногда не хватает, и падение говорит о загрузке машины, а не о системе.
+ */
+const CONTRACT_BUILD_TIMEOUT = 60_000;
+
 async function buildContract(page: Page, resident: string): Promise<void> {
   await page.goto('/contract');
 
   const row = page.getByTestId('contract-row').filter({ hasText: resident });
   await row.getByRole('button', { name: 'Собрать договор' }).click();
 
-  await expect(row).toContainText('Открыть договор');
+  await expect(row).toContainText('Открыть договор', { timeout: CONTRACT_BUILD_TIMEOUT });
 }
 
 async function signContract(page: Page): Promise<void> {

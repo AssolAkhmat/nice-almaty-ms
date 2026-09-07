@@ -1,7 +1,7 @@
 'use client';
 
 import { useFormatter, useTranslations } from 'next-intl';
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Field, Input, Select } from '@/components/ui/input';
 import { Money } from '@/components/ui/money';
 import { Table } from '@/components/ui/table';
+import { ReceiptUpload } from '@/components/upload/receipt-upload';
 import { parseInstant } from '@/lib/time';
 
 import { recordExpenseAction, reverseEntryAction, type AccountingActionState } from './actions';
@@ -40,6 +41,7 @@ export interface JournalRowView {
   description: string;
   sourceType: string;
   category: string | null;
+  receiptFileId: string | null;
   reversed: boolean;
   lines: JournalLineView[];
 }
@@ -47,6 +49,8 @@ export interface JournalRowView {
 export interface AccountOption {
   id: string;
   name: string;
+  /** Дом счёта; у общего счёта его нет — тогда и чек уровня сети. */
+  houseId: string | null;
 }
 
 export interface TaxHouseRow {
@@ -212,6 +216,17 @@ export function Journal({ rows }: { rows: readonly JournalRowView[] }) {
               ))}
             </ul>
 
+            {row.receiptFileId !== null && (
+              <a
+                className="text-text-muted hover:text-text underline-offset-2 hover:underline"
+                href={`/api/v1/files/${row.receiptFileId}/content`}
+                rel="noreferrer"
+                target="_blank"
+              >
+                {t('files.receipt')}
+              </a>
+            )}
+
             {row.sourceType === 'manual' && !row.reversed && <ReverseEntry entryId={row.id} />}
           </div>
         </Card>
@@ -222,10 +237,14 @@ export function Journal({ rows }: { rows: readonly JournalRowView[] }) {
 
 const CATEGORIES = ['rent', 'equipment', 'chemicals', 'depreciation', 'repair', 'other'] as const;
 
-/** Расход: дата, сумма, категория, счёт списания, описание (модуль 10). */
+/** Расход: дата, сумма, категория, счёт списания, описание, чек (модуль 10). */
 export function ExpenseForm({ accounts }: { accounts: readonly AccountOption[] }) {
   const t = useTranslations();
   const [state, action, isPending] = useActionState(recordExpenseAction, INITIAL);
+  const [accountId, setAccountId] = useState(accounts[0]?.id ?? '');
+
+  // Чек принадлежит дому счёта списания: у общего счёта дома нет (§10.1).
+  const receiptHouseId = accounts.find((account) => account.id === accountId)?.houseId ?? null;
 
   return (
     <Card>
@@ -264,7 +283,14 @@ export function ExpenseForm({ accounts }: { accounts: readonly AccountOption[] }
           </Field>
 
           <Field htmlFor="expense-account" label={t('accounting.writeOffAccount')}>
-            <Select id="expense-account" name="accountId">
+            <Select
+              id="expense-account"
+              name="accountId"
+              onChange={(event) => {
+                setAccountId(event.target.value);
+              }}
+              value={accountId}
+            >
               {accounts.map((account) => (
                 <option key={account.id} value={account.id}>
                   {account.name}
@@ -287,6 +313,13 @@ export function ExpenseForm({ accounts }: { accounts: readonly AccountOption[] }
           <Field htmlFor="expense-description" label={t('accounting.description')}>
             <Input data-testid="expense-description" id="expense-description" name="description" />
           </Field>
+
+          <ReceiptUpload
+            houseId={receiptHouseId}
+            id="expense-receipt"
+            name="receiptFileId"
+            purpose="expense-receipt"
+          />
         </div>
 
         <Button disabled={isPending} type="submit">

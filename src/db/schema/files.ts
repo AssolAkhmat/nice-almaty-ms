@@ -11,6 +11,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
+import { houses } from './houses';
 import { organizations } from './organizations';
 import { residencies } from './residencies';
 import { users } from './users';
@@ -42,6 +43,12 @@ export const files = pgTable(
      * разойдётся с оригиналом, и разойдётся молча.
      */
     residencyId: uuid('residency_id').references(() => residencies.id),
+    /*
+     * Дом, которому принадлежит файл, когда проживания у него нет: чек
+     * к ущербу, расходу и строке коммуналки. Ровно одно из двух полей
+     * заполнено — по нему и идёт видимость.
+     */
+    houseId: uuid('house_id').references(() => houses.id),
     provider: fileProviderEnum('provider').notNull(),
     /** Идентификатор объекта у провайдера; у локального диска его нет. */
     externalId: text('external_id'),

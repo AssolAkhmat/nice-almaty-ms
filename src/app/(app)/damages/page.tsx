@@ -104,6 +104,7 @@ export default async function DamagesPage({
     splitMode: row.damage.splitMode,
     createdAt: row.damage.createdAt.toISOString(),
     reversed: row.damage.reversedAt !== null,
+    receiptFileId: row.damage.receiptFileId,
     shares: row.shares.map((share) => ({
       userId: share.userId,
       name: nameOf.get(share.userId) ?? share.userId,

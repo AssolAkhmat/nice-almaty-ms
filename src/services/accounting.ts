@@ -142,8 +142,8 @@ export async function recordExpense(
         entryDate: input.date ?? today,
         description: input.description.trim(),
         sourceType: 'expense',
-        sourceId: input.receiptFileId ?? null,
         category: input.category,
+        receiptFileId: input.receiptFileId ?? null,
         createdBy: actor.context.userId,
       },
       [

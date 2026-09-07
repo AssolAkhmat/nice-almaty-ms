@@ -1,4 +1,4 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 
 import { NotFoundError } from '@/lib/errors';
 import { now } from '@/lib/time';
@@ -7,15 +7,16 @@ import { getDb, type Executor } from '../client';
 import { files, residencies, type FileRecord, type NewFileRecord } from '../schema';
 import { residencyVisibility } from './residencies';
 
-import type { AccessContext } from '../access';
+import { visibleHouseIds, type AccessContext } from '../access';
 
 /**
- * Файлы. Видимость идёт через проживание тем же правилом, что и всё
- * остальное в фазе 2: жилец — свои, админ — своего дома, суперадмин — сети.
+ * Файлы. Видимость идёт через владельца: у документа жильца это проживание
+ * (жилец — свои, админ — своего дома, суперадмин — сети), у чека к ущербу,
+ * расходу или коммуналке — дом.
  *
- * Файл без проживания (уровня сети) в фазе 2 не создаётся: у таких файлов
- * не было бы владельца, а значит и правила видимости. Появятся — правило
- * придётся дописать здесь, а не обойти в вызывающем коде.
+ * Ровно одно из двух полей заполнено. Файл без обоих не виден никому:
+ * у него нет владельца, а значит и правила видимости, — и это лучше,
+ * чем правило, выведенное на месте вызова (T3.12).
  */
 function visibleResidencies(context: AccessContext, executor: Executor) {
   return executor
@@ -24,10 +25,25 @@ function visibleResidencies(context: AccessContext, executor: Executor) {
     .where(residencyVisibility(context));
 }
 
+/**
+ * Файл дома виден админу этого дома; файл без дома и без проживания —
+ * уровня сети (чек к расходу с общего счёта) и виден тому, кто видит сеть
+ * целиком, то есть суперадмину.
+ */
+function visibleHouses(context: AccessContext) {
+  const visible = visibleHouseIds(context);
+
+  if (visible === 'all') {
+    return or(isNotNull(files.houseId), isNull(files.residencyId));
+  }
+
+  return visible.length === 0 ? sql`false` : inArray(files.houseId, [...visible]);
+}
+
 function scope(context: AccessContext, executor: Executor) {
   return and(
     eq(files.orgId, context.orgId),
-    inArray(files.residencyId, visibleResidencies(context, executor)),
+    or(inArray(files.residencyId, visibleResidencies(context, executor)), visibleHouses(context)),
   );
 }
 

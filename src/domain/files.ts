@@ -107,6 +107,36 @@ export function documentStorageKey(parts: DocumentKeyParts): string {
   ].join('/');
 }
 
+/** Папка файлов уровня сети: у них дома нет (общий счёт, §10.1). */
+export const NETWORK_STORAGE_SEGMENT = '_network';
+
+export interface HouseFileKeyParts {
+  /** Слаг дома либо `NETWORK_STORAGE_SEGMENT`, если дома у файла нет. */
+  houseSlug: string;
+  /** Назначение файла: `damage-receipt`, `expense-receipt`, `utility-receipt`. */
+  purpose: string;
+  fileId: string;
+  mime: string;
+}
+
+/**
+ * Путь хранения файла, принадлежащего дому, а не проживанию:
+ * `/{house_slug}/{purpose}/`.
+ *
+ * Чек к ущербу, расходу и строке коммуналки жильцу не принадлежит — он
+ * принадлежит дому, и сегмента проживания в пути быть не должно: иначе чек
+ * лёг бы в чужую папку и попал бы под чужое правило видимости.
+ */
+export function houseFileStorageKey(parts: HouseFileKeyParts): string {
+  const extension = extensionForMime(asAllowedMime(parts.mime));
+
+  return [
+    assertSegment(parts.houseSlug, 'дом'),
+    assertSegment(parts.purpose, 'назначение'),
+    `${assertSegment(parts.fileId, 'файл')}.${extension}`,
+  ].join('/');
+}
+
 const MAGIC: readonly { mime: AllowedMime; bytes: readonly number[] }[] = [
   { mime: 'image/jpeg', bytes: [0xff, 0xd8, 0xff] },
   { mime: 'image/png', bytes: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] },

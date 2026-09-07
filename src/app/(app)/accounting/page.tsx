@@ -114,6 +114,7 @@ export default async function AccountingPage({
     description: row.entry.description,
     sourceType: row.entry.sourceType,
     category: row.entry.category,
+    receiptFileId: row.entry.receiptFileId,
     reversed: row.entry.reversedByEntryId !== null,
     lines: row.lines.map((line) => ({
       code: line.code,
@@ -158,7 +159,15 @@ export default async function AccountingPage({
         }}
       />
 
-      {can(context, 'accounting.write') && <ExpenseForm accounts={writeOff} />}
+      {can(context, 'accounting.write') && (
+        <ExpenseForm
+          accounts={writeOff.map((account) => ({
+            id: account.id,
+            name: account.name,
+            houseId: account.houseId,
+          }))}
+        />
+      )}
 
       <section className="flex flex-col gap-3">
         <h2 className="text-[15px] font-medium">{t('journal')}</h2>

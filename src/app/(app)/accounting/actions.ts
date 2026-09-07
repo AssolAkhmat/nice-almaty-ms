@@ -60,6 +60,7 @@ export async function recordExpenseAction(
 
   const date = tryParseBusinessDate(text(formData, 'date'));
   const paidFrom = text(formData, 'paidFrom');
+  const receiptFileId = text(formData, 'receiptFileId');
 
   try {
     await recordExpense(current, {
@@ -68,6 +69,7 @@ export async function recordExpenseAction(
       description: text(formData, 'description'),
       accountId: text(formData, 'accountId'),
       paidFrom: paidFrom === 'kaspi' ? 'kaspi' : 'cash',
+      receiptFileId: receiptFileId === '' ? null : receiptFileId,
       ...(date === null ? {} : { date }),
     });
   } catch (error) {
