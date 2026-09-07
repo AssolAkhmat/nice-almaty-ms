@@ -16,6 +16,7 @@ import {
   type InvoiceFilter,
 } from '@/db/repositories/invoices';
 import { listAssignments, requireResidency } from '@/db/repositories/residencies';
+import { findClosedAllocation } from '@/db/repositories/utilities';
 import {
   allocatePayment,
   depositBalance,
@@ -27,6 +28,7 @@ import { rentForMonth } from '@/domain/monthly-invoice';
 import { assertCan } from '@/lib/authz';
 import { ConflictError, NotFoundError, ValidationError } from '@/lib/errors';
 import {
+  addMonths,
   compareBusinessDates,
   now,
   parseBusinessDate,
@@ -38,6 +40,7 @@ import { AUDIT_ACTIONS, recordAudit } from './audit';
 import { settleDepositInvoice } from './deposits';
 import { postInvoicePayment } from './ledger';
 
+import type { AccessContext } from '@/db/access';
 import type { Invoice, InvoiceLine, Payment, Residency } from '@/db/schema';
 import type { UserActor } from './users';
 
@@ -115,12 +118,40 @@ const KIND_ORDER: readonly InvoiceLineKind[] = [
 
 /**
  * Строки, которые «Пересчитать» перестраивает по актуальным данным
- * (модуль 2). Коммуналка, штрафы и скидка сюда попадут вместе со своими
- * источниками — периодом (T3.7) и рейтингом (фаза 5); пока их источников
- * нет, пересчёт их не трогает, иначе он стирал бы то, чего не умеет
- * восстановить.
+ * (модуль 2). Штрафы и скидка сюда попадут вместе со своим источником —
+ * рейтингом (фаза 5); пока его нет, пересчёт их не трогает, иначе он стирал
+ * бы то, чего не умеет восстановить.
  */
-const REBUILT_KINDS: readonly InvoiceLineKind[] = ['rent', 'damage_carryover'];
+const REBUILT_KINDS: readonly InvoiceLineKind[] = ['rent', 'utilities', 'damage_carryover'];
+
+/**
+ * Строка коммуналки для счёта за месяц: доля берётся из закрытого периода
+ * **прошлого** месяца (§3 — коммуналка идёт за прошлый месяц, §4).
+ * `null` — период не закрыт или жилец в нём не участвовал.
+ */
+export async function utilitiesLineFor(
+  context: AccessContext,
+  target: { houseId: string; userId: string; invoiceMonth: BusinessDate },
+  executor: Executor,
+): Promise<InvoiceLineInput | null> {
+  const month = addMonths(target.invoiceMonth, -1);
+
+  const allocation = await findClosedAllocation(
+    context,
+    { houseId: target.houseId, month, userId: target.userId },
+    executor,
+  );
+
+  if (allocation === null || allocation.amount <= 0) {
+    return null;
+  }
+
+  return {
+    kind: 'utilities',
+    title: `Коммунальные услуги за ${month.slice(0, 7)}`,
+    amount: allocation.amount,
+  };
+}
 
 function assertMoney(amount: number): void {
   // Деньги — целые тенге (§0). Дробь сюда попасть не должна вовсе.
@@ -314,6 +345,75 @@ export async function editInvoiceLines(
     );
 
     return updated;
+  });
+}
+
+/**
+ * Дописать строку в уже выставленный счёт. Нужно коммуналке: период,
+ * закрытый после 1 числа, добавляет долю в счёт того же месяца (§4).
+ * Оплаченный счёт не трогается — платить по нему уже нечего, и доля
+ * уходит отдельным счётом (решение вызывающей стороны).
+ */
+export async function appendInvoiceLine(
+  actor: UserActor,
+  invoiceId: string,
+  line: InvoiceLineInput,
+  deps: InvoiceDeps = {},
+): Promise<{ invoice: Invoice; line: InvoiceLine }> {
+  const { executor } = resolve(deps);
+
+  const { invoice } = await invoiceWithResidency(actor, invoiceId, 'invoice.issue', executor);
+
+  if (invoice.status === 'paid' || invoice.status === 'cancelled') {
+    throw new ConflictError('invoices.errors.closed');
+  }
+
+  assertLines([line]);
+
+  return executor.transaction(async (tx) => {
+    const [added] = await addInvoiceLines(
+      [
+        {
+          invoiceId: invoice.id,
+          kind: line.kind,
+          title: line.title.trim(),
+          amount: line.amount,
+        },
+      ],
+      tx,
+    );
+
+    if (added === undefined) {
+      throw new ConflictError('invoices.errors.notUpdated');
+    }
+
+    const total = invoice.total + line.amount;
+    const paid = totalOf(await listPayments(invoice.id, tx));
+
+    const updated = await updateInvoice(
+      actor.context,
+      invoice.id,
+      { total, status: invoiceStatus(total, paid) },
+      tx,
+    );
+
+    if (updated === null) {
+      throw new NotFoundError('Счёт не найден');
+    }
+
+    await recordAudit(
+      { context: actor.context, ip: actor.ip, requestId: actor.requestId },
+      {
+        action: AUDIT_ACTIONS.invoiceEdited,
+        entityType: 'invoice',
+        entityId: invoice.id,
+        before: { total: invoice.total },
+        after: { total, added: line.kind },
+      },
+      tx,
+    );
+
+    return { invoice: updated, line: added };
   });
 }
 
@@ -540,6 +640,16 @@ export async function recalculateInvoice(
   const balance = depositBalance(transactions.map((transaction) => transaction.amount));
 
   const rebuilt: InvoiceLineInput[] = [{ kind: 'rent', title: 'Проживание', amount: rent }];
+
+  const utilities = await utilitiesLineFor(
+    actor.context,
+    { houseId: residency.houseId, userId: residency.userId, invoiceMonth: month },
+    executor,
+  );
+
+  if (utilities !== null) {
+    rebuilt.push(utilities);
+  }
 
   if (balance < 0) {
     rebuilt.push({

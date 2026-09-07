@@ -378,6 +378,37 @@ async function postDepositFundToHouse(
   );
 }
 
+/**
+ * Излишек округления коммуналки — в фонд дома (§4.2): Коммунальный фонд →
+ * Фонд дома. Проводка идёт при закрытии периода: жильцы вносят сумму долей,
+ * а поставщику причитается ровно итог периода — разница дому.
+ */
+export async function postUtilitySurplus(
+  actor: UserActor,
+  input: DepositFundEntry,
+  deps: LedgerDeps = {},
+): Promise<LedgerEntry> {
+  const { executor } = resolve(deps);
+
+  const utilityFund = await requireAccountByCode(actor, ACCOUNT_CODES.utilityFund, executor);
+  const houseFund = await requireHouseFund(actor, input.houseId, executor);
+
+  return postSystemEntry(
+    actor,
+    {
+      description: 'Излишек округления коммуналки',
+      sourceType: 'utilities',
+      sourceId: input.sourceId,
+      ...(input.date === undefined ? {} : { date: input.date }),
+      lines: [
+        { accountId: utilityFund.id, direction: 'debit', amount: input.amount },
+        { accountId: houseFund.id, direction: 'credit', amount: input.amount },
+      ],
+    },
+    deps,
+  );
+}
+
 export interface InvoicePaymentEntry {
   houseId: string;
   invoiceId: string;

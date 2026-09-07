@@ -48,6 +48,9 @@ export const ACTIONS = [
   'damage.read',
   'damage.create',
   'damage.reverse',
+  'utility.read',
+  'utility.manage',
+  'utility.reopen',
   'accounting.read',
   'accounting.write',
   'settings.org.read',
@@ -101,6 +104,9 @@ export const PERMISSIONS: PermissionMatrix = {
     'damage.read': 'org',
     'damage.create': 'org',
     'damage.reverse': 'org',
+    'utility.read': 'org',
+    'utility.manage': 'org',
+    'utility.reopen': 'org',
     'accounting.read': 'org',
     'accounting.write': 'org',
     'settings.org.read': 'org',
@@ -148,6 +154,13 @@ export const PERMISSIONS: PermissionMatrix = {
      * админ дома — тот же человек, который ущерб и завёл.
      */
     'damage.reverse': 'none',
+    'utility.read': 'house',
+    'utility.manage': 'house',
+    /*
+     * Переоткрытие закрытого периода меняет уже выставленные счета
+     * (§4, модуль 6), поэтому остаётся за суперадмином и пишется в журнал.
+     */
+    'utility.reopen': 'none',
     /*
      * Бухгалтерия — дело суперадмина (модуль 10): план счетов, проводки
      * и отчёты по сети. Админ ведёт деньги дома через счета и депозиты,
@@ -227,6 +240,10 @@ export const PERMISSIONS: PermissionMatrix = {
     'damage.read': 'none',
     'damage.create': 'none',
     'damage.reverse': 'none',
+    // Свою долю коммуналки жилец видит строкой счёта, а не экраном периода.
+    'utility.read': 'none',
+    'utility.manage': 'none',
+    'utility.reopen': 'none',
     'accounting.read': 'none',
     'accounting.write': 'none',
     'settings.org.read': 'none',

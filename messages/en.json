@@ -34,7 +34,8 @@
       "file": "File",
       "invoice": "Invoice",
       "ledger_entry": "Ledger entry",
-      "damage": "Damage"
+      "damage": "Damage",
+      "utility_period": "Utility period"
     }
   },
   "auth": {
@@ -843,6 +844,58 @@
       "notMonthly": "Only a monthly invoice can be recalculated",
       "noPeriod": "The invoice has no month",
       "method": "Choose a payment method"
+    }
+  },
+  "utilities": {
+    "title": "Utilities",
+    "subtitle": "House period: lines, split by days, closing",
+    "lines": "Period lines",
+    "noLines": "No lines yet",
+    "lineTitle": "Title",
+    "lineAmount": "Amount",
+    "addLine": "Add line",
+    "previewAllocation": "Preview split",
+    "allocation": "Split",
+    "allocationCaption": "Utilities split across residents",
+    "resident": "Resident",
+    "days": "Days",
+    "share": "Share",
+    "surplus": "Rounding surplus",
+    "surplusHint": "The surplus stays in the house fund",
+    "undistributed": "Nobody to split with",
+    "noParticipants": "Nobody to split with",
+    "noParticipantsHint": "Nobody lived in the house that month",
+    "close": "Close period",
+    "reopen": "Reopen period",
+    "closedHint": "The period is closed: shares are fixed and sent to invoices",
+    "residentTitle": "Admin section",
+    "residentHint": "Your share appears as a line on the monthly invoice",
+    "noHouse": "No house selected",
+    "noHouseHint": "Add a house in the network settings",
+    "status": {
+      "draft": "Draft",
+      "closed": "Closed"
+    },
+    "done": {
+      "opened": "Period opened",
+      "lineAdded": "Line added",
+      "lineRemoved": "Line removed",
+      "closed": "Period closed",
+      "reopened": "Period reopened"
+    },
+    "errors": {
+      "unauthorized": "Sign in required",
+      "forbidden": "This action is not available to your role",
+      "not_found": "Not found",
+      "unknown": "The action could not be completed",
+      "month": "Choose the period month",
+      "amountInvalid": "The amount must be a whole non-negative number of tenge",
+      "titleRequired": "Enter a line title",
+      "closed": "The period is closed: lines cannot be edited",
+      "notClosed": "The period is already open",
+      "nothingToDistribute": "The period has no lines: nothing to split",
+      "noParticipants": "Nobody lived in the house that month",
+      "notUpdated": "The period was not updated"
     }
   }
 }

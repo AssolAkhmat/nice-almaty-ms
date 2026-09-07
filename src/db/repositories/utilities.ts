@@ -157,6 +157,19 @@ export async function addUtilityLine(
   return line;
 }
 
+export async function findUtilityLine(
+  lineId: string,
+  executor: Executor = getDb(),
+): Promise<UtilityLine | null> {
+  const [line] = await executor
+    .select()
+    .from(utilityLines)
+    .where(eq(utilityLines.id, lineId))
+    .limit(1);
+
+  return line ?? null;
+}
+
 export async function updateUtilityLine(
   lineId: string,
   patch: Partial<Omit<NewUtilityLine, 'id' | 'periodId'>>,
@@ -187,6 +200,37 @@ export async function listUtilityAllocations(
     .from(utilityAllocations)
     .where(eq(utilityAllocations.periodId, periodId))
     .orderBy(asc(utilityAllocations.createdAt));
+}
+
+/**
+ * Доля жильца за закрытый период — для строки месячного счёта (§3, §4).
+ *
+ * Открытый период доли не даёт: пока строки правятся, распределение
+ * предварительное, и попасть в счёт оно не должно.
+ */
+export async function findClosedAllocation(
+  context: AccessContext,
+  filter: { houseId: string; month: BusinessDate; userId: string },
+  executor: Executor = getDb(),
+): Promise<UtilityAllocation | null> {
+  assertHouseVisible(context, filter.houseId);
+
+  const [row] = await executor
+    .select({ allocation: utilityAllocations })
+    .from(utilityAllocations)
+    .innerJoin(utilityPeriods, eq(utilityPeriods.id, utilityAllocations.periodId))
+    .where(
+      and(
+        periodScope(context),
+        eq(utilityPeriods.houseId, filter.houseId),
+        eq(utilityPeriods.month, filter.month),
+        eq(utilityPeriods.status, 'closed'),
+        eq(utilityAllocations.userId, filter.userId),
+      ),
+    )
+    .limit(1);
+
+  return row?.allocation ?? null;
 }
 
 export async function saveUtilityAllocations(

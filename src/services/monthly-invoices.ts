@@ -11,7 +11,7 @@ import { buildMonthlyInvoice, rentForMonth } from '@/domain/monthly-invoice';
 import { logger } from '@/lib/logger';
 import { now, startOfMonth, todayInAlmaty, type BusinessDate } from '@/lib/time';
 
-import { createInvoice } from './invoices';
+import { createInvoice, utilitiesLineFor } from './invoices';
 
 import type { AccessContext } from '@/db/access';
 import type { UserActor } from './users';
@@ -78,10 +78,11 @@ async function actorForOrg(orgId: string, executor: Executor): Promise<UserActor
 /** Строки счёта одного проживания за месяц; `null` — счёт уже есть. */
 async function draftFor(
   actor: UserActor,
-  residencyId: string,
+  residency: { id: string; houseId: string; userId: string },
   month: BusinessDate,
   executor: Executor,
 ) {
+  const residencyId = residency.id;
   const existing = await listInvoices(
     actor.context,
     { residencyId, type: 'monthly', periodMonth: month },
@@ -108,9 +109,20 @@ async function draftFor(
 
   const balance = depositBalance(transactions.map((transaction) => transaction.amount));
 
+  /*
+   * Коммуналка идёт за прошлый месяц и только из закрытого периода (§3, §4).
+   * Период, закрытый позже, допишет строку в этот же счёт сам.
+   */
+  const utilities = await utilitiesLineFor(
+    actor.context,
+    { houseId: residency.houseId, userId: residency.userId, invoiceMonth: month },
+    executor,
+  );
+
   return buildMonthlyInvoice({
     month,
     rent,
+    utilities: utilities === null ? null : { amount: utilities.amount, title: utilities.title },
     // Перерасход депозита переносится в ближайший месячный счёт (§2.4).
     depositDebt: balance < 0 ? -balance : 0,
   });
@@ -156,7 +168,7 @@ export async function generateMonthlyInvoices(
       const residencies = await listResidencies(actor.context, { status: 'active' }, executor);
 
       for (const residency of residencies) {
-        const draft = await draftFor(actor, residency.id, month, executor);
+        const draft = await draftFor(actor, residency, month, executor);
 
         if (draft === null) {
           existing += 1;
