@@ -1,5 +1,6 @@
 import type { Executor } from '@/db/client';
 import type { DeliveryOutcome, LocalizedText, NotificationChannel } from '@/domain/notifications';
+import type { Locale } from '@/lib/i18n/config';
 
 /**
  * Канал доставки уведомления (docs/01-ARCHITECTURE.md, адаптеры `notify/*`).
@@ -16,6 +17,11 @@ export interface DeliveryMessage {
   title: LocalizedText;
   body: LocalizedText;
   payload: unknown;
+  /**
+   * Язык адресата. Каналу, у которого текст один — push, — нужен выбор,
+   * а делать его за пределами очереди негде: язык живёт в профиле.
+   */
+  locale: Locale;
 }
 
 export interface DeliveryDeps {

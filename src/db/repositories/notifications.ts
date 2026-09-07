@@ -317,6 +317,19 @@ export async function listPushSubscriptions(
     .orderBy(asc(pushSubscriptions.createdAt), asc(pushSubscriptions.id));
 }
 
+export async function findPushSubscription(
+  endpoint: string,
+  executor: Executor = getDb(),
+): Promise<PushSubscription | null> {
+  const [subscription] = await executor
+    .select()
+    .from(pushSubscriptions)
+    .where(eq(pushSubscriptions.endpoint, endpoint))
+    .limit(1);
+
+  return subscription ?? null;
+}
+
 /** Отзыв по адресу: push-сервис сообщает именно его, а не пользователя. */
 export async function revokePushSubscription(
   endpoint: string,

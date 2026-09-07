@@ -1,8 +1,9 @@
-import { resolveSenders } from '@/adapters/notify';
+import { pushPublicKey, resolveSenders } from '@/adapters/notify';
 import { getDb, type Executor } from '@/db/client';
 import {
   countUnread,
   createNotification,
+  findPushSubscription,
   listNotifications,
   listOutbox,
   listPushSubscriptions,
@@ -10,9 +11,12 @@ import {
   markOutboxFailed,
   markOutboxSent,
   markOutboxSkipped,
+  putPushSubscription,
   queueOutbox,
   requireNotification,
+  revokePushSubscription,
   type NotificationFilter,
+  type PushSubscriptionInput,
 } from '@/db/repositories/notifications';
 import { findUserInOrg } from '@/db/repositories/users';
 import {
@@ -24,11 +28,12 @@ import {
   type NotificationChannel,
 } from '@/domain/notifications';
 import { NotFoundError, ValidationError } from '@/lib/errors';
+import { DEFAULT_LOCALE, type Locale } from '@/lib/i18n/config';
 import { logger } from '@/lib/logger';
 
 import type { DeliveryMessage, SenderRegistry } from '@/adapters/notify/types';
 import type { AccessContext } from '@/db/access';
-import type { Notification } from '@/db/schema';
+import type { Notification, PushSubscription } from '@/db/schema';
 
 /**
  * Ядро очереди уведомлений (docs/01-ARCHITECTURE.md, «Планировщик»;
@@ -149,6 +154,54 @@ export async function markRead(
   return markNotificationRead(context, notificationId, executor);
 }
 
+/**
+ * Публичный ключ VAPID для браузера: без него подписка не оформляется.
+ * `null` значит, что push в этом окружении не настроен, — экран профиля
+ * тогда честно говорит, что канал недоступен, а не молчит.
+ */
+export function pushKeyForBrowser(): string | null {
+  return pushPublicKey();
+}
+
+/** Подписка браузера: адресат берётся из контекста, а не из запроса. */
+export async function subscribeToPush(
+  context: AccessContext,
+  input: PushSubscriptionInput,
+  executor: Executor = getDb(),
+): Promise<PushSubscription> {
+  return putPushSubscription(context, input, executor);
+}
+
+/**
+ * Отписка по адресу.
+ *
+ * Адрес подписки уникален глобально, поэтому владелец проверяется явно:
+ * иначе чужой браузер отключался бы от уведомлений по одному лишь знанию
+ * его адреса. Несуществующая подписка — «не найдено», а не тихий успех:
+ * человек нажал «отключить» и вправе знать, что ничего не случилось.
+ */
+export async function unsubscribeFromPush(
+  context: AccessContext,
+  endpoint: string,
+  executor: Executor = getDb(),
+): Promise<void> {
+  const subscription = await findPushSubscription(endpoint, executor);
+
+  if (subscription === null || subscription.userId !== context.userId) {
+    throw new NotFoundError('Подписка не найдена');
+  }
+
+  await revokePushSubscription(endpoint, executor);
+}
+
+/** Живые подписки читающего: экран профиля показывает, сколько их. */
+export async function listOwnPushSubscriptions(
+  context: AccessContext,
+  executor: Executor = getDb(),
+): Promise<PushSubscription[]> {
+  return listPushSubscriptions(context.userId, executor);
+}
+
 export interface DispatchDeps {
   executor?: Executor;
   /** Каналы доставки. По умолчанию — подключённые в этом окружении. */
@@ -167,7 +220,7 @@ export interface DispatchResult {
   skipped: number;
 }
 
-function messageOf(notification: Notification): DeliveryMessage {
+function messageOf(notification: Notification, locale: Locale): DeliveryMessage {
   return {
     notificationId: notification.id,
     userId: notification.userId,
@@ -175,6 +228,33 @@ function messageOf(notification: Notification): DeliveryMessage {
     title: notification.titleI18n as LocalizedText,
     body: notification.bodyI18n as LocalizedText,
     payload: notification.payload,
+    locale,
+  };
+}
+
+/**
+ * Язык адресата для каналов, показывающих один текст.
+ *
+ * Пачка почти всегда про одного-двух человек — уведомления ставятся
+ * заданиями подряд, — поэтому профиль читается один раз на прогон.
+ * Пропавший адресат берёт язык сети по умолчанию: текст всё равно
+ * заполнен во всех трёх локалях.
+ */
+function localeReader(executor: Executor): (notification: Notification) => Promise<Locale> {
+  const cache = new Map<string, Locale>();
+
+  return async (notification: Notification) => {
+    const known = cache.get(notification.userId);
+
+    if (known !== undefined) {
+      return known;
+    }
+
+    const user = await findUserInOrg(notification.orgId, notification.userId, executor);
+    const locale = user?.locale ?? DEFAULT_LOCALE;
+    cache.set(notification.userId, locale);
+
+    return locale;
   };
 }
 
@@ -198,6 +278,7 @@ export async function dispatchNotifications(deps: DispatchDeps = {}): Promise<Di
 
   return executor.transaction(async (tx) => {
     const batch = await listOutbox({ status: 'queued', limit, lock: true }, tx);
+    const localeOf = localeReader(tx);
     const result: DispatchResult = {
       taken: batch.length,
       sent: 0,
@@ -223,7 +304,9 @@ export async function dispatchNotifications(deps: DispatchDeps = {}): Promise<Di
         outcome = { kind: 'skipped', reason: `Канал ${row.channel} не подключён` };
       } else {
         try {
-          outcome = await sender.deliver(messageOf(notification), { executor: tx });
+          outcome = await sender.deliver(messageOf(notification, await localeOf(notification)), {
+            executor: tx,
+          });
         } catch (error) {
           /*
            * Упавший канал не должен ронять пачку: остальные строки

@@ -9,7 +9,15 @@ import { MAX_DELIVERY_ATTEMPTS, type DeliveryOutcome } from '@/domain/notificati
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { parseInstant } from '@/lib/time';
 
-import { dispatchNotifications, listInbox, markRead, notify } from './notifications';
+import {
+  dispatchNotifications,
+  listInbox,
+  listOwnPushSubscriptions,
+  markRead,
+  notify,
+  subscribeToPush,
+  unsubscribeFromPush,
+} from './notifications';
 
 import type { SenderRegistry } from '@/adapters/notify/types';
 import type { AccessContext } from '@/db/access';
@@ -431,7 +439,73 @@ describe('разбор очереди', () => {
         title: TEXTS.title,
         body: TEXTS.body,
         payload: { id: 7 },
+        locale: 'ru',
       });
+    });
+  });
+
+  it('канал получает язык адресата, а не язык отправителя', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6214');
+      const locales: unknown[] = [];
+
+      await tx.update(schema.users).set({ locale: 'kk' }).where(eq(schema.users.id, fixture.first));
+
+      const registry: SenderRegistry = {
+        inapp: {
+          channel: 'inapp',
+          deliver: (message) => {
+            locales.push(message.locale);
+
+            return Promise.resolve({ kind: 'sent' });
+          },
+        },
+      };
+
+      await notify(
+        fixture.network,
+        { userId: fixture.first, type: 'rotation.reminder', ...TEXTS },
+        tx,
+      );
+      await dispatchNotifications({ executor: tx, senders: registry });
+
+      expect(locales).toEqual(['kk']);
+    });
+  });
+});
+
+describe('подписка на push', () => {
+  it('жилец подписывает свой браузер и отключает его сам', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6215');
+      const endpoint = 'https://push.example.com/send/6215';
+
+      const subscription = await subscribeToPush(
+        fixture.dweller,
+        { endpoint, p256dh: 'k', auth: 'a', userAgent: 'Firefox' },
+        tx,
+      );
+
+      expect(subscription.userId).toBe(fixture.first);
+      expect(await listOwnPushSubscriptions(fixture.dweller, tx)).toHaveLength(1);
+
+      await unsubscribeFromPush(fixture.dweller, endpoint, tx);
+
+      expect(await listOwnPushSubscriptions(fixture.dweller, tx)).toEqual([]);
+    });
+  });
+
+  it('чужую подписку сосед не отключает', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6216');
+      const endpoint = 'https://push.example.com/send/6216';
+
+      await subscribeToPush(fixture.dweller, { endpoint, p256dh: 'k', auth: 'a' }, tx);
+
+      await expect(unsubscribeFromPush(fixture.neighbour, endpoint, tx)).rejects.toBeInstanceOf(
+        NotFoundError,
+      );
+      expect(await listOwnPushSubscriptions(fixture.dweller, tx)).toHaveLength(1);
     });
   });
 });

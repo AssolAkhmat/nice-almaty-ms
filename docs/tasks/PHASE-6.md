@@ -38,10 +38,11 @@ API для ботов, OpenAPI и токены — фаза 7. WhatsApp оста
 - Коммит: `feat(notifications): очередь доставки и разбор outbox`
 
 ### T6.3 — Адаптеры доставки
-- [ ] `inapp` — запись в `notifications`, счётчик непрочитанного
-- [ ] `webpush` — VAPID, подписка из браузера, отзыв на 410/404
-- [ ] `whatsapp.stub` — честная заглушка со статусом `skipped`
-- [ ] Ключи VAPID из `src/env.ts`, в `.env.example` и в архитектуре
+- [x] `inapp` — запись в `notifications`, счётчик непрочитанного
+- [x] `webpush` — VAPID, приём подписки, отзыв на 410/404
+      (кнопка в профиле — T6.4, service worker — T6.6)
+- [x] `whatsapp.stub` — честная заглушка со статусом `skipped`
+- [x] Ключи VAPID из `src/env.ts`, в `.env.example` и в архитектуре
 - Коммит: `feat(notifications): inapp, web push и заглушка whatsapp`
 
 ### T6.4 — Центр уведомлений
