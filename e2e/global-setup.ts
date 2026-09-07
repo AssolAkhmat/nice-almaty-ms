@@ -32,6 +32,14 @@ export const E2E_ACCOUNTS = {
   adminHouse3: adminPhone(3),
   adminHouse4: adminPhone(4),
   adminHouse5: adminPhone(5),
+  /*
+   * Дома приёмки фазы 4 — тоже по одному на ширину. Ряд ротаций у дома
+   * общий, и три копии приёмки в одном доме собирали бы его друг поверх
+   * друга: побеждала бы та, что успела сохранить последней.
+   */
+  adminHouse6: adminPhone(6),
+  adminHouse7: adminPhone(7),
+  adminHouse8: adminPhone(8),
 } as const;
 
 /**
@@ -124,6 +132,29 @@ async function removeLeftoverAccounts(db: ReturnType<typeof drizzle>): Promise<v
   await db.delete(schema.files).where(inArray(schema.files.uploadedBy, ids));
   await db.delete(schema.utilityAllocations).where(inArray(schema.utilityAllocations.userId, ids));
 
+  /*
+   * Ротации: долг принадлежит человеку и уходит вместе с ним, а назначение
+   * принадлежит занятию — у него обезличивается исполнитель, как и автор
+   * записи в журнале. Иначе внешние ключи не дадут удалить учётную запись.
+   */
+  await db.delete(schema.rotationDebts).where(inArray(schema.rotationDebts.userId, ids));
+  await db
+    .update(schema.rotationAssignments)
+    .set({ userId: null, state: 'needs_reassignment' })
+    .where(inArray(schema.rotationAssignments.userId, ids));
+  await db
+    .update(schema.rotationAssignments)
+    .set({ confirmedBy: null })
+    .where(inArray(schema.rotationAssignments.confirmedBy, ids));
+  await db
+    .update(schema.rotationAssignments)
+    .set({ scoredBy: null })
+    .where(inArray(schema.rotationAssignments.scoredBy, ids));
+  await db
+    .update(schema.rotationOccurrences)
+    .set({ createdBy: null })
+    .where(inArray(schema.rotationOccurrences.createdBy, ids));
+
   // Ссылки «кто сделал» обнуляются: сама операция к прогону отношения не имеет.
   await db
     .update(schema.ledgerEntries)
@@ -186,6 +217,54 @@ async function removeLeftoverAreas(db: ReturnType<typeof drizzle>): Promise<void
 
   const ids = leftovers.map((row) => row.id);
 
+  /*
+   * Ротации держат зону за чек-лист и за само занятие, а ряд — за место.
+   * Сначала снимаются они, иначе внешние ключи не дадут убрать зону.
+   */
+  const occurrenceIds = (
+    await db
+      .select({ id: schema.rotationOccurrences.id })
+      .from(schema.rotationOccurrences)
+      .where(inArray(schema.rotationOccurrences.areaId, ids))
+  ).map((row) => row.id);
+
+  if (occurrenceIds.length > 0) {
+    const assignmentIds = (
+      await db
+        .select({ id: schema.rotationAssignments.id })
+        .from(schema.rotationAssignments)
+        .where(inArray(schema.rotationAssignments.occurrenceId, occurrenceIds))
+    ).map((row) => row.id);
+
+    if (assignmentIds.length > 0) {
+      await db
+        .delete(schema.rotationDebts)
+        .where(inArray(schema.rotationDebts.sourceAssignmentId, assignmentIds));
+      await db
+        .delete(schema.rotationAssignments)
+        .where(inArray(schema.rotationAssignments.id, assignmentIds));
+    }
+
+    await db
+      .delete(schema.rotationOccurrences)
+      .where(inArray(schema.rotationOccurrences.id, occurrenceIds));
+  }
+
+  await db.delete(schema.rotationRowZones).where(inArray(schema.rotationRowZones.areaId, ids));
+
+  const areaBedIds = (
+    await db
+      .select({ id: schema.beds.id })
+      .from(schema.beds)
+      .where(inArray(schema.beds.areaId, ids))
+  ).map((row) => row.id);
+
+  if (areaBedIds.length > 0) {
+    await db
+      .delete(schema.rotationRowSlots)
+      .where(inArray(schema.rotationRowSlots.bedId, areaBedIds));
+  }
+
   await db.delete(schema.areaEligibility).where(inArray(schema.areaEligibility.areaId, ids));
   await db.delete(schema.areaChecklists).where(inArray(schema.areaChecklists.areaId, ids));
 
@@ -240,7 +319,7 @@ async function removeLeftoverAreas(db: ReturnType<typeof drizzle>): Promise<void
  * до строки. Убирается всё, что прогон в этих домах заводит: периоды
  * с их строками и снимками распределения и ущербы с долями.
  */
-export const ACCEPTANCE_HOUSES = [3, 4, 5] as const;
+export const ACCEPTANCE_HOUSES = [3, 4, 5, 6, 7, 8] as const;
 
 async function removeAcceptanceHouseData(db: ReturnType<typeof drizzle>): Promise<void> {
   const houses = await db
@@ -268,6 +347,70 @@ async function removeAcceptanceHouseData(db: ReturnType<typeof drizzle>): Promis
     await db.delete(schema.utilityLines).where(inArray(schema.utilityLines.periodId, periodIds));
     await db.delete(schema.utilityPeriods).where(inArray(schema.utilityPeriods.id, periodIds));
   }
+
+  /*
+   * Ротации приёмки фазы 4: ряд у дома один, и оставленный прошлым прогоном
+   * он не даёт следующему собрать свой. Убирается всё дерево — назначения,
+   * занятия, слоты, зоны рядов, сами ряды, допуски и чек-листы.
+   */
+  const rowIds = (
+    await db
+      .select({ id: schema.rotationRows.id })
+      .from(schema.rotationRows)
+      .where(inArray(schema.rotationRows.houseId, houseIds))
+  ).map((row) => row.id);
+
+  const occurrenceIds = (
+    await db
+      .select({ id: schema.rotationOccurrences.id })
+      .from(schema.rotationOccurrences)
+      .where(inArray(schema.rotationOccurrences.houseId, houseIds))
+  ).map((row) => row.id);
+
+  if (occurrenceIds.length > 0) {
+    const assignmentIds = (
+      await db
+        .select({ id: schema.rotationAssignments.id })
+        .from(schema.rotationAssignments)
+        .where(inArray(schema.rotationAssignments.occurrenceId, occurrenceIds))
+    ).map((row) => row.id);
+
+    if (assignmentIds.length > 0) {
+      // Долг ссылается на назначение: связь снимается до удаления.
+      await db
+        .delete(schema.rotationDebts)
+        .where(inArray(schema.rotationDebts.sourceAssignmentId, assignmentIds));
+      await db
+        .delete(schema.rotationAssignments)
+        .where(inArray(schema.rotationAssignments.id, assignmentIds));
+    }
+
+    await db
+      .delete(schema.rotationOccurrences)
+      .where(inArray(schema.rotationOccurrences.id, occurrenceIds));
+  }
+
+  if (rowIds.length > 0) {
+    await db.delete(schema.rotationRowSlots).where(inArray(schema.rotationRowSlots.rowId, rowIds));
+    await db.delete(schema.rotationRowZones).where(inArray(schema.rotationRowZones.rowId, rowIds));
+    await db.delete(schema.rotationRows).where(inArray(schema.rotationRows.id, rowIds));
+  }
+
+  const areaIds = (
+    await db
+      .select({ id: schema.areas.id })
+      .from(schema.areas)
+      .where(inArray(schema.areas.houseId, houseIds))
+  ).map((row) => row.id);
+
+  if (areaIds.length > 0) {
+    await db.delete(schema.areaEligibility).where(inArray(schema.areaEligibility.areaId, areaIds));
+    await db.delete(schema.areaChecklists).where(inArray(schema.areaChecklists.areaId, areaIds));
+  }
+
+  await db
+    .delete(schema.eligibilityGroups)
+    .where(inArray(schema.eligibilityGroups.houseId, houseIds));
 
   const damageIds = (
     await db

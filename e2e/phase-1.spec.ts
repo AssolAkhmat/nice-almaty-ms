@@ -147,7 +147,7 @@ test.describe('админ не видит чужого', () => {
     const visible = await page.locator('main').innerText();
 
     expect(visible).toContain('Дом 1');
-    for (const name of ['Дом 2', 'Дом 3', 'Дом 4', 'Дом 5']) {
+    for (const name of ['Дом 2', 'Дом 3', 'Дом 4', 'Дом 5', 'Дом 6', 'Дом 7', 'Дом 8']) {
       expect(visible, name).not.toContain(name);
     }
   });

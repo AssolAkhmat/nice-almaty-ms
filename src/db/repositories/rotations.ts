@@ -1065,7 +1065,9 @@ export async function readTemplateSettings(
   type: ChecklistType,
   executor: Executor = getDb(),
 ): Promise<RotationTemplateSettings | null> {
-  assertHouseVisible(context, houseId);
+  // Шапку читает и жилец: текст дня показывается в календаре, который
+  // ему положен. Дом при этом проверяет `houseScope`, а не контекст.
+  assertHouseReadable(context, houseId);
 
   const [settings] = await executor
     .select()

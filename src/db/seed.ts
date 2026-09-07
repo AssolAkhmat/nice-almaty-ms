@@ -25,7 +25,7 @@ import {
  */
 export const ORG_SLUG = 'nice-almaty';
 
-export const HOUSE_COUNT = 5;
+export const HOUSE_COUNT = 8;
 
 export const SUPERADMIN_PHONE = '+77010000000';
 
