@@ -155,6 +155,19 @@ async function removeLeftoverAccounts(db: ReturnType<typeof drizzle>): Promise<v
     .set({ createdBy: null })
     .where(inArray(schema.rotationOccurrences.createdBy, ids));
 
+  /*
+   * Рейтинг прогона уходит вместе с человеком: события, состояния порогов,
+   * штрафы и скидки принадлежат ему, а не дому. Штраф, оставшийся без
+   * жильца, не даёт удалить учётную запись — прогон падал на этом.
+   */
+  await db.delete(schema.ratingEvents).where(inArray(schema.ratingEvents.userId, ids));
+  await db
+    .delete(schema.ratingThresholdStates)
+    .where(inArray(schema.ratingThresholdStates.userId, ids));
+  await db.delete(schema.discounts).where(inArray(schema.discounts.userId, ids));
+  await db.delete(schema.fines).where(inArray(schema.fines.userId, ids));
+  await db.delete(schema.absences).where(inArray(schema.absences.userId, ids));
+
   // Ссылки «кто сделал» обнуляются: сама операция к прогону отношения не имеет.
   await db
     .update(schema.ledgerEntries)
@@ -164,6 +177,26 @@ async function removeLeftoverAccounts(db: ReturnType<typeof drizzle>): Promise<v
     .update(schema.auditLog)
     .set({ actorUserId: null })
     .where(inArray(schema.auditLog.actorUserId, ids));
+  await db
+    .update(schema.fines)
+    .set({ createdBy: null })
+    .where(inArray(schema.fines.createdBy, ids));
+  await db
+    .update(schema.fines)
+    .set({ cancelledBy: null })
+    .where(inArray(schema.fines.cancelledBy, ids));
+  await db
+    .update(schema.discounts)
+    .set({ approvedBy: null })
+    .where(inArray(schema.discounts.approvedBy, ids));
+  await db
+    .update(schema.ratingEvents)
+    .set({ createdBy: null })
+    .where(inArray(schema.ratingEvents.createdBy, ids));
+  await db
+    .update(schema.absences)
+    .set({ reviewedBy: null })
+    .where(inArray(schema.absences.reviewedBy, ids));
 
   await db.delete(schema.residencies).where(inArray(schema.residencies.userId, ids));
   await db.delete(schema.sessions).where(inArray(schema.sessions.userId, ids));
