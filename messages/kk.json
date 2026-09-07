@@ -45,7 +45,9 @@
       "rating_event": "Рейтинг оқиғасы",
       "fine": "Айыппұл",
       "discount": "Жеңілдік",
-      "rating_rule": "Рейтинг ережесі"
+      "rating_rule": "Рейтинг ережесі",
+      "inventory_item": "Түгендеу позициясы",
+      "inventory_audit": "Түгендеу"
     }
   },
   "auth": {

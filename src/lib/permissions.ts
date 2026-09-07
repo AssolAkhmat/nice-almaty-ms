@@ -68,6 +68,8 @@ export const ACTIONS = [
   'utility.reopen',
   'accounting.read',
   'accounting.write',
+  'inventory.read',
+  'inventory.manage',
   'settings.org.read',
   'settings.org.write',
   'settings.house.read',
@@ -139,6 +141,8 @@ export const PERMISSIONS: PermissionMatrix = {
     'utility.reopen': 'org',
     'accounting.read': 'org',
     'accounting.write': 'org',
+    'inventory.read': 'org',
+    'inventory.manage': 'org',
     'settings.org.read': 'org',
     'settings.org.write': 'org',
     'settings.house.read': 'org',
@@ -218,6 +222,13 @@ export const PERMISSIONS: PermissionMatrix = {
      */
     'accounting.read': 'none',
     'accounting.write': 'none',
+    /*
+     * Инвентарь — дело дома, а не книги проводок: админ ведёт свой
+     * (модуль 10, «Инвентарь»). Область «дом» здесь и означает «свой»:
+     * позиция чужого дома для него не существует.
+     */
+    'inventory.read': 'house',
+    'inventory.manage': 'house',
     'settings.org.read': 'none',
     'settings.org.write': 'none',
     'settings.house.read': 'house',
@@ -327,6 +338,9 @@ export const PERMISSIONS: PermissionMatrix = {
     'utility.reopen': 'none',
     'accounting.read': 'none',
     'accounting.write': 'none',
+    /* Инвентарь дома жильца не касается: он им не распоряжается. */
+    'inventory.read': 'none',
+    'inventory.manage': 'none',
     'settings.org.read': 'none',
     'settings.org.write': 'none',
     'settings.house.read': 'none',

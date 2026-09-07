@@ -87,6 +87,11 @@ export const AUDIT_ACTIONS = {
   fineCancelled: 'fine.cancelled',
   discountApproved: 'discount.approved',
   ratingRuleSaved: 'rating_rule.saved',
+  inventoryItemCreated: 'inventory_item.created',
+  inventoryItemUpdated: 'inventory_item.updated',
+  inventoryMoved: 'inventory_item.moved',
+  inventoryWrittenOff: 'inventory_item.written_off',
+  inventoryAuditClosed: 'inventory_audit.closed',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

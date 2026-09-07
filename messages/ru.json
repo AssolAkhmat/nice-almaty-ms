@@ -45,7 +45,9 @@
       "rating_event": "Событие рейтинга",
       "fine": "Штраф",
       "discount": "Скидка",
-      "rating_rule": "Правило рейтинга"
+      "rating_rule": "Правило рейтинга",
+      "inventory_item": "Позиция инвентаря",
+      "inventory_audit": "Инвентаризация"
     }
   },
   "auth": {

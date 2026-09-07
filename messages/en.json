@@ -45,7 +45,9 @@
       "rating_event": "Rating event",
       "fine": "Fine",
       "discount": "Discount",
-      "rating_rule": "Rating rule"
+      "rating_rule": "Rating rule",
+      "inventory_item": "Inventory item",
+      "inventory_audit": "Inventory audit"
     }
   },
   "auth": {
