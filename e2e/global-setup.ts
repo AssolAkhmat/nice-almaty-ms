@@ -40,7 +40,22 @@ export const E2E_ACCOUNTS = {
   adminHouse6: adminPhone(6),
   adminHouse7: adminPhone(7),
   adminHouse8: adminPhone(8),
+  /*
+   * Дома приёмки фазы 6 — снова по одному на ширину: приёмка заводит ряд
+   * ротаций и дёргает задание напоминаний, а задание идёт по всей сети
+   * сразу. В общем доме три копии считали бы уведомления друг друга.
+   */
+  adminHouse9: adminPhone(9),
+  adminHouse10: adminPhone(10),
+  adminHouse11: adminPhone(11),
 } as const;
+
+/**
+ * Секрет заданий планировщика в прогоне. Тот же, что передаёт
+ * `playwright.config.ts` серверу: приёмка фазы 6 дёргает задание
+ * тем же путём, каким его дёргает расписание.
+ */
+export const E2E_CRON_SECRET = 'e2e-cron-secret-16';
 
 /**
  * Номера, которые заводит сам прогон: `+7708…` — приёмка фазы 1,
@@ -352,7 +367,44 @@ async function removeLeftoverAreas(db: ReturnType<typeof drizzle>): Promise<void
  * до строки. Убирается всё, что прогон в этих домах заводит: периоды
  * с их строками и снимками распределения и ущербы с долями.
  */
-export const ACCEPTANCE_HOUSES = [3, 4, 5, 6, 7, 8] as const;
+export const ACCEPTANCE_HOUSES = [3, 4, 5, 6, 7, 8, 9, 10, 11] as const;
+
+/**
+ * Задания фазы 6 и разосланные ими уведомления.
+ *
+ * Прогон дёргает `rotations-remind` напрямую, а задание идемпотентно
+ * по паре «день и слот»: отработанный прошлым запуском слот не разослал
+ * бы ничего следующему, и приёмка проходила бы только один раз в сутки.
+ * Это фикстура прогона, а не послабление правила: сама идемпотентность
+ * проверяется внутри приёмки повторным вызовом.
+ */
+const PHASE_SIX_JOBS = [
+  'rotations-remind',
+  'curfew-check',
+  'utilities-remind',
+  'schedule-remind',
+  'documents-expiry',
+  'deposit-refund-watch',
+] as const;
+
+async function resetPhaseSixJobs(db: ReturnType<typeof drizzle>): Promise<void> {
+  await db.delete(schema.jobRuns).where(inArray(schema.jobRuns.job, [...PHASE_SIX_JOBS]));
+
+  const notificationIds = (
+    await db.select({ id: schema.notifications.id }).from(schema.notifications)
+  ).map((row) => row.id);
+
+  if (notificationIds.length === 0) {
+    return;
+  }
+
+  await db
+    .delete(schema.notificationOutbox)
+    .where(inArray(schema.notificationOutbox.notificationId, notificationIds));
+  await db.delete(schema.notifications).where(inArray(schema.notifications.id, notificationIds));
+  // Подписки на push тоже держат пользователя: их прогон не заводит, но мог бы.
+  await db.delete(schema.pushSubscriptions);
+}
 
 async function removeAcceptanceHouseData(db: ReturnType<typeof drizzle>): Promise<void> {
   const houses = await db
@@ -491,6 +543,11 @@ export default async function globalSetup(): Promise<void> {
      */
     await db.delete(schema.rateLimits);
 
+    /*
+     * Уведомления снимаются первыми: они ссылаются на пользователей,
+     * а прошлые учётные записи прогона удаляются следующим шагом.
+     */
+    await resetPhaseSixJobs(db);
     await removeLeftoverAccounts(db);
     await removeLeftoverEligibilityGroups(db);
     await removeLeftoverAreas(db);

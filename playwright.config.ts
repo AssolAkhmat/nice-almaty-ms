@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { chromium, defineConfig, devices } from '@playwright/test';
 
+import { E2E_CRON_SECRET } from './e2e/global-setup';
 import { dotEnvFallback } from './scripts/read-dotenv';
 
 /*
@@ -77,7 +78,7 @@ export default defineConfig({
       APP_URL: BASE_URL,
       SESSION_SECRET: 'e2e-session-secret-not-a-real-secret-32',
       FIELD_ENCRYPTION_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
-      CRON_SECRET: 'e2e-cron-secret-16',
+      CRON_SECRET: E2E_CRON_SECRET,
       STORAGE_DRIVER: 'local',
       /*
        * Печать договора идёт настоящим chromium — тем же, которым playwright
