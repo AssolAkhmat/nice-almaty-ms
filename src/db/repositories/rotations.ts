@@ -412,7 +412,12 @@ export async function listEligibilityMembers(
         inArray(residencies.status, ['active', 'terminating']),
       ),
     )
-    .orderBy(asc(residencies.createdAt));
+    /*
+     * По имени, а не по времени заселения: у людей, заведённых одной
+     * транзакцией, время совпадает, и порядок становится случайным —
+     * от него зависят и состав группы, и раздача генеральной уборки.
+     */
+    .orderBy(asc(residentProfiles.lastName), asc(residentProfiles.firstName), asc(users.phone));
 
   return rows.map((row) => {
     const name = [row.lastName, row.firstName]
@@ -698,7 +703,11 @@ export async function listOccurrences(
         between(rotationOccurrences.date, range.from, range.to),
       ),
     )
-    .orderBy(asc(rotationOccurrences.date), asc(rotationOccurrences.createdAt));
+    .orderBy(
+      asc(rotationOccurrences.date),
+      asc(rotationOccurrences.createdAt),
+      asc(rotationOccurrences.id),
+    );
 }
 
 /**
@@ -834,7 +843,11 @@ export async function listAssignmentsFor(
     .select()
     .from(rotationAssignments)
     .where(inArray(rotationAssignments.occurrenceId, [...occurrenceIds]))
-    .orderBy(asc(rotationAssignments.slotPosition), asc(rotationAssignments.createdAt));
+    .orderBy(
+      asc(rotationAssignments.slotPosition),
+      asc(rotationAssignments.createdAt),
+      asc(rotationAssignments.id),
+    );
 }
 
 export interface UpdateOccurrenceInput {
@@ -940,7 +953,7 @@ export async function listOccurrencesOfDate(
         houseScope(context, rotationOccurrences.houseId),
       ),
     )
-    .orderBy(asc(rotationOccurrences.createdAt));
+    .orderBy(asc(rotationOccurrences.createdAt), asc(rotationOccurrences.id));
 }
 
 export interface CalendarDictionaries {
@@ -1004,7 +1017,7 @@ export async function listCalendarDictionaries(
         inArray(residencies.status, ['active', 'terminating']),
       ),
     )
-    .orderBy(asc(residencies.createdAt));
+    .orderBy(asc(residentProfiles.lastName), asc(residentProfiles.firstName), asc(users.phone));
 
   return {
     areas: areaRows,
