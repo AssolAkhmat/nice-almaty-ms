@@ -2,12 +2,15 @@ import { getLocale, getTranslations } from 'next-intl/server';
 import { redirect } from 'next/navigation';
 
 import { ModuleStub } from '@/components/layout/module-stub';
+import { AppLink } from '@/components/ui/app-link';
+import { listHouses } from '@/db/repositories/houses';
 import { DEFAULT_LOCALE, isLocale, type Locale } from '@/lib/i18n/config';
 import { getCurrentSession } from '@/lib/session';
-import { readResidentDashboard } from '@/services/dashboard';
+import { readHouseDashboard, readResidentDashboard } from '@/services/dashboard';
 import { readOnboarding } from '@/services/onboarding';
 import { readTerminationView } from '@/services/terminations';
 
+import { HouseDashboardView } from './house-dashboard';
 import { OnboardingWizard } from './onboarding-wizard';
 import { ResidentDashboard } from './resident-dashboard';
 import { TerminationNotice } from './termination-notice';
@@ -31,19 +34,64 @@ export const dynamic = 'force-dynamic';
  * значит предлагать то, чего нельзя открыть. После расторжения на том же
  * месте стоит сводка выселения: мастер заселения там был бы ложью.
  */
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ house?: string }>;
+}) {
   const session = await getCurrentSession();
   if (session === null) {
     redirect('/login');
   }
 
   const t = await getTranslations('home');
+  const { context } = session;
 
+  /*
+   * Дом админа — свой; суперадмин выбирает, как и на остальных экранах,
+   * и в доме без админа дэшборд ведёт он же (P6-17).
+   */
   if (session.context.role !== 'resident') {
-    return <ModuleStub navKey="dashboard" />;
+    const houses = context.role === 'superadmin' ? await listHouses(context) : [];
+    const requested = (await searchParams).house;
+    const houseId =
+      context.role === 'superadmin' ? (requested ?? houses[0]?.id ?? null) : context.houseId;
+
+    if (houseId === null) {
+      return <ModuleStub navKey="dashboard" />;
+    }
+
+    const view = await readHouseDashboard({ context }, houseId);
+
+    return (
+      <section className="flex flex-col gap-6">
+        <div className="flex flex-col gap-1">
+          <h1>{t('title')}</h1>
+          <p className="text-text-muted text-[13px]">{t('subtitle')}</p>
+        </div>
+
+        {houses.length > 1 && (
+          <nav className="flex flex-wrap gap-2 text-[13px]">
+            {houses.map((house) => (
+              <AppLink
+                className={
+                  house.id === houseId ? 'text-text font-medium' : 'text-text-muted hover:text-text'
+                }
+                data-testid={`house-${house.id}`}
+                href={{ pathname: '/', query: { house: house.id } }}
+                key={house.id}
+              >
+                {house.name}
+              </AppLink>
+            ))}
+          </nav>
+        )}
+
+        <HouseDashboardView view={view} />
+      </section>
+    );
   }
 
-  const { context } = session;
   const onboarding = await readOnboarding({ context });
 
   if (onboarding.scope === 'full') {

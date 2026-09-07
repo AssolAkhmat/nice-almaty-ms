@@ -383,6 +383,34 @@
         "missing": "Құжат жүктелмеген"
       },
       "step": "Қоныстану қадамы жабылмаған"
+    },
+    "admin": {
+      "title": "Бүгін",
+      "noCleanings": "Бүгінге жинау жоқ",
+      "decisions": "Шешім қажет",
+      "noDecisions": "Шешілмегені жоқ",
+      "needsReassignment": "Орындаушы қажет",
+      "unconfirmed": "{date} үшін расталмаған",
+      "money": "{month} төлемдері",
+      "issued": "Қойылды",
+      "paid": "Төленді",
+      "debt": "Қарыз",
+      "debtors": "Қарыздарлар",
+      "noDebtors": "Қарыз жоқ",
+      "remote": "Қашықтан: аударым күтуде — {count}",
+      "ratingTitle": "Үй рейтингі",
+      "average": "Орташа",
+      "best": "Үздіктер",
+      "worst": "Ең төмен",
+      "noRating": "Рейтинг әзірге жоқ",
+      "utilitiesTitle": "{month} коммуналдық",
+      "utilitiesMissing": "Кезең ашылмаған",
+      "utilitiesDraft": "Кезең ашық, сомалар жабылмаған",
+      "utilitiesClosed": "Кезең жабық",
+      "onboardingTitle": "Қоныстану",
+      "onboardingEmpty": "Аяқталмаған қоныстану жоқ",
+      "expiringDocuments": "Жақын айда мерзімі бітетін анықтама: {count}",
+      "openCalendar": "Ротация күнтізбесі"
     }
   },
   "documents": {

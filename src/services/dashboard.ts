@@ -1,12 +1,15 @@
 import { getDb, type Executor } from '@/db/client';
 import { listResidencies } from '@/db/repositories/residencies';
-import { addDays, now, todayInAlmaty, type BusinessDate } from '@/lib/time';
+import { addDays, now, startOfMonth, todayInAlmaty, type BusinessDate } from '@/lib/time';
 
 import { readDepositView } from './deposits';
 import { listDocumentCards } from './documents';
+import { listDocuments } from '@/db/repositories/documents';
 import { listInvoicesFor } from './invoices';
-import { readMyRatingCard } from './rating-views';
+import { readHouseRating, readMyRatingCard, type HouseRatingRow } from './rating-views';
+import { listRemoteTasks } from './remote';
 import { readCalendar } from './rotation-calendar';
+import { listPeriodsOfHouse } from './utilities';
 import { readOnboarding } from './onboarding';
 
 import type { OnboardingStepKey } from './onboarding';
@@ -246,6 +249,204 @@ export async function readResidentDashboard(
     attention: {
       documents,
       steps: onboarding.steps.filter((step) => !step.done).map((step) => step.key),
+    },
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * Дэшборд админа дома (docs/04-MODULES/09-dashboards.md, «Админ дома»)
+ * ------------------------------------------------------------------ */
+
+export interface TodayCleaning {
+  occurrenceId: string;
+  areaName: string;
+  checklistTitle: string;
+  workers: { assignmentId: string; name: string; state: string }[];
+}
+
+export interface DecisionItem {
+  assignmentId: string;
+  date: BusinessDate;
+  areaName: string;
+  /** `needs_reassignment` — дыра в расписании, `assigned` — вчерашняя без отметки. */
+  kind: 'needs_reassignment' | 'unconfirmed';
+  name: string | null;
+}
+
+export interface HouseMoney {
+  month: BusinessDate;
+  issued: number;
+  paid: number;
+  debt: number;
+  debtors: { residencyId: string; name: string; remaining: number; overdue: boolean }[];
+  /** Счета жильцов с Kaspi, по которым ждут перевода (модуль 2, «Удалёнка»). */
+  remoteTasks: number;
+}
+
+export interface HouseDashboard {
+  houseId: string;
+  today: BusinessDate;
+  cleanings: TodayCleaning[];
+  decisions: DecisionItem[];
+  money: HouseMoney;
+  rating: { average: number | null; best: HouseRatingRow[]; worst: HouseRatingRow[] };
+  utilities: { month: BusinessDate; status: 'missing' | 'draft' | 'closed' };
+  onboarding: {
+    moveIn: { residencyId: string; name: string; status: string }[];
+    documents: number;
+  };
+}
+
+/** Сколько имён показывать в списках «лучшие» и «худшие». */
+const RATING_EDGE = 3;
+
+/**
+ * Сколько справок дома истекает в ближайший месяц.
+ *
+ * Порог тот же, с которого предупреждает `documents-expiry`: экран дома
+ * и напоминание не должны расходиться в том, что считать срочным (P6-31).
+ */
+function expiringSoon(
+  documents: readonly { residencyId: string; validUntil: string | null }[],
+  residencies: readonly { id: string }[],
+  today: BusinessDate,
+): number {
+  const ofHouse = new Set(residencies.map((item) => item.id));
+  const edge = addDays(today, DOCUMENT_ATTENTION_DAYS);
+
+  return documents.filter(
+    (document) =>
+      ofHouse.has(document.residencyId) &&
+      document.validUntil !== null &&
+      document.validUntil <= edge,
+  ).length;
+}
+
+function nameOf(members: Map<string, string>, userId: string | null): string | null {
+  return userId === null ? null : (members.get(userId) ?? null);
+}
+
+export async function readHouseDashboard(
+  actor: UserActor,
+  houseId: string,
+  deps: DashboardDeps = {},
+): Promise<HouseDashboard> {
+  const { executor, today } = resolve(deps);
+  const month = startOfMonth(today);
+  const yesterday = addDays(today, -1);
+
+  const calendar = await readCalendar(actor, { from: yesterday, to: today }, { executor, houseId });
+
+  const areas = new Map(calendar.dictionaries.areas.map((area) => [area.id, area.name]));
+  const checklists = new Map(
+    calendar.dictionaries.checklists.map((checklist) => [checklist.id, checklist.title]),
+  );
+  const members = new Map(
+    calendar.dictionaries.members.map((member) => [member.userId, member.name]),
+  );
+
+  const cleanings: TodayCleaning[] = calendar.occurrences
+    .filter((item) => item.occurrence.date === today && item.occurrence.status !== 'cancelled')
+    .map((item) => ({
+      occurrenceId: item.occurrence.id,
+      areaName: areas.get(item.occurrence.areaId) ?? '',
+      checklistTitle: checklists.get(item.occurrence.checklistId) ?? '',
+      workers: item.assignments.map((assignment) => ({
+        assignmentId: assignment.id,
+        name: nameOf(members, assignment.userId) ?? '',
+        state: assignment.state,
+      })),
+    }));
+
+  /*
+   * Требует решения ровно две вещи: дыра в расписании — её закрывает
+   * админ, — и вчерашняя уборка без отметки, у которой сегодня последний
+   * день (§7). Остальное система разбирает сама.
+   */
+  const decisions: DecisionItem[] = calendar.occurrences
+    .filter((item) => item.occurrence.status === 'scheduled')
+    .flatMap((item) =>
+      item.assignments
+        .filter(
+          (assignment) =>
+            assignment.state === 'needs_reassignment' ||
+            (assignment.state === 'assigned' && item.occurrence.date === yesterday),
+        )
+        .map((assignment) => ({
+          assignmentId: assignment.id,
+          date: item.occurrence.date as BusinessDate,
+          areaName: areas.get(item.occurrence.areaId) ?? '',
+          kind:
+            assignment.state === 'needs_reassignment'
+              ? ('needs_reassignment' as const)
+              : ('unconfirmed' as const),
+          name: nameOf(members, assignment.userId),
+        })),
+    );
+
+  const [invoices, remote, rating, periods, residencies, documents] = await Promise.all([
+    listInvoicesFor(actor, { houseId, periodMonth: month }, { executor, today }),
+    listRemoteTasks(actor, { houseId }, { executor, today }),
+    readHouseRating(actor, houseId, { executor, today }),
+    listPeriodsOfHouse(actor, houseId, { executor, today }),
+    listResidencies(actor.context, { houseId }, executor),
+    listDocuments(actor.context, { status: 'approved' }, executor),
+  ]);
+
+  const issued = invoices.reduce((sum, row) => sum + row.invoice.total, 0);
+  const paid = invoices.reduce((sum, row) => sum + row.paid, 0);
+
+  const names = new Map(rating.map((row) => [row.userId, row.name]));
+  const byResidency = new Map(residencies.map((item) => [item.id, item]));
+
+  const debtors = invoices
+    .filter((row) => row.remaining > 0)
+    .map((row) => ({
+      residencyId: row.invoice.residencyId,
+      name: names.get(byResidency.get(row.invoice.residencyId)?.userId ?? '') ?? '',
+      remaining: row.remaining,
+      overdue: row.overdue,
+    }));
+
+  const ordered = [...rating].sort((left, right) => right.rating - left.rating);
+  const average =
+    rating.length === 0
+      ? null
+      : Math.round(rating.reduce((sum, row) => sum + row.rating, 0) / rating.length);
+
+  const period = periods.find((item) => item.month === month);
+
+  return {
+    houseId,
+    today,
+    cleanings,
+    decisions,
+    money: {
+      month,
+      issued,
+      paid,
+      debt: issued - paid,
+      debtors,
+      remoteTasks: remote.filter((task) => !task.sent).length,
+    },
+    rating: {
+      average,
+      best: ordered.slice(0, RATING_EDGE),
+      worst: ordered.slice(-RATING_EDGE).reverse(),
+    },
+    utilities: {
+      month,
+      status: period === undefined ? 'missing' : period.status === 'closed' ? 'closed' : 'draft',
+    },
+    onboarding: {
+      moveIn: residencies
+        .filter((item) => item.status !== 'active' && item.status !== 'archived')
+        .map((item) => ({
+          residencyId: item.id,
+          name: names.get(item.userId) ?? '',
+          status: item.status,
+        })),
+      documents: expiringSoon(documents, residencies, today),
     },
   };
 }

@@ -383,6 +383,34 @@
         "missing": "Document not uploaded"
       },
       "step": "Move-in step is not complete"
+    },
+    "admin": {
+      "title": "Today",
+      "noCleanings": "No cleanings today",
+      "decisions": "Needs a decision",
+      "noDecisions": "Nothing pending",
+      "needsReassignment": "Needs someone assigned",
+      "unconfirmed": "Not confirmed for {date}",
+      "money": "Payments for {month}",
+      "issued": "Issued",
+      "paid": "Paid",
+      "debt": "Debt",
+      "debtors": "Debtors",
+      "noDebtors": "No debts",
+      "remote": "Remote: awaiting transfer — {count}",
+      "ratingTitle": "House rating",
+      "average": "Average",
+      "best": "Best",
+      "worst": "Lowest",
+      "noRating": "No rating yet",
+      "utilitiesTitle": "Utilities for {month}",
+      "utilitiesMissing": "Period not created",
+      "utilitiesDraft": "Period open, amounts not closed",
+      "utilitiesClosed": "Period closed",
+      "onboardingTitle": "Move-in",
+      "onboardingEmpty": "No open move-ins",
+      "expiringDocuments": "Documents expiring within a month: {count}",
+      "openCalendar": "Rotation calendar"
     }
   },
   "documents": {

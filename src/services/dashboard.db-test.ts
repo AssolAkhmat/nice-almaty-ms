@@ -6,7 +6,7 @@ import * as schema from '@/db/schema';
 import { testDatabaseUrl } from '@/db/testing/database-url';
 import { addDays, parseBusinessDate, type BusinessDate } from '@/lib/time';
 
-import { readResidentDashboard } from './dashboard';
+import { readHouseDashboard, readResidentDashboard } from './dashboard';
 import { createInvoice } from './invoices';
 import { saveRow } from './rotation-rows';
 import { generateSchedule } from './rotation-schedule';
@@ -276,6 +276,82 @@ describe('дэшборд жильца', () => {
       const rejected = view?.attention.documents.find((item) => item.reason === 'rejected');
       expect(rejected).toBeDefined();
       expect(rejected?.title).toMatchObject({ ru: 'Флюорография' });
+    });
+  });
+
+  it('дэшборд дома показывает уборки дня и требующее решения', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6707');
+      await withRotationOn(tx, fixture, MONDAY);
+
+      const view = await readHouseDashboard(fixture.network, fixture.houseId, {
+        executor: tx,
+        today: MONDAY,
+      });
+
+      expect(view.cleanings).toHaveLength(1);
+      expect(view.cleanings[0]?.areaName).toBe('Двор');
+      expect(view.cleanings[0]?.workers[0]?.state).toBe('assigned');
+      // Сегодняшняя ещё не просрочена: решать нечего.
+      expect(view.decisions).toEqual([]);
+    });
+  });
+
+  it('вчерашняя неподтверждённая попадает в «Требует решения»', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6708');
+      await withRotationOn(tx, fixture, MONDAY);
+
+      const view = await readHouseDashboard(fixture.network, fixture.houseId, {
+        executor: tx,
+        today: addDays(MONDAY, 1),
+      });
+
+      expect(view.decisions).toHaveLength(1);
+      expect(view.decisions[0]?.kind).toBe('unconfirmed');
+      expect(view.decisions[0]?.date).toBe(MONDAY);
+    });
+  });
+
+  it('деньги месяца: выставлено, оплачено, долг и должники', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6709');
+
+      await createInvoice(
+        fixture.network,
+        {
+          residencyId: fixture.residencyId,
+          type: 'monthly',
+          periodMonth: parseBusinessDate('2026-09-01'),
+          dueDate: parseBusinessDate('2026-09-10'),
+          lines: [{ kind: 'rent', title: 'Проживание', amount: 100_000 }],
+        },
+        { executor: tx, today: MONDAY },
+      );
+
+      const view = await readHouseDashboard(fixture.network, fixture.houseId, {
+        executor: tx,
+        today: MONDAY,
+      });
+
+      expect(view.money.issued).toBe(100_000);
+      expect(view.money.paid).toBe(0);
+      expect(view.money.debt).toBe(100_000);
+      expect(view.money.debtors).toHaveLength(1);
+    });
+  });
+
+  it('коммуналка без периода названа незаведённой', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6710');
+
+      const view = await readHouseDashboard(fixture.network, fixture.houseId, {
+        executor: tx,
+        today: MONDAY,
+      });
+
+      expect(view.utilities.status).toBe('missing');
+      expect(view.utilities.month).toBe('2026-09-01');
     });
   });
 

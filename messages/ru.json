@@ -383,6 +383,34 @@
         "missing": "Документ не загружен"
       },
       "step": "Шаг заселения не закрыт"
+    },
+    "admin": {
+      "title": "Сегодня",
+      "noCleanings": "Уборок на сегодня нет",
+      "decisions": "Требует решения",
+      "noDecisions": "Нерешённого нет",
+      "needsReassignment": "Нужен исполнитель",
+      "unconfirmed": "Не подтверждена за {date}",
+      "money": "Оплаты за {month}",
+      "issued": "Выставлено",
+      "paid": "Оплачено",
+      "debt": "Долг",
+      "debtors": "Должники",
+      "noDebtors": "Долгов нет",
+      "remote": "Удалёнка: ждут перевода — {count}",
+      "ratingTitle": "Рейтинг дома",
+      "average": "Средний",
+      "best": "Лучшие",
+      "worst": "Худшие",
+      "noRating": "Рейтинга пока нет",
+      "utilitiesTitle": "Коммуналка за {month}",
+      "utilitiesMissing": "Период не заведён",
+      "utilitiesDraft": "Период открыт, суммы не закрыты",
+      "utilitiesClosed": "Период закрыт",
+      "onboardingTitle": "Заселение",
+      "onboardingEmpty": "Незакрытых заселений нет",
+      "expiringDocuments": "Справок истекает в ближайший месяц: {count}",
+      "openCalendar": "Календарь ротаций"
     }
   },
   "documents": {
