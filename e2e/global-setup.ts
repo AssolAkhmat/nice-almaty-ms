@@ -141,6 +141,100 @@ async function removeLeftoverAccounts(db: ReturnType<typeof drizzle>): Promise<v
 }
 
 /**
+ * Группы допуска, заведённые прогоном. Интерфейс их не удаляет — в модуле 11
+ * такого действия нет, — а копиться от запуска к запуску им нельзя: экран
+ * настройки ротаций рос бы бесконечно, и приёмка однажды перестала бы
+ * в него укладываться, как это уже случилось со списком аккаунтов (I3, I5).
+ */
+async function removeLeftoverEligibilityGroups(db: ReturnType<typeof drizzle>): Promise<void> {
+  const leftovers = await db
+    .select({ id: schema.eligibilityGroups.id })
+    .from(schema.eligibilityGroups)
+    .where(like(schema.eligibilityGroups.name, 'e2e %'));
+
+  if (leftovers.length === 0) {
+    return;
+  }
+
+  const ids = leftovers.map((row) => row.id);
+
+  await db.delete(schema.areaEligibility).where(inArray(schema.areaEligibility.groupId, ids));
+  await db.delete(schema.eligibilityGroups).where(inArray(schema.eligibilityGroups.id, ids));
+}
+
+/**
+ * Зоны, заведённые прогоном: настройкой ротаций («Зона e2e…») и приёмкой
+ * фазы 2 («Комната приёмки-…»). Успешный прогон убирает свои зоны сам,
+ * руками админа; упавший — оставляет, и настройка дома растёт от запуска
+ * к запуску вместе со временем отрисовки. Полторы сотни комнат приёмки
+ * уже замедляли экран настолько, что проверки не укладывались в ожидание.
+ *
+ * Места удаляются вместе с зоной: назначения к этому моменту сняты вместе
+ * с учётными записями прогона.
+ */
+const RUN_CREATED_AREAS = ['Зона e2e%', 'Комната приёмки-%'] as const;
+
+async function removeLeftoverAreas(db: ReturnType<typeof drizzle>): Promise<void> {
+  const leftovers = await db
+    .select({ id: schema.areas.id })
+    .from(schema.areas)
+    .where(or(...RUN_CREATED_AREAS.map((pattern) => like(schema.areas.name, pattern))));
+
+  if (leftovers.length === 0) {
+    return;
+  }
+
+  const ids = leftovers.map((row) => row.id);
+
+  await db.delete(schema.areaEligibility).where(inArray(schema.areaEligibility.areaId, ids));
+  await db.delete(schema.areaChecklists).where(inArray(schema.areaChecklists.areaId, ids));
+
+  const bedIds = (
+    await db
+      .select({ id: schema.beds.id })
+      .from(schema.beds)
+      .where(inArray(schema.beds.areaId, ids))
+  ).map((row) => row.id);
+
+  if (bedIds.length > 0) {
+    // Зона с занятым местом остаётся: удалять её означало бы стереть
+    // проживание, к прогону отношения не имеющее.
+    const assigned = (
+      await db
+        .select({ bedId: schema.bedAssignments.bedId })
+        .from(schema.bedAssignments)
+        .where(inArray(schema.bedAssignments.bedId, bedIds))
+    ).map((row) => row.bedId);
+
+    const free = bedIds.filter((bedId) => !assigned.includes(bedId));
+    const busyAreas = new Set(
+      assigned.length === 0
+        ? []
+        : (
+            await db
+              .select({ areaId: schema.beds.areaId })
+              .from(schema.beds)
+              .where(inArray(schema.beds.id, assigned))
+          ).map((row) => row.areaId),
+    );
+
+    if (free.length > 0) {
+      await db.delete(schema.beds).where(inArray(schema.beds.id, free));
+    }
+
+    const removable = ids.filter((areaId) => !busyAreas.has(areaId));
+
+    if (removable.length > 0) {
+      await db.delete(schema.areas).where(inArray(schema.areas.id, removable));
+    }
+
+    return;
+  }
+
+  await db.delete(schema.areas).where(inArray(schema.areas.id, ids));
+}
+
+/**
  * Дома приёмки фазы 3 отданы ей целиком: коммунальный период дома заводится
  * один на месяц, и закрытый прошлым прогоном он не даёт следующему дойти
  * до строки. Убирается всё, что прогон в этих домах заводит: периоды
@@ -216,6 +310,8 @@ export default async function globalSetup(): Promise<void> {
     await db.delete(schema.rateLimits);
 
     await removeLeftoverAccounts(db);
+    await removeLeftoverEligibilityGroups(db);
+    await removeLeftoverAreas(db);
     await removeAcceptanceHouseData(db);
 
     const phones = Object.values(E2E_ACCOUNTS);

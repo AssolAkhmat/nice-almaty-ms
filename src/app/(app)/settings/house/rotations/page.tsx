@@ -2,26 +2,27 @@ import { getTranslations } from 'next-intl/server';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
-import { listHouses } from '@/db/repositories/houses';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { listHouses } from '@/db/repositories/houses';
+import { parseEligibilityRule } from '@/domain/eligibility';
 import { can } from '@/lib/authz';
 import { getCurrentSession } from '@/lib/session';
-import { readHouseSetup } from '@/services/house-setup';
+import { readRotationSetup } from '@/services/rotation-setup';
 
-import { HouseSetupManager, type AreaRow } from './house-setup-manager';
+import { RotationSetupManager, type AreaBlock, type GroupRow } from './rotation-setup-manager';
 
 import type { UserActor } from '@/services/users';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * Настройки дома (docs/04-MODULES/11-users-settings.md, «Настройки дома»).
+ * Чек-листы зон и группы допуска (docs/04-MODULES/03-rotations.md, «Настройка»).
  *
- * Админ настраивает свой дом; суперадмин выбирает дом ссылкой — сводного
- * экрана по всей сети в модуле 11 нет, и настраивается всегда один дом.
+ * Отдельная страница внутри настроек дома: зоны и места уже занимают экран
+ * целиком, а к ротациям сюда же добавятся ряды и шаблоны текста.
  */
-export default async function HouseSettingsPage({
+export default async function RotationSetupPage({
   searchParams,
 }: {
   searchParams: Promise<{ house?: string }>;
@@ -38,7 +39,7 @@ export default async function HouseSettingsPage({
     redirect('/settings');
   }
 
-  const t = await getTranslations('houseSetup');
+  const t = await getTranslations('rotationSetup');
   const actor: UserActor = { context };
 
   const houses = context.role === 'superadmin' ? await listHouses(context) : [];
@@ -56,41 +57,42 @@ export default async function HouseSettingsPage({
     );
   }
 
-  const setup = await readHouseSetup(actor, houseId);
+  const setup = await readRotationSetup(actor, houseId);
 
-  const areas: AreaRow[] = setup.areas.map((area) => ({
+  const areas: AreaBlock[] = setup.areas.map((area) => ({
     areaId: area.area.id,
     name: area.area.name,
     type: area.area.type,
-    sortOrder: area.area.sortOrder,
-    beds: area.beds.map((bed) => ({
-      bedId: bed.bed.id,
-      label: bed.bed.label,
-      number: bed.bed.number,
-      tier: bed.bed.tier,
-      defaultPrice: bed.bed.defaultPrice,
-      occupied: bed.occupied,
+    checklists: area.checklists.map((checklist) => ({
+      checklistId: checklist.id,
+      type: checklist.type,
+      title: checklist.title,
+      items: Array.isArray(checklist.items) ? (checklist.items as string[]) : [],
+      peopleNeeded: checklist.peopleNeeded,
     })),
+    eligibility: area.eligibility,
   }));
+
+  const groups: GroupRow[] = setup.groups.map((group) => {
+    const rule = parseEligibilityRule(group.rule);
+
+    return {
+      groupId: group.id,
+      name: group.name,
+      base: rule.base,
+      areaId: rule.areaId,
+      includeUserIds: rule.includeUserIds,
+      excludeUserIds: rule.excludeUserIds,
+    };
+  });
 
   return (
     <section className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
         <h1>{t('title')}</h1>
         <p className="text-text-muted text-[13px]">{setup.houseName}</p>
-        {/*
-          Без параметра `house` и без предзагрузки: раздел сам берёт дом
-          из роли, а страница, открытая переходом по предзагруженной ссылке,
-          после сохранения показывала прежние данные — ответ брался
-          из кеша маршрутизатора, снятого до правки.
-        */}
-        <Link
-          className="text-accent text-[13px] underline"
-          data-testid="to-rotation-setup"
-          href="/settings/house/rotations"
-          prefetch={false}
-        >
-          {t('toRotations')}
+        <Link className="text-accent text-[13px] underline" href="/settings/house">
+          {t('backToHouse')}
         </Link>
       </div>
 
@@ -104,7 +106,7 @@ export default async function HouseSettingsPage({
             {houses.map((house) => (
               <Link
                 className={house.id === houseId ? 'font-medium' : 'text-accent underline'}
-                href={{ pathname: '/settings/house', query: { house: house.id } }}
+                href={{ pathname: '/settings/house/rotations', query: { house: house.id } }}
                 key={house.id}
               >
                 {house.name}
@@ -114,7 +116,12 @@ export default async function HouseSettingsPage({
         </Card>
       )}
 
-      <HouseSetupManager areas={areas} depositDefault={setup.depositDefault} houseId={houseId} />
+      <RotationSetupManager
+        areas={areas}
+        groups={groups}
+        houseId={houseId}
+        members={setup.members.map((member) => ({ userId: member.userId, name: member.name }))}
+      />
     </section>
   );
 }

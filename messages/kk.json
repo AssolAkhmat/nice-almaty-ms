@@ -35,7 +35,9 @@
       "invoice": "Шот",
       "ledger_entry": "Жазба",
       "damage": "Залал",
-      "utility_period": "Коммуналдық кезең"
+      "utility_period": "Коммуналдық кезең",
+      "area_checklist": "Аймақ тізімі",
+      "eligibility_group": "Рұқсат тобы"
     }
   },
   "auth": {
@@ -681,7 +683,8 @@
       "bedDuplicate": "Бөлмеде мұндай нөмірі мен қабаты бар орын бар",
       "bedOccupied": "Бос емес орынды мұрағатқа жіберуге болмайды",
       "areaHasBeds": "Алдымен осы аймақтың орындарын алып тастаңыз"
-    }
+    },
+    "toRotations": "Тексеру тізімдері және рұқсат топтары"
   },
   "accounting": {
     "title": "Бухгалтерия",
@@ -1007,5 +1010,51 @@
       "upload": "Файлды жүктеу мүмкін болмады"
     },
     "unknownPurpose": "Файлдың мақсаты белгісіз"
+  },
+  "rotationSetup": {
+    "title": "Кезекшілік: баптау",
+    "noHouse": "Үй таңдалмаған",
+    "noHouseHint": "Тізімдер мен топтарды жүргізу үшін желі баптауында үй қосыңыз",
+    "chooseHouse": "Үй",
+    "backToHouse": "Аймақтар мен орындарға",
+    "groupsTitle": "Рұқсат топтары",
+    "addGroupTitle": "Жаңа топ",
+    "addGroup": "Топ қосу",
+    "groupName": "Атауы",
+    "groupBase": "Негізі",
+    "groupRoom": "Бөлме",
+    "chooseRoom": "Бөлмені таңдаңыз",
+    "include": "Негізден тыс қосу",
+    "exclude": "Шығару",
+    "checklistTitle": "Тізім атауы",
+    "items": "Тармақтар",
+    "itemsHint": "Әр жолда бір тармақ",
+    "peopleNeeded": "Адам",
+    "peopleShort": "Адам: {count}",
+    "notSet": "Жасалмаған",
+    "save": "Сақтау",
+    "archiveChecklist": "Тізімді алып тастау",
+    "saveEligibility": "Рұқсатты сақтау",
+    "eligibility": "Кім жинайды: {kind}",
+    "empty": "Үйде аймақ жоқ",
+    "emptyHint": "Тазалауды сипаттау үшін үй баптауында аймақ қосыңыз",
+    "saved": "Сақталды",
+    "archived": "Тізім алынды",
+    "types": {
+      "regular": "Күнделікті тазалау",
+      "general": "Жалпы тазалау"
+    },
+    "bases": {
+      "all": "Барлық тұрғындар",
+      "male": "Ұлдар",
+      "female": "Қыздар",
+      "room": "Бөлме тұрғындары"
+    },
+    "errors": {
+      "titleRequired": "Атауы бос болмауы керек",
+      "peopleNeededInvalid": "Адам саны — бүтін, бірден бастап",
+      "ruleInvalid": "Топ ережесі толық толтырылмаған",
+      "unknown": "Сақтау мүмкін болмады"
+    }
   }
 }

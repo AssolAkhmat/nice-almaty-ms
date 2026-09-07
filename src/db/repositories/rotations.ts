@@ -7,14 +7,21 @@ import { assertHouseVisible, visibleHouseIds, type AccessContext } from '../acce
 import { getDb, type Executor } from '../client';
 import {
   areaChecklists,
+  areaEligibility,
   areas,
+  bedAssignments,
+  beds,
   eligibilityGroups,
+  residencies,
+  residentProfiles,
   rotationOccurrences,
   rotationRowSlots,
   rotationRowZones,
   rotationRows,
   rotationTemplatesSettings,
+  users,
   type AreaChecklist,
+  type AreaEligibility,
   type EligibilityGroup,
   type RotationOccurrence,
   type RotationRow,
@@ -226,6 +233,167 @@ export async function listEligibilityGroups(
       ),
     )
     .orderBy(asc(eligibilityGroups.name));
+}
+
+export async function requireEligibilityGroup(
+  context: AccessContext,
+  groupId: string,
+  executor: Executor = getDb(),
+): Promise<EligibilityGroup> {
+  const [group] = await executor
+    .select()
+    .from(eligibilityGroups)
+    .where(
+      and(
+        eq(eligibilityGroups.id, groupId),
+        eq(eligibilityGroups.orgId, context.orgId),
+        houseScope(context, eligibilityGroups.houseId),
+      ),
+    )
+    .limit(1);
+
+  if (group === undefined) {
+    throw new NotFoundError('Группа допуска не найдена');
+  }
+
+  return group;
+}
+
+export interface UpdateEligibilityGroupInput {
+  name?: string;
+  rule?: unknown;
+}
+
+export async function updateEligibilityGroup(
+  context: AccessContext,
+  groupId: string,
+  patch: UpdateEligibilityGroupInput,
+  executor: Executor = getDb(),
+): Promise<EligibilityGroup> {
+  await requireEligibilityGroup(context, groupId, executor);
+
+  const [group] = await executor
+    .update(eligibilityGroups)
+    .set({
+      ...(patch.name === undefined ? {} : { name: patch.name }),
+      ...(patch.rule === undefined ? {} : { rule: patch.rule }),
+      updatedAt: now(),
+    })
+    .where(eq(eligibilityGroups.id, groupId))
+    .returning();
+
+  if (group === undefined) {
+    throw new NotFoundError('Группа допуска не найдена');
+  }
+
+  return group;
+}
+
+/** Допуски всех зон дома: читается вместе с настройкой, поэтому одним запросом. */
+export async function listAreaEligibility(
+  context: AccessContext,
+  houseId: string,
+  executor: Executor = getDb(),
+): Promise<AreaEligibility[]> {
+  assertHouseVisible(context, houseId);
+
+  const rows = await executor
+    .select({ link: areaEligibility })
+    .from(areaEligibility)
+    .innerJoin(areas, eq(areas.id, areaEligibility.areaId))
+    .where(and(eq(areas.houseId, houseId), houseScope(context, areas.houseId)))
+    .orderBy(asc(areaEligibility.checklistType));
+
+  return rows.map((row) => row.link);
+}
+
+/**
+ * Допуск зоны переписывается целиком: список групп — это и есть допуск,
+ * а правка по одной строке оставила бы зону наполовину открытой.
+ */
+export async function replaceAreaEligibility(
+  context: AccessContext,
+  areaId: string,
+  checklistType: ChecklistType,
+  groupIds: readonly string[],
+  executor: Executor = getDb(),
+): Promise<AreaEligibility[]> {
+  await requireVisibleArea(context, areaId, executor);
+
+  await executor
+    .delete(areaEligibility)
+    .where(
+      and(eq(areaEligibility.areaId, areaId), eq(areaEligibility.checklistType, checklistType)),
+    );
+
+  if (groupIds.length === 0) {
+    return [];
+  }
+
+  return executor
+    .insert(areaEligibility)
+    .values(groupIds.map((groupId) => ({ areaId, checklistType, groupId })))
+    .returning();
+}
+
+export interface EligibilityMemberRow {
+  userId: string;
+  sex: 'male' | 'female' | null;
+  areaId: string | null;
+  /** Имя из профиля; пока профиль не заполнен — телефон. */
+  name: string;
+}
+
+/**
+ * Жильцы дома для групп допуска: пол из профиля, комната — из места,
+ * назначенного сейчас. Съехавшие не попадают: убирать им уже нечего.
+ */
+export async function listEligibilityMembers(
+  context: AccessContext,
+  houseId: string,
+  executor: Executor = getDb(),
+): Promise<EligibilityMemberRow[]> {
+  assertHouseVisible(context, houseId);
+
+  const rows = await executor
+    .select({
+      userId: residencies.userId,
+      sex: residentProfiles.sex,
+      areaId: beds.areaId,
+      lastName: residentProfiles.lastName,
+      firstName: residentProfiles.firstName,
+      phone: users.phone,
+    })
+    .from(residencies)
+    .leftJoin(
+      bedAssignments,
+      and(eq(bedAssignments.residencyId, residencies.id), sql`upper_inf(${bedAssignments.period})`),
+    )
+    .leftJoin(beds, eq(beds.id, bedAssignments.bedId))
+    .leftJoin(residentProfiles, eq(residentProfiles.userId, residencies.userId))
+    .innerJoin(users, eq(users.id, residencies.userId))
+    .where(
+      and(
+        eq(residencies.orgId, context.orgId),
+        eq(residencies.houseId, houseId),
+        inArray(residencies.status, ['active', 'terminating']),
+      ),
+    )
+    .orderBy(asc(residencies.createdAt));
+
+  return rows.map((row) => {
+    const name = [row.lastName, row.firstName]
+      .filter((part) => part !== null)
+      .join(' ')
+      .trim();
+
+    return {
+      userId: row.userId,
+      sex: row.sex,
+      areaId: row.areaId,
+      name: name === '' ? row.phone : name,
+    };
+  });
 }
 
 export interface CreateRotationRowInput {

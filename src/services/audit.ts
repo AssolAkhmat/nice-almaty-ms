@@ -63,6 +63,10 @@ export const AUDIT_ACTIONS = {
   expenseRecorded: 'expense.recorded',
   ledgerEntryPosted: 'ledger.entry_posted',
   ledgerEntryReversed: 'ledger.entry_reversed',
+  checklistSaved: 'checklist.saved',
+  checklistArchived: 'checklist.archived',
+  eligibilityGroupSaved: 'eligibility_group.saved',
+  areaEligibilitySet: 'area_eligibility.set',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

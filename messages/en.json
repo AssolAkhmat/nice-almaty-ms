@@ -35,7 +35,9 @@
       "invoice": "Invoice",
       "ledger_entry": "Ledger entry",
       "damage": "Damage",
-      "utility_period": "Utility period"
+      "utility_period": "Utility period",
+      "area_checklist": "Area checklist",
+      "eligibility_group": "Eligibility group"
     }
   },
   "auth": {
@@ -681,7 +683,8 @@
       "bedDuplicate": "This room already has a bed with that number and tier",
       "bedOccupied": "An occupied bed cannot be archived",
       "areaHasBeds": "Remove the beds of this area first"
-    }
+    },
+    "toRotations": "Checklists and eligibility groups"
   },
   "accounting": {
     "title": "Accounting",
@@ -1007,5 +1010,51 @@
       "upload": "The file could not be uploaded"
     },
     "unknownPurpose": "Unknown file purpose"
+  },
+  "rotationSetup": {
+    "title": "Rotations setup",
+    "noHouse": "No house selected",
+    "noHouseHint": "Create a house in network settings to manage checklists and groups",
+    "chooseHouse": "House",
+    "backToHouse": "Back to areas and beds",
+    "groupsTitle": "Eligibility groups",
+    "addGroupTitle": "New group",
+    "addGroup": "Add group",
+    "groupName": "Name",
+    "groupBase": "Base",
+    "groupRoom": "Room",
+    "chooseRoom": "Choose a room",
+    "include": "Add on top of the base",
+    "exclude": "Exclude",
+    "checklistTitle": "Checklist title",
+    "items": "Items",
+    "itemsHint": "One item per line",
+    "peopleNeeded": "People",
+    "peopleShort": "People: {count}",
+    "notSet": "Not set",
+    "save": "Save",
+    "archiveChecklist": "Remove checklist",
+    "saveEligibility": "Save eligibility",
+    "eligibility": "Who cleans: {kind}",
+    "empty": "The house has no areas",
+    "emptyHint": "Create areas in house settings to describe cleaning",
+    "saved": "Saved",
+    "archived": "Checklist removed",
+    "types": {
+      "regular": "Regular cleaning",
+      "general": "Deep cleaning"
+    },
+    "bases": {
+      "all": "All residents",
+      "male": "Men",
+      "female": "Women",
+      "room": "Room residents"
+    },
+    "errors": {
+      "titleRequired": "Title cannot be empty",
+      "peopleNeededInvalid": "People count must be a whole number from one",
+      "ruleInvalid": "The group rule is incomplete",
+      "unknown": "Could not save"
+    }
   }
 }
