@@ -27,6 +27,15 @@ export interface PeriodLineView {
   receiptFileId: string | null;
 }
 
+export interface HistoryRowView {
+  periodId: string;
+  month: string;
+  total: number;
+  participants: number;
+  days: number;
+  averageShare: number;
+}
+
 export interface AllocationRowView {
   userId: string;
   name: string;
@@ -47,6 +56,7 @@ export interface PeriodScreenProps {
   undistributed: number;
   canManage: boolean;
   canReopen: boolean;
+  history: readonly HistoryRowView[];
 }
 
 const INITIAL: UtilityActionState = {};
@@ -108,10 +118,64 @@ function RemoveLine({ lineId }: { lineId: string }) {
   );
 }
 
+/** История по дому: месяц, сумма, средняя доля, число жильцов и дней. */
+function History({ rows }: { rows: readonly HistoryRowView[] }) {
+  const t = useTranslations();
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('utilities.history')}</CardTitle>
+      </CardHeader>
+      <div className="p-4 pt-0">
+        <Table
+          caption={t('utilities.history')}
+          columns={[
+            { key: 'month', header: t('utilities.month'), cell: (row) => row.month.slice(0, 7) },
+            {
+              key: 'total',
+              header: t('utilities.total'),
+              numeric: true,
+              cell: (row) => <Money amount={row.total} />,
+            },
+            {
+              key: 'participants',
+              header: t('utilities.residents'),
+              numeric: true,
+              cell: (row) => row.participants,
+            },
+            {
+              key: 'days',
+              header: t('utilities.days'),
+              numeric: true,
+              cell: (row) => row.days,
+            },
+            {
+              key: 'average',
+              header: t('utilities.averageShare'),
+              numeric: true,
+              cell: (row) => <Money amount={row.averageShare} />,
+            },
+          ]}
+          emptyState={
+            <EmptyState
+              description={t('utilities.noHistoryHint')}
+              title={t('utilities.noHistory')}
+            />
+          }
+          rowKey={(row) => row.periodId}
+          rows={rows}
+        />
+      </div>
+    </Card>
+  );
+}
+
 export function PeriodScreen({
   canManage,
   canReopen,
   closed,
+  history,
   houseId,
   lines,
   periodId,
@@ -247,6 +311,8 @@ export function PeriodScreen({
           {closed && <p className="text-text-muted text-[13px]">{t('utilities.closedHint')}</p>}
         </div>
       </Card>
+
+      <History rows={history} />
     </div>
   );
 }

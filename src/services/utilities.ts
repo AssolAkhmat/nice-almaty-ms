@@ -9,6 +9,7 @@ import {
   findUtilityPeriod,
   listUtilityAllocations,
   listUtilityLines,
+  listUtilityHistory,
   listUtilityPeriods,
   requireUtilityPeriod,
   saveUtilityAllocations,
@@ -466,6 +467,43 @@ export async function reopenUtilityPeriod(
 
     return reopened;
   });
+}
+
+export interface UtilityHistoryEntry {
+  periodId: string;
+  month: string;
+  /** Сумма долей: ущерб периода вместе с излишком округления. */
+  total: number;
+  participants: number;
+  days: number;
+  /** Средняя доля на жильца, целые тенге вниз: это справка, а не начисление. */
+  averageShare: number;
+}
+
+/**
+ * История коммуналки по дому (модуль 6, «Отчёты»): месяц, сумма, средняя
+ * доля, число жильцов и дней. Сравнение домов идёт переключателем дома —
+ * тем же, что на остальных экранах сети.
+ */
+export async function readUtilityHistory(
+  actor: UserActor,
+  houseId: string,
+  deps: UtilityDeps = {},
+): Promise<UtilityHistoryEntry[]> {
+  const { executor } = resolve(deps);
+
+  assertCan(actor.context, 'utility.read', { houseId });
+
+  const rows = await listUtilityHistory(actor.context, houseId, executor);
+
+  return rows.map((row) => ({
+    periodId: row.periodId,
+    month: row.month,
+    total: row.total,
+    participants: row.participants,
+    days: row.days,
+    averageShare: row.participants === 0 ? 0 : Math.floor(row.total / row.participants),
+  }));
 }
 
 /** Периоды дома по месяцам — список для экрана коммуналки. */

@@ -31,6 +31,25 @@ test.describe('экран коммуналки', () => {
     await expect(page.getByTestId('close-period')).toBeVisible();
   });
 
+  test('история по дому на месте (модуль 6, «Отчёты»)', async ({ page }) => {
+    await login(page, E2E_ACCOUNTS.adminHouse1);
+    await page.goto('/utilities');
+
+    const main = page.locator('main');
+    await expect(main).toContainText('История по дому');
+
+    /*
+     * Закрытых периодов в базе прогона может не быть вовсе: колонки таблицы
+     * тогда не рисуются, и вместо них стоит пустое состояние. Проверяется
+     * то, что раздел объясняет себя в обоих случаях, а не одно из двух.
+     */
+    const hasRows = await main.getByText('Средняя доля').count();
+
+    if (hasRows === 0) {
+      await expect(main).toContainText('Закрытых периодов нет');
+    }
+  });
+
   test('излишек округления назван и объяснён', async ({ page }) => {
     await login(page, E2E_ACCOUNTS.adminHouse1);
     await page.goto('/utilities');

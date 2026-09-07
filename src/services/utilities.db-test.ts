@@ -15,6 +15,7 @@ import {
   addPeriodLine,
   closeUtilityPeriod,
   openUtilityPeriod,
+  readUtilityHistory,
   readUtilityPeriod,
   removePeriodLine,
   reopenUtilityPeriod,
@@ -480,6 +481,55 @@ describe('область видимости', () => {
       const after = await readUtilityPeriod(fixture.admin, period.id, { executor: tx });
       expect(after.lines).toEqual([]);
       expect(after.total).toBe(0);
+    });
+  });
+});
+
+/**
+ * История коммуналки по дому (модуль 6, «Отчёты»): месяц, сумма, средняя
+ * доля, число жильцов и дней. Считается по снимку закрытого периода —
+ * открытый ещё меняется, и в отчёте ему делать нечего.
+ */
+describe('история по дому', () => {
+  it('показывает сумму, число жильцов, дней и среднюю долю', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9940');
+      const period = await periodWith(tx, fixture, 30_000);
+
+      await closeUtilityPeriod(fixture.admin, period.id, {
+        executor: tx,
+        today: IN_NOVEMBER,
+        instant: INSTANT,
+      });
+
+      const history = await readUtilityHistory(fixture.admin, fixture.houseA, { executor: tx });
+
+      expect(history).toHaveLength(1);
+      expect(history[0]?.month).toBe('2026-10-01');
+      expect(history[0]?.total).toBe(30_000);
+      expect(history[0]?.participants).toBe(3);
+      expect(history[0]?.days).toBe(60);
+      // 30 000 на троих — в среднем 10 000 на человека.
+      expect(history[0]?.averageShare).toBe(10_000);
+    });
+  });
+
+  it('открытый период в отчёт не попадает: его доли ещё меняются', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9941');
+      await periodWith(tx, fixture, 30_000);
+
+      expect(await readUtilityHistory(fixture.admin, fixture.houseA, { executor: tx })).toEqual([]);
+    });
+  });
+
+  it('чужой дом в отчёт не отдаётся', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9942');
+
+      await expect(
+        readUtilityHistory(fixture.adminOfB, fixture.houseA, { executor: tx }),
+      ).rejects.toBeInstanceOf(NotFoundError);
     });
   });
 });

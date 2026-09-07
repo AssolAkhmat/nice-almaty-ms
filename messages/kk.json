@@ -990,7 +990,14 @@
       "nothingToDistribute": "Кезеңде жол жоқ: бөлетін ештеңе жоқ",
       "noParticipants": "Бұл айда үйде ешкім тұрмаған",
       "notUpdated": "Кезең жаңартылмады"
-    }
+    },
+    "history": "Үй бойынша тарих",
+    "month": "Ай",
+    "total": "Сома",
+    "residents": "Тұрғын",
+    "averageShare": "Орташа үлес",
+    "noHistory": "Жабылған кезеңдер жоқ",
+    "noHistoryHint": "Мұнда кезеңі жабылған айлар шығады"
   },
   "files": {
     "receipt": "Түбіртек",

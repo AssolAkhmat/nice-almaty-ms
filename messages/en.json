@@ -990,7 +990,14 @@
       "nothingToDistribute": "The period has no lines: nothing to split",
       "noParticipants": "Nobody lived in the house that month",
       "notUpdated": "The period was not updated"
-    }
+    },
+    "history": "House history",
+    "month": "Month",
+    "total": "Total",
+    "residents": "Residents",
+    "averageShare": "Average share",
+    "noHistory": "No closed periods",
+    "noHistoryHint": "Months with a closed period will appear here"
   },
   "files": {
     "receipt": "Receipt",

@@ -8,7 +8,7 @@ import { can } from '@/lib/authz';
 import { getCurrentSession } from '@/lib/session';
 import { addMonths, startOfMonth, todayInAlmaty, tryParseBusinessDate } from '@/lib/time';
 import { readProfile } from '@/services/resident-profiles';
-import { openUtilityPeriod, readUtilityPeriod } from '@/services/utilities';
+import { openUtilityPeriod, readUtilityHistory, readUtilityPeriod } from '@/services/utilities';
 
 import { PeriodScreen, type AllocationRowView } from './period-screen';
 
@@ -75,7 +75,10 @@ export default async function UtilitiesPage({
     tryParseBusinessDate(requestedMonth ?? '') ?? addMonths(startOfMonth(todayInAlmaty()), -1);
 
   const period = await openUtilityPeriod(actor, houseId, month);
-  const view = await readUtilityPeriod(actor, period.id);
+  const [view, history] = await Promise.all([
+    readUtilityPeriod(actor, period.id),
+    readUtilityHistory(actor, houseId),
+  ]);
 
   const closed = view.period.status === 'closed';
   const source = closed
@@ -146,6 +149,7 @@ export default async function UtilitiesPage({
         canManage={can(context, 'utility.manage', { houseId })}
         canReopen={can(context, 'utility.reopen', { houseId })}
         closed={closed}
+        history={history}
         houseId={houseId}
         lines={view.lines.map((line) => ({
           id: line.id,

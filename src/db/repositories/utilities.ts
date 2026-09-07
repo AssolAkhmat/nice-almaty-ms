@@ -208,6 +208,47 @@ export async function listUtilityAllocations(
  * Открытый период доли не даёт: пока строки правятся, распределение
  * предварительное, и попасть в счёт оно не должно.
  */
+export interface UtilityHistoryRow {
+  periodId: string;
+  month: string;
+  participants: number;
+  days: number;
+  total: number;
+}
+
+/**
+ * Сводка закрытых периодов дома (модуль 6, «Отчёты»). Считается по снимку
+ * распределения: открытый период в отчёт не входит — его доли ещё меняются,
+ * а отчёт о том, что может измениться, вводит в заблуждение.
+ */
+export async function listUtilityHistory(
+  context: AccessContext,
+  houseId: string,
+  executor: Executor = getDb(),
+): Promise<UtilityHistoryRow[]> {
+  assertHouseVisible(context, houseId);
+
+  return executor
+    .select({
+      periodId: utilityPeriods.id,
+      month: utilityPeriods.month,
+      participants: sql<number>`count(${utilityAllocations.id})::int`,
+      days: sql<number>`coalesce(sum(${utilityAllocations.days}), 0)::int`,
+      total: sql<number>`coalesce(sum(${utilityAllocations.amount}), 0)::int`,
+    })
+    .from(utilityPeriods)
+    .leftJoin(utilityAllocations, eq(utilityAllocations.periodId, utilityPeriods.id))
+    .where(
+      and(
+        periodScope(context),
+        eq(utilityPeriods.houseId, houseId),
+        eq(utilityPeriods.status, 'closed'),
+      ),
+    )
+    .groupBy(utilityPeriods.id, utilityPeriods.month)
+    .orderBy(desc(utilityPeriods.month));
+}
+
 export async function findClosedAllocation(
   context: AccessContext,
   filter: { houseId: string; month: BusinessDate; userId: string },
