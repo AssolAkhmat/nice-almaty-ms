@@ -1,3 +1,5 @@
+import { businessDate, businessDateToParts, type BusinessDate } from '@/lib/time';
+
 /**
  * Рейтинг (docs/03-BUSINESS-RULES.md §5).
  *
@@ -53,6 +55,28 @@ export const DEFAULT_RATING_RULES: RatingRules = {
     { threshold: 90, discountAmount: 5_000 },
   ],
 };
+
+/**
+ * Начало года рейтинга — 1 июля (§5.1).
+ *
+ * Год у рейтинга свой: события с июля по июнь складываются в одно число,
+ * прошлые остаются историей. Дата приходит аргументом, часов у ядра нет.
+ */
+export function ratingYearStart(date: BusinessDate): BusinessDate {
+  const { year, month } = businessDateToParts(date);
+
+  return businessDate(month >= 7 ? year : year - 1, 7, 1);
+}
+
+/**
+ * Число рейтинга из дельт года (§5.1).
+ *
+ * Границы применяются на каждом шаге, а не к сумме: иначе провал в минус
+ * копил бы отрицательный запас, невидимый на экране (P5-3).
+ */
+export function foldRating(deltas: readonly number[]): number {
+  return deltas.reduce<number>(applyDelta, RATING_START);
+}
 
 export function deltaForScore(rules: RatingRules, score: number): number {
   const delta = rules.scoreDeltas[score];

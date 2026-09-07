@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
+import { parseBusinessDate } from '@/lib/time';
+
 import {
   applyDelta,
   crossDown,
   crossUp,
   deltaForScore,
   DEFAULT_RATING_RULES,
+  ratingYearStart,
+  foldRating,
   type ThresholdState,
 } from './rating';
 
@@ -154,5 +158,35 @@ describe('пороги вверх (§5.4)', () => {
     const result = crossUp(RULES, 95, states);
 
     expect(result.triggered.map((item) => item.threshold)).toEqual([70, 90]);
+  });
+});
+
+describe('год рейтинга (§5.1)', () => {
+  it('год начинается 1 июля', () => {
+    expect(ratingYearStart(parseBusinessDate('2026-07-01'))).toBe('2026-07-01');
+    expect(ratingYearStart(parseBusinessDate('2026-09-07'))).toBe('2026-07-01');
+    expect(ratingYearStart(parseBusinessDate('2026-12-31'))).toBe('2026-07-01');
+  });
+
+  it('до июля год ещё прошлогодний', () => {
+    expect(ratingYearStart(parseBusinessDate('2026-06-30'))).toBe('2025-07-01');
+    expect(ratingYearStart(parseBusinessDate('2026-01-01'))).toBe('2025-07-01');
+  });
+});
+
+describe('свёртка событий в число (§5.1)', () => {
+  it('начинает с 50 и складывает дельты', () => {
+    expect(foldRating([3, 2, -1])).toBe(54);
+  });
+
+  it('границы держатся на каждом шаге, а не в конце', () => {
+    // Минус сорок девять и плюс сорок девять: без ограничения на шаге
+    // получилось бы 50, с ограничением — 1 плюс 49.
+    expect(foldRating([-100, 49])).toBe(49);
+    expect(foldRating([100, -30])).toBe(70);
+  });
+
+  it('пустая история — старт', () => {
+    expect(foldRating([])).toBe(50);
   });
 });

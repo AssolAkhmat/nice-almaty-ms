@@ -1,15 +1,17 @@
 import { getDb, type Executor } from '@/db/client';
 import {
   listAssignmentsById,
+  listAssignmentsFor,
   requireOccurrence,
   updateAssignment,
   updateOccurrence,
 } from '@/db/repositories/rotations';
 import { assertCan } from '@/lib/authz';
 import { NotFoundError, ValidationError } from '@/lib/errors';
-import { now } from '@/lib/time';
+import { now, type BusinessDate } from '@/lib/time';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
+import { syncScoreEvent } from './rating';
 
 import type { RotationAssignment, RotationOccurrence } from '@/db/schema';
 import type { UserActor } from './users';
@@ -171,6 +173,26 @@ export async function markAssignment(
       tx,
     );
 
+    /*
+     * Оценка — это и есть событие рейтинга (§5.2): дельта считается по
+     * правилам дома. Переоценка задним числом правит ту же строку, а не
+     * начисляет дельту второй раз.
+     */
+    if (marked.userId !== null) {
+      await syncScoreEvent(
+        actor,
+        {
+          userId: marked.userId,
+          houseId: occurrence.houseId,
+          assignmentId,
+          score: marked.score,
+          date: occurrence.date as BusinessDate,
+          cancelled: occurrence.status === 'cancelled' || marked.state === 'cancelled',
+        },
+        { executor: tx, instant },
+      );
+    }
+
     return marked;
   });
 }
@@ -205,6 +227,29 @@ export async function setOccurrenceStatus(
       },
       tx,
     );
+
+    /*
+     * «Отменена» снимает влияние на рейтинг (§7), возврат в расписание —
+     * возвращает: дельта пересчитывается по той же оценке, что стоит сейчас.
+     */
+    for (const assignment of await listAssignmentsFor([occurrenceId], tx)) {
+      if (assignment.userId === null) {
+        continue;
+      }
+
+      await syncScoreEvent(
+        actor,
+        {
+          userId: assignment.userId,
+          houseId: occurrence.houseId,
+          assignmentId: assignment.id,
+          score: assignment.score,
+          date: occurrence.date as BusinessDate,
+          cancelled: status === 'cancelled' || assignment.state === 'cancelled',
+        },
+        { executor: tx, instant: deps.instant ?? now() },
+      );
+    }
 
     return updated;
   });

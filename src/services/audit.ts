@@ -82,6 +82,7 @@ export const AUDIT_ACTIONS = {
   absenceSubmitted: 'absence.submitted',
   absenceApproved: 'absence.approved',
   absenceRejected: 'absence.rejected',
+  ratingEventAdded: 'rating_event.added',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

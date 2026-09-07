@@ -41,7 +41,8 @@
       "rotation_row": "Ряд ротаций",
       "rotation_occurrence": "Ротация",
       "rotation_template": "Шаблон ротаций",
-      "absence": "Отсутствие"
+      "absence": "Отсутствие",
+      "rating_event": "Событие рейтинга"
     }
   },
   "auth": {
@@ -1298,6 +1299,13 @@
       "rejectReasonRequired": "Отклонение — с причиной",
       "startRequired": "Укажите дату начала",
       "unknown": "Не получилось выполнить"
+    }
+  },
+  "rating": {
+    "title": "Рейтинг",
+    "errors": {
+      "reasonRequired": "Укажите причину",
+      "unknownAction": "Такого действия нет в правилах"
     }
   }
 }

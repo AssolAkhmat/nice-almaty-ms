@@ -41,7 +41,8 @@
       "rotation_row": "Кезекшілік қатары",
       "rotation_occurrence": "Кезекшілік",
       "rotation_template": "Кезекшілік үлгісі",
-      "absence": "Болмау"
+      "absence": "Болмау",
+      "rating_event": "Рейтинг оқиғасы"
     }
   },
   "auth": {
@@ -1298,6 +1299,13 @@
       "rejectReasonRequired": "Бас тарту — себебімен",
       "startRequired": "Басталу күнін көрсетіңіз",
       "unknown": "Орындау мүмкін болмады"
+    }
+  },
+  "rating": {
+    "title": "Рейтинг",
+    "errors": {
+      "reasonRequired": "Себебін көрсетіңіз",
+      "unknownAction": "Мұндай әрекет ережеде жоқ"
     }
   }
 }

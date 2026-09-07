@@ -57,6 +57,9 @@ export const ACTIONS = [
   'absence.read',
   'absence.create',
   'absence.review',
+  'rating.read',
+  'rating.event',
+  'rating.history',
   'utility.reopen',
   'accounting.read',
   'accounting.write',
@@ -120,6 +123,9 @@ export const PERMISSIONS: PermissionMatrix = {
     'absence.read': 'org',
     'absence.create': 'org',
     'absence.review': 'org',
+    'rating.read': 'org',
+    'rating.event': 'org',
+    'rating.history': 'org',
     'utility.reopen': 'org',
     'accounting.read': 'org',
     'accounting.write': 'org',
@@ -177,6 +183,9 @@ export const PERMISSIONS: PermissionMatrix = {
     'absence.read': 'house',
     'absence.create': 'house',
     'absence.review': 'house',
+    'rating.read': 'house',
+    'rating.event': 'house',
+    'rating.history': 'house',
     /*
      * Переоткрытие закрытого периода меняет уже выставленные счета
      * (§4, модуль 6), поэтому остаётся за суперадмином и пишется в журнал.
@@ -282,6 +291,13 @@ export const PERMISSIONS: PermissionMatrix = {
     'absence.read': 'self',
     'absence.create': 'self',
     'absence.review': 'none',
+    /*
+     * Жилец видит только своё число (§5.6): ни истории, ни детализации,
+     * ни чужого рейтинга. События ставит админ, себе их не поставишь.
+     */
+    'rating.read': 'self',
+    'rating.event': 'none',
+    'rating.history': 'none',
     'utility.reopen': 'none',
     'accounting.read': 'none',
     'accounting.write': 'none',

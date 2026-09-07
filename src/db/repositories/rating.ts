@@ -355,6 +355,53 @@ export async function createRatingEvent(
   return event;
 }
 
+/**
+ * Событие по ссылке: одно на назначение ротации (§7).
+ *
+ * Админ правит оценку задним числом, и второе событие на ту же уборку
+ * начислило бы дельту дважды. Ограничение уникальности превращает повтор
+ * в правку — той же строки, с той же датой года.
+ */
+export async function putRefRatingEvent(
+  context: AccessContext,
+  input: CreateRatingEventInput & { refType: string; refId: string },
+  executor: Executor = getDb(),
+): Promise<RatingEvent> {
+  const [event] = await executor
+    .insert(ratingEvents)
+    .values({
+      orgId: context.orgId,
+      userId: input.userId,
+      type: input.type,
+      delta: input.delta,
+      refType: input.refType,
+      refId: input.refId,
+      note: input.note ?? null,
+      createdBy: context.userId,
+      ...(input.effectiveAt === undefined ? {} : { effectiveAt: input.effectiveAt }),
+      periodStart: input.periodStart,
+    })
+    .onConflictDoUpdate({
+      target: [ratingEvents.userId, ratingEvents.refType, ratingEvents.refId],
+      targetWhere: isNotNull(ratingEvents.refId),
+      set: {
+        type: input.type,
+        delta: input.delta,
+        note: input.note ?? null,
+        createdBy: context.userId,
+        periodStart: input.periodStart,
+        ...(input.effectiveAt === undefined ? {} : { effectiveAt: input.effectiveAt }),
+      },
+    })
+    .returning();
+
+  if (event === undefined) {
+    throw new Error('Событие рейтинга не создано');
+  }
+
+  return event;
+}
+
 export interface RatingEventFilter {
   userId: string;
   periodStart?: BusinessDate;

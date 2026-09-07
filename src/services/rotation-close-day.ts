@@ -14,6 +14,7 @@ import { logger } from '@/lib/logger';
 import { addDays, now, todayInAlmaty, type BusinessDate } from '@/lib/time';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
+import { syncScoreEvent } from './rating';
 
 import type { AccessContext } from '@/db/access';
 import type { UserActor } from './users';
@@ -24,9 +25,8 @@ import type { UserActor } from './users';
  * В 23:55 дня, следующего за днём ротации, неподтверждённое становится
  * «Не выполнена» с оценкой 1 и даёт +1 к долгу дополнительных ротаций.
  * У жильца, таким образом, есть весь следующий день — как и обещает §7.
- *
- * Событие рейтинга (−2) здесь не пишется: таблицы рейтинга появляются
- * в фазе 5, и это видно по коду, а не по умолчанию.
+ * Оценка 1 идёт тем же путём, что и оценка админа: событием рейтинга
+ * с дельтой из правил дома.
  */
 export const ROTATIONS_CLOSE_DAY_JOB = 'rotations-close-day';
 
@@ -132,6 +132,18 @@ export async function closeRotationDay(deps: CloseDayDeps = {}): Promise<CloseDa
           // Долг получает человек, а не пустое место: у назначения без
           // исполнителя спрашивать некого — это задача админа (§6.3).
           if (assignment.userId !== null) {
+            await syncScoreEvent(
+              actor,
+              {
+                userId: assignment.userId,
+                houseId: occurrence.houseId,
+                assignmentId: assignment.id,
+                score: 1,
+                date: occurrence.date as BusinessDate,
+              },
+              { executor, instant },
+            );
+
             await executor.insert(rotationDebts).values({
               userId: assignment.userId,
               reason: 'rotation.missed',

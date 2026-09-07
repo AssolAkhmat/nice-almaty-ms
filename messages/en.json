@@ -41,7 +41,8 @@
       "rotation_row": "Rotation row",
       "rotation_occurrence": "Rotation",
       "rotation_template": "Rotation template",
-      "absence": "Absence"
+      "absence": "Absence",
+      "rating_event": "Rating event"
     }
   },
   "auth": {
@@ -1298,6 +1299,13 @@
       "rejectReasonRequired": "Rejection needs a reason",
       "startRequired": "Set the start date",
       "unknown": "Could not complete"
+    }
+  },
+  "rating": {
+    "title": "Rating",
+    "errors": {
+      "reasonRequired": "State the reason",
+      "unknownAction": "No such action in the rules"
     }
   }
 }
