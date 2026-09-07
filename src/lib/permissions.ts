@@ -52,6 +52,8 @@ export const ACTIONS = [
   'utility.manage',
   'rotation.read',
   'rotation.manage',
+  'rotation.confirm',
+  'rotation.score',
   'utility.reopen',
   'accounting.read',
   'accounting.write',
@@ -110,6 +112,8 @@ export const PERMISSIONS: PermissionMatrix = {
     'utility.manage': 'org',
     'rotation.read': 'org',
     'rotation.manage': 'org',
+    'rotation.confirm': 'org',
+    'rotation.score': 'org',
     'utility.reopen': 'org',
     'accounting.read': 'org',
     'accounting.write': 'org',
@@ -162,6 +166,8 @@ export const PERMISSIONS: PermissionMatrix = {
     'utility.manage': 'house',
     'rotation.read': 'house',
     'rotation.manage': 'house',
+    'rotation.confirm': 'house',
+    'rotation.score': 'house',
     /*
      * Переоткрытие закрытого периода меняет уже выставленные счета
      * (§4, модуль 6), поэтому остаётся за суперадмином и пишется в журнал.
@@ -257,6 +263,9 @@ export const PERMISSIONS: PermissionMatrix = {
      */
     'rotation.read': 'self',
     'rotation.manage': 'none',
+    /* Жилец подтверждает свою ротацию сам; оценку ставит только админ (§7). */
+    'rotation.confirm': 'self',
+    'rotation.score': 'none',
     'utility.reopen': 'none',
     'accounting.read': 'none',
     'accounting.write': 'none',

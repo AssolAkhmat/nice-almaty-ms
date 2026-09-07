@@ -1011,7 +1011,11 @@
     "errors": {
       "upload": "The file could not be uploaded"
     },
-    "unknownPurpose": "Unknown file purpose"
+    "unknownPurpose": "Unknown file purpose",
+    "photo": "Cleaning photo",
+    "photoHint": "Optional",
+    "photoReady": "Photo uploaded",
+    "rotationPhotoWithoutResident": "The rotation has no assignee to attach a photo to"
   },
   "rotationSetup": {
     "title": "Rotations setup",
@@ -1166,7 +1170,22 @@
       "dateTaken": "This rotation already exists on that date",
       "checklistArea": "The checklist belongs to another zone",
       "unknown": "Could not complete"
-    }
+    },
+    "confirm": "Confirm",
+    "confirmed": "Rotation confirmed",
+    "confirmedShort": "Confirmed",
+    "missedShort": "Missed",
+    "doneAt": "Cleaned at",
+    "note": "Comment",
+    "mark": "Mark",
+    "marked": "Mark saved",
+    "markDone": "Done",
+    "markMissed": "Missed",
+    "markScheduled": "Back to plan",
+    "score": "Score: {score}",
+    "scorePlaceholder": "1–10",
+    "setStatus": "Change status",
+    "statusChanged": "Status changed"
   },
   "generalCleaning": {
     "title": "Deep cleaning",
@@ -1180,6 +1199,12 @@
     "settingSaved": "Setting saved",
     "errors": {
       "dateInvalid": "Set the cleaning date"
+    }
+  },
+  "rotationConfirmation": {
+    "errors": {
+      "cancelled": "A cancelled rotation cannot be confirmed",
+      "scoreRange": "The score is a whole number from 1 to 10"
     }
   }
 }

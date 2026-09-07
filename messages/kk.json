@@ -1011,7 +1011,11 @@
     "errors": {
       "upload": "Файлды жүктеу мүмкін болмады"
     },
-    "unknownPurpose": "Файлдың мақсаты белгісіз"
+    "unknownPurpose": "Файлдың мақсаты белгісіз",
+    "photo": "Тазалау фотосы",
+    "photoHint": "Міндетті емес",
+    "photoReady": "Фото жүктелді",
+    "rotationPhotoWithoutResident": "Кезекшілікте орындаушы жоқ: фотоны тіркейтін адам жоқ"
   },
   "rotationSetup": {
     "title": "Кезекшілік: баптау",
@@ -1166,7 +1170,22 @@
       "dateTaken": "Бұл күнге мұндай кезекшілік бар",
       "checklistArea": "Тізім басқа аймаққа тиесілі",
       "unknown": "Орындау мүмкін болмады"
-    }
+    },
+    "confirm": "Растау",
+    "confirmed": "Кезекшілік расталды",
+    "confirmedShort": "Расталды",
+    "missedShort": "Орындалмады",
+    "doneAt": "Қашан жиналды",
+    "note": "Түсініктеме",
+    "mark": "Белгілеу",
+    "marked": "Белгі сақталды",
+    "markDone": "Орындалды",
+    "markMissed": "Орындалмады",
+    "markScheduled": "Жоспарға қайтару",
+    "score": "Баға: {score}",
+    "scorePlaceholder": "1–10",
+    "setStatus": "Мәртебені ауыстыру",
+    "statusChanged": "Мәртебе өзгертілді"
   },
   "generalCleaning": {
     "title": "Жалпы тазалау",
@@ -1180,6 +1199,12 @@
     "settingSaved": "Баптау сақталды",
     "errors": {
       "dateInvalid": "Тазалау күнін көрсетіңіз"
+    }
+  },
+  "rotationConfirmation": {
+    "errors": {
+      "cancelled": "Болдырылмаған кезекшілікті растауға болмайды",
+      "scoreRange": "Баға — 1-ден 10-ға дейінгі бүтін сан"
     }
   }
 }

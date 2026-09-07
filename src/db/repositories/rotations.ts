@@ -792,6 +792,15 @@ export interface UpdateAssignmentInput {
   userId?: string | null;
   state?: 'assigned' | 'needs_reassignment' | 'confirmed' | 'missed' | 'cancelled';
   source?: 'auto' | 'manual' | 'debt';
+  confirmedAt?: Date | null;
+  confirmedBy?: string | null;
+  doneAt?: Date | null;
+  /** Оценка 1–10; проверка диапазона — в сервисе (§7). */
+  score?: number | null;
+  scoredBy?: string | null;
+  scoredAt?: Date | null;
+  photoFileIds?: string[];
+  note?: string | null;
 }
 
 export async function updateAssignment(

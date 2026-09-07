@@ -1011,7 +1011,11 @@
     "errors": {
       "upload": "Не удалось загрузить файл"
     },
-    "unknownPurpose": "Неизвестное назначение файла"
+    "unknownPurpose": "Неизвестное назначение файла",
+    "photo": "Фото уборки",
+    "photoHint": "Необязательно",
+    "photoReady": "Фото загружено",
+    "rotationPhotoWithoutResident": "У ротации нет исполнителя: фото приложить не к кому"
   },
   "rotationSetup": {
     "title": "Ротации: настройка",
@@ -1166,7 +1170,22 @@
       "dateTaken": "На эту дату такая ротация уже стоит",
       "checklistArea": "Чек-лист принадлежит другой зоне",
       "unknown": "Не получилось выполнить"
-    }
+    },
+    "confirm": "Подтвердить",
+    "confirmed": "Ротация подтверждена",
+    "confirmedShort": "Подтверждена",
+    "missedShort": "Не выполнена",
+    "doneAt": "Когда убрано",
+    "note": "Комментарий",
+    "mark": "Отметить",
+    "marked": "Отметка сохранена",
+    "markDone": "Выполнена",
+    "markMissed": "Не выполнена",
+    "markScheduled": "Вернуть в план",
+    "score": "Оценка: {score}",
+    "scorePlaceholder": "1–10",
+    "setStatus": "Сменить статус",
+    "statusChanged": "Статус изменён"
   },
   "generalCleaning": {
     "title": "Генеральная уборка",
@@ -1180,6 +1199,12 @@
     "settingSaved": "Настройка сохранена",
     "errors": {
       "dateInvalid": "Укажите дату уборки"
+    }
+  },
+  "rotationConfirmation": {
+    "errors": {
+      "cancelled": "Отменённую ротацию подтверждать нечем",
+      "scoreRange": "Оценка — целое число от 1 до 10"
     }
   }
 }

@@ -96,11 +96,22 @@ export async function readCalendar(
     listCalendarDictionaries(actor.context, houseId, executor),
   ]);
 
+  /*
+   * Оценка видна только админу и суперадмину (§7). Жильцу она не показывается
+   * нигде — ни своя, ни соседская, — поэтому вычищается здесь, в единственном
+   * месте чтения календаря, а не в каждом экране по отдельности.
+   */
+  const hideScores = actor.context.role === 'resident';
+
   return {
     houseId,
     occurrences: occurrences.map((occurrence) => ({
       occurrence,
-      assignments: assignments.filter((item) => item.occurrenceId === occurrence.id),
+      assignments: assignments
+        .filter((item) => item.occurrenceId === occurrence.id)
+        .map((item) =>
+          hideScores ? { ...item, score: null, scoredBy: null, scoredAt: null } : item,
+        ),
     })),
     dictionaries,
   };

@@ -131,6 +131,8 @@ export default async function RotationsPage({
       userName: assignment.userId === null ? null : (memberNames.get(assignment.userId) ?? '—'),
       state: assignment.state,
       isMine: assignment.userId === context.userId,
+      score: assignment.score,
+      note: assignment.note,
     })),
   }));
 

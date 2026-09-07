@@ -9,13 +9,17 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Field, Input, Select } from '@/components/ui/input';
+import { RotationPhotoUpload } from '@/components/upload/rotation-photo-upload';
 
 import {
   cancelOccurrenceAction,
   cancelRangeAction,
+  confirmAction,
   createExtraAction,
+  markAction,
   moveOccurrenceAction,
   reassignAction,
+  setStatusAction,
   type CalendarActionState,
 } from './actions';
 
@@ -30,6 +34,9 @@ export interface AssignmentView {
   state: 'assigned' | 'needs_reassignment' | 'confirmed' | 'missed' | 'cancelled';
   /** Назначение самого читателя: жилец должен видеть свою ротацию сразу. */
   isMine: boolean;
+  /** Оценка 1–10; жильцу не приходит вовсе (§7). */
+  score: number | null;
+  note: string | null;
 }
 
 export interface OccurrenceCard {
@@ -105,10 +112,16 @@ function OccurrenceBlock({
   const [moveState, move, isMoving] = useActionState(moveOccurrenceAction, INITIAL);
   const [cancelState, cancel, isCancelling] = useActionState(cancelOccurrenceAction, INITIAL);
   const [assignState, assign, isAssigning] = useActionState(reassignAction, INITIAL);
+  const [confirmState, confirm, isConfirming] = useActionState(confirmAction, INITIAL);
+  const [markState, mark, isMarking] = useActionState(markAction, INITIAL);
+  const [statusState, setStatus, isSettingStatus] = useActionState(setStatusAction, INITIAL);
 
   useRefreshOnDone(moveState);
   useRefreshOnDone(cancelState);
   useRefreshOnDone(assignState);
+  useRefreshOnDone(confirmState);
+  useRefreshOnDone(markState);
+  useRefreshOnDone(statusState);
 
   return (
     <li
@@ -144,6 +157,85 @@ function OccurrenceBlock({
             )}
             {assignment.isMine && <Badge tone="info">{t('mine')}</Badge>}
 
+            {assignment.state === 'confirmed' && (
+              <Badge tone="success">{t('confirmedShort')}</Badge>
+            )}
+            {assignment.state === 'missed' && <Badge tone="danger">{t('missedShort')}</Badge>}
+            {assignment.score !== null && (
+              <Badge tone="neutral">{t('score', { score: assignment.score })}</Badge>
+            )}
+
+            {assignment.isMine && card.status === 'scheduled' && !canManage && (
+              <form action={confirm} className="flex flex-wrap items-end gap-2">
+                <input name="assignmentId" type="hidden" value={assignment.assignmentId} />
+                <Field htmlFor={`done-${assignment.assignmentId}`} label={t('doneAt')}>
+                  <Input
+                    className="w-52"
+                    data-testid={`confirm-done-${assignment.assignmentId}`}
+                    id={`done-${assignment.assignmentId}`}
+                    name="doneAt"
+                    type="datetime-local"
+                  />
+                </Field>
+                <Field htmlFor={`note-${assignment.assignmentId}`} label={t('note')}>
+                  <Input
+                    className="w-52"
+                    data-testid={`confirm-note-${assignment.assignmentId}`}
+                    id={`note-${assignment.assignmentId}`}
+                    name="note"
+                  />
+                </Field>
+                <RotationPhotoUpload
+                  assignmentId={assignment.assignmentId}
+                  id={`confirm-photo-${assignment.assignmentId}`}
+                />
+                <Button
+                  data-testid={`confirm-${assignment.assignmentId}`}
+                  disabled={isConfirming}
+                  size="sm"
+                  type="submit"
+                >
+                  {t('confirm')}
+                </Button>
+              </form>
+            )}
+
+            {canManage && card.status !== 'cancelled' && (
+              <form action={mark} className="flex flex-wrap items-end gap-2">
+                <input name="assignmentId" type="hidden" value={assignment.assignmentId} />
+                <Select
+                  className="h-9 w-40"
+                  data-testid={`mark-state-${assignment.assignmentId}`}
+                  defaultValue={assignment.state === 'missed' ? 'missed' : 'confirmed'}
+                  name="state"
+                >
+                  <option value="confirmed">{t('markDone')}</option>
+                  <option value="missed">{t('markMissed')}</option>
+                  <option value="assigned">{t('markScheduled')}</option>
+                </Select>
+                <Input
+                  className="w-20"
+                  data-testid={`mark-score-${assignment.assignmentId}`}
+                  defaultValue={assignment.score ?? ''}
+                  max={10}
+                  min={1}
+                  name="score"
+                  placeholder={t('scorePlaceholder')}
+                  step={1}
+                  type="number"
+                />
+                <Button
+                  data-testid={`mark-${assignment.assignmentId}`}
+                  disabled={isMarking}
+                  size="sm"
+                  type="submit"
+                  variant="secondary"
+                >
+                  {t('mark')}
+                </Button>
+              </form>
+            )}
+
             {canManage && card.status === 'scheduled' && (
               <form action={assign} className="flex items-center gap-2">
                 <input name="assignmentId" type="hidden" value={assignment.assignmentId} />
@@ -176,6 +268,36 @@ function OccurrenceBlock({
       </ul>
 
       <Message state={assignState} />
+      <Message state={confirmState} />
+      <Message state={markState} />
+
+      {canManage && (
+        <form action={setStatus} className="flex flex-wrap items-end gap-2">
+          <input name="occurrenceId" type="hidden" value={card.occurrenceId} />
+          <Select
+            className="h-9 w-44"
+            data-testid={`status-${card.occurrenceId}`}
+            defaultValue={card.status}
+            name="status"
+          >
+            <option value="scheduled">{t('statuses.scheduled')}</option>
+            <option value="done">{t('statuses.done')}</option>
+            <option value="missed">{t('statuses.missed')}</option>
+            <option value="cancelled">{t('statuses.cancelled')}</option>
+          </Select>
+          <Button
+            data-testid={`status-save-${card.occurrenceId}`}
+            disabled={isSettingStatus}
+            size="sm"
+            type="submit"
+            variant="ghost"
+          >
+            {t('setStatus')}
+          </Button>
+        </form>
+      )}
+
+      <Message state={statusState} />
 
       {canManage && card.status === 'scheduled' && (
         <div className="flex flex-wrap items-end gap-2">

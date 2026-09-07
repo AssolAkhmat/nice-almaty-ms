@@ -1,8 +1,9 @@
 import { getStorageProvider } from '@/adapters/storage';
 import { getDb, type Executor } from '@/db/client';
 import { createFile, requireFile, updateFile } from '@/db/repositories/files';
+import { listAssignmentsById, requireOccurrence } from '@/db/repositories/rotations';
 import { requireHouse, requireHouseOfResidency } from '@/db/repositories/houses';
-import { requireResidency } from '@/db/repositories/residencies';
+import { listResidencies, requireResidency } from '@/db/repositories/residencies';
 import {
   asAllowedMime,
   checkUpload,
@@ -165,6 +166,108 @@ export async function createUploadSession(
     .catch(async (error: unknown) => {
       // Сессия без цели загрузки бесполезна: пусть она будет явно негодной,
       // а не вечно ожидающей байтов, которые некуда прислать.
+      await updateFile(actor.context, file.id, { status: 'failed' }, executor);
+      throw error;
+    });
+
+  if (target.kind === 'external') {
+    await updateFile(actor.context, file.id, { externalId: target.externalId }, executor);
+
+    return {
+      fileId: file.id,
+      upload: { url: target.url, method: target.method, headers: target.headers },
+      maxBytes: MAX_UPLOAD_BYTES,
+    };
+  }
+
+  return {
+    fileId: file.id,
+    upload: { url: `/api/v1/files/${file.id}/blob`, method: 'PUT', headers: {} },
+    maxBytes: MAX_UPLOAD_BYTES,
+  };
+}
+
+export interface RotationPhotoInput {
+  /** Назначение, к которому прикладывается фото. */
+  assignmentId: string;
+  mime: string;
+  sizeBytes: number;
+  originalName: string;
+}
+
+/** Назначение файла-фотографии уборки: из него собирается путь хранения. */
+export const ROTATION_PHOTO_PURPOSE = 'rotation-photo';
+
+/**
+ * Сессия загрузки фото к подтверждению ротации (§7).
+ *
+ * Фото принадлежит проживанию того, кто убирал, а не дому: жилец должен
+ * видеть собственный снимок, а файл дома ему не виден (P3-32). Право
+ * проверяется по самой ротации — подтверждать и прикладывать фото может
+ * исполнитель или админ дома.
+ */
+export async function createRotationPhotoSession(
+  actor: UserActor,
+  input: RotationPhotoInput,
+  deps: FileDeps = {},
+): Promise<UploadSessionResult> {
+  const { executor, storage } = resolve(deps);
+
+  const [assignment] = await listAssignmentsById([input.assignmentId], executor);
+  if (assignment === undefined) {
+    throw new NotFoundError('Назначение не найдено');
+  }
+
+  const occurrence = await requireOccurrence(actor.context, assignment.occurrenceId, executor);
+
+  assertCan(actor.context, 'rotation.confirm', {
+    houseId: occurrence.houseId,
+    userId: assignment.userId ?? undefined,
+  });
+
+  rejectUpload(input);
+
+  // Проживание исполнителя: оно и владеет снимком. У ротации без исполнителя
+  // фотографировать нечего — её сначала назначают.
+  const residencies = await listResidencies(
+    actor.context,
+    { houseId: occurrence.houseId },
+    executor,
+  );
+  const residency = residencies.find((item) => item.userId === assignment.userId);
+
+  if (residency === undefined) {
+    throw new ValidationError('files.rotationPhotoWithoutResident');
+  }
+
+  const house = await requireHouseOfResidency(actor.context, residency.id, executor);
+  const fileId = crypto.randomUUID();
+  const path = houseFileStorageKey({
+    houseSlug: house.slug,
+    purpose: ROTATION_PHOTO_PURPOSE,
+    fileId,
+    mime: input.mime,
+  });
+
+  const file = await createFile(
+    actor.context,
+    {
+      id: fileId,
+      residencyId: residency.id,
+      provider: storage.driver,
+      path,
+      mime: input.mime,
+      sizeBytes: input.sizeBytes,
+      originalName: input.originalName,
+      uploadedBy: actor.context.userId,
+      scope: { purpose: ROTATION_PHOTO_PURPOSE, assignmentId: input.assignmentId },
+    },
+    executor,
+  );
+
+  const target = await storage
+    .createUploadTarget(path, { mime: input.mime, sizeBytes: input.sizeBytes })
+    .catch(async (error: unknown) => {
       await updateFile(actor.context, file.id, { status: 'failed' }, executor);
       throw error;
     });

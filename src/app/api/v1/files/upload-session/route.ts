@@ -2,7 +2,11 @@ import { z } from 'zod';
 
 import { ValidationError } from '@/lib/errors';
 import { apiJson, apiRoute, requireApiActor } from '@/lib/api/route';
-import { createHouseUploadSession, createUploadSession } from '@/services/files';
+import {
+  createHouseUploadSession,
+  createRotationPhotoSession,
+  createUploadSession,
+} from '@/services/files';
 
 /**
  * Первый шаг двухшаговой загрузки (D4): права, тип и размер проверяются
@@ -16,14 +20,19 @@ const commonSchema = {
 };
 
 /**
- * Владелец файла — либо проживание (документ жильца), либо дом (чек
- * к ущербу, расходу, коммуналке). Два разных владельца — две разные
- * проверки прав, поэтому и тело запроса разное, а не «одно с пустыми полями».
+ * Владелец файла — проживание (документ жильца или фото уборки) либо дом
+ * (чек к ущербу, расходу, коммуналке). Разные владельцы — разные проверки
+ * прав, поэтому и тело запроса разное, а не «одно с пустыми полями».
  */
 const bodySchema = z.union([
   z.object({
     residency_id: z.uuid(),
     document_type: z.string().min(1).max(64),
+    ...commonSchema,
+  }),
+  z.object({
+    /** Фото к подтверждению ротации: владелец — проживание исполнителя (§7). */
+    assignment_id: z.uuid(),
     ...commonSchema,
   }),
   z.object({
@@ -49,22 +58,36 @@ export const POST = apiRoute(async (request, { requestId }) => {
 
   const body = parsed.data;
 
-  const session =
-    'residency_id' in body
-      ? await createUploadSession(actor, {
-          residencyId: body.residency_id,
-          documentType: body.document_type,
-          mime: body.mime,
-          sizeBytes: body.size_bytes,
-          originalName: body.original_name,
-        })
-      : await createHouseUploadSession(actor, {
-          houseId: body.house_id,
-          purpose: body.purpose,
-          mime: body.mime,
-          sizeBytes: body.size_bytes,
-          originalName: body.original_name,
-        });
+  async function openSession() {
+    if ('residency_id' in body) {
+      return createUploadSession(actor, {
+        residencyId: body.residency_id,
+        documentType: body.document_type,
+        mime: body.mime,
+        sizeBytes: body.size_bytes,
+        originalName: body.original_name,
+      });
+    }
+
+    if ('assignment_id' in body) {
+      return createRotationPhotoSession(actor, {
+        assignmentId: body.assignment_id,
+        mime: body.mime,
+        sizeBytes: body.size_bytes,
+        originalName: body.original_name,
+      });
+    }
+
+    return createHouseUploadSession(actor, {
+      houseId: body.house_id,
+      purpose: body.purpose,
+      mime: body.mime,
+      sizeBytes: body.size_bytes,
+      originalName: body.original_name,
+    });
+  }
+
+  const session = await openSession();
 
   return apiJson(
     {
