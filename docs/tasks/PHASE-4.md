@@ -36,12 +36,12 @@
 - Коммит: `feat(domain): сетка ротаций по формуле §6.2`
 
 ### T4.2 — Схема ротаций
-- [ ] `area_checklists`, `eligibility_groups`, `area_eligibility`
-- [ ] `rotation_rows`, `rotation_row_slots`, `rotation_row_zones`
-- [ ] `rotation_occurrences`, `rotation_assignments`, `rotation_debts`
-- [ ] `rotation_templates_settings`
-- [ ] Уникальность `(row_id, position)` у слотов; миграция на чистой базе
-- [ ] Репозитории фильтруют по `org_id` и дому
+- [x] `area_checklists`, `eligibility_groups`, `area_eligibility`
+- [x] `rotation_rows`, `rotation_row_slots`, `rotation_row_zones`
+- [x] `rotation_occurrences`, `rotation_assignments`, `rotation_debts`
+- [x] `rotation_templates_settings`
+- [x] Уникальность `(row_id, position)` у слотов; миграция на чистой базе
+- [x] Репозитории фильтруют по `org_id` и дому
 - Коммит: `feat(db): чек-листы, ряды и ротации`
 
 ### T4.3 — Чек-листы и группы допуска

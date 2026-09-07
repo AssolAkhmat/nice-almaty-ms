@@ -14,6 +14,7 @@ export * from './organizations';
 export * from './rate-limits';
 export * from './residencies';
 export * from './resident-profiles';
+export * from './rotations';
 export * from './sessions';
 export * from './settings';
 export * from './users';
