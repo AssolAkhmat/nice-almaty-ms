@@ -1,7 +1,9 @@
 import { getTranslations } from 'next-intl/server';
 import { redirect } from 'next/navigation';
 
+import { AppLink } from '@/components/ui/app-link';
 import { EmptyState } from '@/components/ui/empty-state';
+import { listHouses } from '@/db/repositories/houses';
 import { listResidencies } from '@/db/repositories/residencies';
 import { can } from '@/lib/authz';
 import { getCurrentSession } from '@/lib/session';
@@ -20,7 +22,11 @@ export const dynamic = 'force-dynamic';
  * Жилец подаёт и видит свои; админ разбирает очередь и смотрит календарь
  * дома. Кто что видит, решает право, а не роль в коде экрана.
  */
-export default async function AbsencesPage() {
+export default async function AbsencesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ house?: string }>;
+}) {
   const session = await getCurrentSession();
   if (session === null) {
     redirect('/login');
@@ -51,12 +57,17 @@ export default async function AbsencesPage() {
 
   const mine = canSubmit ? await listMyAbsences(actor) : [];
 
-  // Дом админа — свой; суперадмин смотрит тот, где есть проживания.
+  /*
+   * Дом админа — свой, у жильца — из проживания. Суперадмин выбирает:
+   * первый попавшийся дом сети — почти всегда не тот, ради которого он
+   * пришёл, а в доме без админа очередь заявок разбирает именно он.
+   */
+  const houses = context.role === 'superadmin' ? await listHouses(context) : [];
+  const requested = (await searchParams).house;
   const houseId =
-    context.houseId ??
-    residency?.houseId ??
-    (await listResidencies(context, {}))[0]?.houseId ??
-    null;
+    context.role === 'superadmin'
+      ? (requested ?? houses[0]?.id ?? null)
+      : (context.houseId ?? residency?.houseId ?? null);
 
   const houseRows =
     canReview && houseId !== null ? await listHouseAbsences(actor, houseId, {}) : [];
@@ -87,6 +98,23 @@ export default async function AbsencesPage() {
         <h1>{t('title')}</h1>
         <p className="text-text-muted text-[13px]">{t('subtitle')}</p>
       </div>
+
+      {houses.length > 1 && (
+        <nav className="flex flex-wrap gap-2 text-[13px]">
+          {houses.map((house) => (
+            <AppLink
+              className={
+                house.id === houseId ? 'text-text font-medium' : 'text-text-muted hover:text-text'
+              }
+              data-testid={`house-${house.id}`}
+              href={{ pathname: '/absences', query: { house: house.id } }}
+              key={house.id}
+            >
+              {house.name}
+            </AppLink>
+          ))}
+        </nav>
+      )}
 
       <AbsencesView
         canReview={canReview}

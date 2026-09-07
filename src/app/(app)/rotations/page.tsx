@@ -3,6 +3,7 @@ import { getLocale, getTranslations } from 'next-intl/server';
 import { redirect } from 'next/navigation';
 
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
+import { listHouses } from '@/db/repositories/houses';
 import { can } from '@/lib/authz';
 import { getCurrentSession } from '@/lib/session';
 import {
@@ -87,7 +88,7 @@ function shift(mode: CalendarMode, date: BusinessDate, direction: -1 | 1): Busin
 export default async function RotationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mode?: string; date?: string }>;
+  searchParams: Promise<{ mode?: string; date?: string; house?: string }>;
 }) {
   const session = await getCurrentSession();
   if (session === null) {
@@ -108,7 +109,17 @@ export default async function RotationsPage({
   const anchor = tryParseBusinessDate(params.date ?? '') ?? todayInAlmaty();
   const range = rangeOf(mode, anchor);
 
-  const calendar = await readCalendar(actor, range);
+  /*
+   * Дом у админа свой, у жильца — из проживания, а суперадмин выбирает.
+   * Без выбора он видел бы пустой календарь: своего дома у него нет —
+   * и дом, у которого нет админа, вести было бы некому (указание владельца).
+   */
+  const houses = context.role === 'superadmin' ? await listHouses(context) : [];
+  const selectedHouse = context.role === 'superadmin' ? (params.house ?? houses[0]?.id) : undefined;
+
+  const calendar = await readCalendar(actor, range, {
+    ...(selectedHouse === undefined ? {} : { houseId: selectedHouse }),
+  });
   const canManage = can(context, 'rotation.manage', { houseId: calendar.houseId });
 
   const areaNames = new Map(calendar.dictionaries.areas.map((area) => [area.id, area.name]));
@@ -169,6 +180,10 @@ export default async function RotationsPage({
         )
       : null;
 
+  /** Выбранный дом держится в адресе: без него ссылки увели бы в чужой. */
+  const houseQuery =
+    houses.length > 1 && calendar.houseId !== null ? { house: calendar.houseId } : {};
+
   return (
     <section className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
@@ -177,6 +192,25 @@ export default async function RotationsPage({
           {range.from} — {range.to}
         </p>
       </div>
+
+      {houses.length > 1 && (
+        <nav className="flex flex-wrap gap-2 text-[13px]">
+          {houses.map((house) => (
+            <AppLink
+              className={
+                house.id === calendar.houseId
+                  ? 'text-text font-medium'
+                  : 'text-text-muted hover:text-text'
+              }
+              data-testid={`house-${house.id}`}
+              href={{ pathname: '/rotations', query: { house: house.id, mode, date: anchor } }}
+              key={house.id}
+            >
+              {house.name}
+            </AppLink>
+          ))}
+        </nav>
+      )}
 
       <Card>
         <CardHeader>
@@ -188,7 +222,7 @@ export default async function RotationsPage({
             <AppLink
               className={item === mode ? 'font-medium' : 'text-accent underline'}
               data-testid={`mode-${item}`}
-              href={{ pathname: '/rotations', query: { mode: item, date: anchor } }}
+              href={{ pathname: '/rotations', query: { ...houseQuery, mode: item, date: anchor } }}
               key={item}
             >
               {t(`modes.${item}`)}
@@ -200,14 +234,17 @@ export default async function RotationsPage({
           <AppLink
             className="text-accent underline"
             data-testid="calendar-prev"
-            href={{ pathname: '/rotations', query: { mode, date: shift(mode, anchor, -1) } }}
+            href={{
+              pathname: '/rotations',
+              query: { ...houseQuery, mode, date: shift(mode, anchor, -1) },
+            }}
           >
             {t('previous')}
           </AppLink>
           <AppLink
             className="text-accent underline"
             data-testid="calendar-today"
-            href={{ pathname: '/rotations', query: { mode } }}
+            href={{ pathname: '/rotations', query: { ...houseQuery, mode } }}
           >
             {t('today')}
           </AppLink>
@@ -218,7 +255,10 @@ export default async function RotationsPage({
           <AppLink
             className="text-accent underline"
             data-testid="calendar-next"
-            href={{ pathname: '/rotations', query: { mode, date: shift(mode, anchor, 1) } }}
+            href={{
+              pathname: '/rotations',
+              query: { ...houseQuery, mode, date: shift(mode, anchor, 1) },
+            }}
           >
             {t('next')}
           </AppLink>
