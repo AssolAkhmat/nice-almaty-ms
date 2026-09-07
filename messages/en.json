@@ -1433,6 +1433,48 @@
     "errors": {
       "unknown": "It did not work. Try again",
       "subscription": "Subscription was not saved"
+    },
+    "messages": {
+      "rotationToday": {
+        "title": "Your cleaning is today",
+        "body": "Mark it done in the app"
+      },
+      "rotationTomorrow": {
+        "title": "Your cleaning is tomorrow",
+        "body": "Date: {date}"
+      },
+      "rotationMissed": {
+        "title": "Cleaning not confirmed",
+        "body": "Cleaning for {date} is still not marked done"
+      },
+      "curfew": {
+        "title": "No curfew notice submitted",
+        "body": "Did not report being late on {date}: {count}"
+      },
+      "utilities": {
+        "title": "Utilities for {month}",
+        "body": "Fill in the amounts and close the period"
+      },
+      "schedule": {
+        "title": "Schedule for {month}",
+        "body": "Prepare the cleaning schedule for the month"
+      },
+      "documentExpiring": {
+        "title": "Document expires soon",
+        "body": "{document}: valid until {date}"
+      },
+      "documentExpiresToday": {
+        "title": "Document expires today",
+        "body": "{document}"
+      },
+      "depositDeadline": {
+        "title": "Deposit refund",
+        "body": "{days} days until the deadline, house {house}"
+      },
+      "depositOverdue": {
+        "title": "Deposit refund overdue",
+        "body": "The deadline was {date}, house {house}"
+      }
     }
   }
 }

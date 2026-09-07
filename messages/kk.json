@@ -1433,6 +1433,48 @@
     "errors": {
       "unknown": "Болмады. Қайта көріңіз",
       "subscription": "Жазылым сақталмады"
+    },
+    "messages": {
+      "rotationToday": {
+        "title": "Бүгін сіздің жинауыңыз",
+        "body": "Орындалғанын қосымшада белгілеңіз"
+      },
+      "rotationTomorrow": {
+        "title": "Ертең сіздің жинауыңыз",
+        "body": "Күні: {date}"
+      },
+      "rotationMissed": {
+        "title": "Жинау расталмаған",
+        "body": "{date} жинауы әлі орындалды деп белгіленбеген"
+      },
+      "curfew": {
+        "title": "Тыныштық уақытына хабарлама берілмеген",
+        "body": "{date} кешігуін хабарламағандар: {count}"
+      },
+      "utilities": {
+        "title": "{month} коммуналдық",
+        "body": "Сомаларды толтырып, кезеңді жабыңыз"
+      },
+      "schedule": {
+        "title": "{month} кестесі",
+        "body": "Айға арналған жинау кестесін жасаңыз"
+      },
+      "documentExpiring": {
+        "title": "Құжат мерзімі бітуде",
+        "body": "{document}: {date} дейін жарамды"
+      },
+      "documentExpiresToday": {
+        "title": "Құжат мерзімі бүгін бітеді",
+        "body": "{document}"
+      },
+      "depositDeadline": {
+        "title": "Депозитті қайтару",
+        "body": "Соңғы мерзімге {days} күн, үй {house}"
+      },
+      "depositOverdue": {
+        "title": "Депозитті қайтару мерзімі өтті",
+        "body": "Соңғы мерзім {date} болды, үй {house}"
+      }
     }
   }
 }

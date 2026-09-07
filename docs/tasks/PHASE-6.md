@@ -52,11 +52,11 @@ API для ботов, OpenAPI и токены — фаза 7. WhatsApp оста
 - Коммит: `feat(notifications): центр уведомлений и подписка`
 
 ### T6.5 — Остальные задания планировщика
-- [ ] `rotations-remind` 09:00 и 19:00
-- [ ] `curfew-check` 23:05: список без уведомления — админу, без автосанкций
-- [ ] `utilities-remind` и `schedule-remind` 25 числа
-- [ ] `documents-expiry` и `deposit-refund-watch` 09:00
-- [ ] Каждое идемпотентно через `job_runs`
+- [x] `rotations-remind` 09:00 и 19:00
+- [x] `curfew-check` 23:05: список без уведомления — админу, без автосанкций
+- [x] `utilities-remind` и `schedule-remind` 25 числа
+- [x] `documents-expiry` и `deposit-refund-watch` 09:00
+- [x] Каждое идемпотентно через `job_runs`
 - Коммит: `feat(jobs): напоминания, отбой и сроки документов`
 
 ### T6.6 — PWA

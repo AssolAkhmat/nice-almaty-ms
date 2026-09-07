@@ -32,6 +32,16 @@ export const JOBS: readonly ScheduledJob[] = [
   { job: 'rating-year-reset', schedule: '10 0 1 7 *' },
   // Каждые пять минут: разбор очереди доставки уведомлений.
   { job: 'notifications-dispatch', schedule: '*/5 * * * *' },
+  // 09:00 и 19:00: напоминания о сегодняшней, завтрашней и вчерашней уборке.
+  { job: 'rotations-remind', schedule: '0 9,19 * * *' },
+  // 23:05: список тех, кто не подал уведомление к отбою (§9).
+  { job: 'curfew-check', schedule: '5 23 * * *' },
+  // 25 числа в 10:00: коммуналка за месяц и расписание на следующий.
+  { job: 'utilities-remind', schedule: '0 10 25 * *' },
+  { job: 'schedule-remind', schedule: '0 10 25 * *' },
+  // 09:00 ежедневно: сроки справок и обратный отсчёт по депозитам.
+  { job: 'documents-expiry', schedule: '0 9 * * *' },
+  { job: 'deposit-refund-watch', schedule: '0 9 * * *' },
 ];
 
 export function start(): void {

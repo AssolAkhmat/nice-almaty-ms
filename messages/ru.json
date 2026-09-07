@@ -1433,6 +1433,48 @@
     "errors": {
       "unknown": "Не получилось. Попробуйте ещё раз",
       "subscription": "Подписка не сохранена"
+    },
+    "messages": {
+      "rotationToday": {
+        "title": "Сегодня ваша уборка",
+        "body": "Отметьте выполнение в приложении"
+      },
+      "rotationTomorrow": {
+        "title": "Завтра ваша уборка",
+        "body": "Дата: {date}"
+      },
+      "rotationMissed": {
+        "title": "Уборка не подтверждена",
+        "body": "Уборка за {date} ещё не отмечена выполненной"
+      },
+      "curfew": {
+        "title": "Не подали уведомление к отбою",
+        "body": "Не сообщили об опоздании {date}: {count}"
+      },
+      "utilities": {
+        "title": "Коммуналка за {month}",
+        "body": "Заполните суммы и закройте период"
+      },
+      "schedule": {
+        "title": "Расписание на {month}",
+        "body": "Составьте расписание уборок на месяц"
+      },
+      "documentExpiring": {
+        "title": "Срок документа истекает",
+        "body": "{document}: действует до {date}"
+      },
+      "documentExpiresToday": {
+        "title": "Срок документа истекает сегодня",
+        "body": "{document}"
+      },
+      "depositDeadline": {
+        "title": "Возврат депозита",
+        "body": "До крайнего срока {days} дн., дом {house}"
+      },
+      "depositOverdue": {
+        "title": "Возврат депозита просрочен",
+        "body": "Крайний срок был {date}, дом {house}"
+      }
     }
   }
 }
