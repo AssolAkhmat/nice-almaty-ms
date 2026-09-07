@@ -1,12 +1,27 @@
+import { getLocale, getTranslations } from 'next-intl/server';
 import { redirect } from 'next/navigation';
 
 import { ModuleStub } from '@/components/layout/module-stub';
+import { DEFAULT_LOCALE, isLocale, type Locale } from '@/lib/i18n/config';
 import { getCurrentSession } from '@/lib/session';
+import { readResidentDashboard } from '@/services/dashboard';
 import { readOnboarding } from '@/services/onboarding';
 import { readTerminationView } from '@/services/terminations';
 
 import { OnboardingWizard } from './onboarding-wizard';
+import { ResidentDashboard } from './resident-dashboard';
 import { TerminationNotice } from './termination-notice';
+
+/** Название документа хранится на трёх языках: выбирает читающий. */
+function textIn(value: unknown, locale: Locale): string {
+  if (typeof value !== 'object' || value === null) {
+    return '';
+  }
+
+  const texts = value as Partial<Record<Locale, string>>;
+
+  return texts[locale] ?? texts[DEFAULT_LOCALE] ?? '';
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +37,8 @@ export default async function DashboardPage() {
     redirect('/login');
   }
 
+  const t = await getTranslations('home');
+
   if (session.context.role !== 'resident') {
     return <ModuleStub navKey="dashboard" />;
   }
@@ -30,7 +47,38 @@ export default async function DashboardPage() {
   const onboarding = await readOnboarding({ context });
 
   if (onboarding.scope === 'full') {
-    return <ModuleStub navKey="dashboard" />;
+    const view = await readResidentDashboard({ context });
+
+    if (view === null) {
+      return <ModuleStub navKey="dashboard" />;
+    }
+
+    const rawLocale = await getLocale();
+    const locale: Locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
+
+    return (
+      <section className="flex flex-col gap-6">
+        <div className="flex flex-col gap-1">
+          <h1>{t('title')}</h1>
+          <p className="text-text-muted text-[13px]">{t('subtitle')}</p>
+        </div>
+
+        <ResidentDashboard
+          attention={{
+            documents: view.attention.documents.map((document) => ({
+              title: textIn(document.title, locale),
+              reason: document.reason,
+              daysLeft: document.daysLeft,
+            })),
+            steps: view.attention.steps,
+          }}
+          cleaning={view.nextCleaning}
+          deposit={view.deposit}
+          invoice={view.invoice}
+          rating={view.rating}
+        />
+      </section>
+    );
   }
 
   if (onboarding.scope === 'termination' && onboarding.residency !== null) {

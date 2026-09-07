@@ -341,7 +341,49 @@
   },
   "home": {
     "title": "Nice Almaty",
-    "subtitle": "Application shell"
+    "subtitle": "Application shell",
+    "cleaning": {
+      "title": "Next cleaning",
+      "none": "No cleaning assigned",
+      "confirm": "Confirm",
+      "confirmed": "Confirmed",
+      "withPhoto": "Confirm with a photo",
+      "done": "Marked"
+    },
+    "absence": {
+      "title": "Absence",
+      "hint": "Being late, a trip or illness",
+      "action": "Report an absence"
+    },
+    "invoice": {
+      "title": "Invoice due",
+      "none": "No open invoices",
+      "due": "Due",
+      "remaining": "Left",
+      "overdue": "Overdue",
+      "open": "Open the invoice"
+    },
+    "deposit": {
+      "title": "Deposit",
+      "balance": "Balance",
+      "empty": "No movements yet",
+      "open": "Open the deposit"
+    },
+    "rating": {
+      "title": "Rating",
+      "hidden": "Rating is hidden by a network setting"
+    },
+    "attention": {
+      "title": "Needs attention",
+      "empty": "All good",
+      "reasons": {
+        "rejected": "Document rejected",
+        "expired": "Expired",
+        "expiring": "Expires in {days} days",
+        "missing": "Document not uploaded"
+      },
+      "step": "Move-in step is not complete"
+    }
   },
   "documents": {
     "title": "Documents",
