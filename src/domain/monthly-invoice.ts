@@ -7,10 +7,11 @@ import { compareBusinessDates, startOfMonth, type BusinessDate } from '@/lib/tim
  * а решение, какие строки в счёт войдут и в каком порядке, принимается здесь
  * и проверяется числами.
  *
- * Штрафы и скидка за рейтинг — фаза 5: пока их источников нет, счёт собирается
- * без них, и это видно по составу, а не по умолчанию.
+ * Порядок строк — из таблицы §3: проживание, коммуналка, штрафы, погашение
+ * перерасхода депозита, ручные начисления, скидка за рейтинг.
  */
-export type MonthlyLineKind = 'rent' | 'utilities' | 'damage_carryover' | 'extra';
+export type MonthlyLineKind =
+  'rent' | 'utilities' | 'fine' | 'damage_carryover' | 'extra' | 'discount';
 
 export interface MonthlyInvoiceLine {
   kind: MonthlyLineKind;
@@ -38,9 +39,13 @@ export interface MonthlyInvoiceInput {
   rent: number;
   /** Доля за прошлый месяц; `null` — период ещё не закрыт (§4.2). */
   utilities?: { amount: number; title: string } | null;
+  /** Начисленные штрафы (§5.3): каждый своей строкой, в порядке начисления. */
+  fines?: readonly ManualLine[];
   /** Непогашенный перерасход депозита (§2.4); ноль — строки нет. */
   depositDebt?: number;
   manualLines?: readonly ManualLine[];
+  /** Скидка за рейтинг (§5.4): наибольшая подтверждённая, одна на счёт. */
+  discount?: { title: string; amount: number } | null;
 }
 
 export interface MonthlyInvoiceDraft {
@@ -88,6 +93,11 @@ export function buildMonthlyInvoice(input: MonthlyInvoiceInput): MonthlyInvoiceD
     });
   }
 
+  for (const fine of input.fines ?? []) {
+    assertMoney(fine.amount);
+    lines.push({ kind: 'fine', title: fine.title, amount: fine.amount });
+  }
+
   const debt = input.depositDebt ?? 0;
   assertMoney(debt);
 
@@ -102,6 +112,21 @@ export function buildMonthlyInvoice(input: MonthlyInvoiceInput): MonthlyInvoiceD
   for (const manual of input.manualLines ?? []) {
     assertMoney(manual.amount);
     lines.push({ kind: 'extra', title: manual.title, amount: manual.amount });
+  }
+
+  /*
+   * Скидка уменьшает проживание и только его (§5.4): «проживание не может
+   * стать отрицательным». Из коммуналки и штрафов она не вычитается —
+   * это чужие деньги, фонд дома и наказание, а не плата за место.
+   */
+  if (input.discount != null) {
+    assertMoney(input.discount.amount);
+
+    const applied = Math.min(input.discount.amount, input.rent);
+
+    if (applied > 0) {
+      lines.push({ kind: 'discount', title: input.discount.title, amount: -applied });
+    }
   }
 
   return { lines, total: lines.reduce((sum, line) => sum + line.amount, 0) };

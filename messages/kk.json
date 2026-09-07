@@ -42,7 +42,9 @@
       "rotation_occurrence": "Кезекшілік",
       "rotation_template": "Кезекшілік үлгісі",
       "absence": "Болмау",
-      "rating_event": "Рейтинг оқиғасы"
+      "rating_event": "Рейтинг оқиғасы",
+      "fine": "Айыппұл",
+      "discount": "Жеңілдік"
     }
   },
   "auth": {
@@ -1305,7 +1307,9 @@
     "title": "Рейтинг",
     "errors": {
       "reasonRequired": "Себебін көрсетіңіз",
-      "unknownAction": "Мұндай әрекет ережеде жоқ"
+      "unknownAction": "Мұндай әрекет ережеде жоқ",
+      "fineCancelled": "Айыппұл бұрын жойылған",
+      "fineAmount": "Айыппұл сомасы — нөлден үлкен бүтін теңге"
     }
   }
 }

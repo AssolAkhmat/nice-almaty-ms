@@ -281,6 +281,32 @@ export async function putRatingRule(
   return rule;
 }
 
+/**
+ * Правило, если его ещё нет: пороги §5.3–5.4 должны существовать строкой,
+ * иначе состоянию порога и скидке не на что сослаться.
+ *
+ * Отличается от `putRatingRule` тем, что чужую правку не затирает: правила
+ * редактирует суперадмин, и умолчание не вправе возвращаться поверх него.
+ */
+export async function ensureRatingRule(
+  context: AccessContext,
+  input: RatingRuleInput,
+  executor: Executor = getDb(),
+): Promise<RatingRule> {
+  const existing = await listRatingRules(
+    context,
+    input.houseId === null ? { networkOnly: true } : { houseId: input.houseId },
+    executor,
+  );
+  const found = existing.find((rule) => rule.code === input.code);
+
+  if (found !== undefined) {
+    return found;
+  }
+
+  return putRatingRule(context, input, executor);
+}
+
 export interface RatingRuleFilter {
   /** Дом: отдаёт только его переопределения. Без него — вся сеть. */
   houseId?: string;

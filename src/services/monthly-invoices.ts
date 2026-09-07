@@ -4,6 +4,7 @@ import { getDb, type Executor } from '@/db/client';
 import { parsePeriod } from '@/db/period';
 import { claimJobRun, finishJobRun } from '@/db/repositories/job-runs';
 import { listDepositTransactions, listInvoices } from '@/db/repositories/invoices';
+import { updateFine } from '@/db/repositories/rating';
 import { listAssignments, listResidencies } from '@/db/repositories/residencies';
 import { organizations, users } from '@/db/schema';
 import { depositBalance } from '@/domain/invoice';
@@ -12,6 +13,7 @@ import { logger } from '@/lib/logger';
 import { now, startOfMonth, todayInAlmaty, type BusinessDate } from '@/lib/time';
 
 import { createInvoice, utilitiesLineFor } from './invoices';
+import { discountForMonth, pendingFinesForMonth } from './rating';
 
 import type { AccessContext } from '@/db/access';
 import type { UserActor } from './users';
@@ -25,9 +27,9 @@ import type { UserActor } from './users';
  * и проверка «счёт за этот месяц уже есть» на каждом проживании. Одной мало:
  * оборвавшийся посередине прогон обязан довести начатое, не удвоив сделанное.
  *
- * Коммуналка в состав пока не входит: её источник — закрытый период (T3.7).
- * Штрафы и скидка за рейтинг — фаза 5. Счёт собирается без них, и это видно
- * по составу, а не по умолчанию.
+ * Коммуналка идёт из закрытого периода прошлого месяца, штрафы — из тех,
+ * что начислены до этого месяца и ещё не применены, скидка — наибольшая
+ * подтверждённая, если рейтинг держит её порог (§3, §5.4).
  */
 export const MONTHLY_INVOICES_JOB = 'invoices-monthly';
 
@@ -119,13 +121,36 @@ async function draftFor(
     executor,
   );
 
-  return buildMonthlyInvoice({
+  /*
+   * Штрафы попадают в ближайший счёт (§3): те, что начислены до первого
+   * числа этого месяца. Начисленный после — ждёт следующего, иначе жилец
+   * узнавал бы о наказании из счёта, выставленного раньше самого штрафа.
+   */
+  const [fines, discount] = await Promise.all([
+    pendingFinesForMonth(actor, { userId: residency.userId, month }, { executor }),
+    discountForMonth(actor, { userId: residency.userId, month }, { executor }),
+  ]);
+
+  const draft = buildMonthlyInvoice({
     month,
     rent,
     utilities: utilities === null ? null : { amount: utilities.amount, title: utilities.title },
+    fines: fines.map((fine) => ({ title: fineTitle(fine.reason), amount: fine.amount })),
     // Перерасход депозита переносится в ближайший месячный счёт (§2.4).
     depositDebt: balance < 0 ? -balance : 0,
+    discount: discount > 0 ? { title: 'Скидка за рейтинг', amount: discount } : null,
   });
+
+  return { ...draft, fineIds: fines.map((fine) => fine.id) };
+}
+
+/** Заголовок строки штрафа: пороговый называет порог, ручной — свою причину. */
+function fineTitle(reason: string): string {
+  const threshold = reason.startsWith('rating.threshold:')
+    ? reason.slice('rating.threshold:'.length)
+    : null;
+
+  return threshold === null ? `Штраф: ${reason}` : `Штраф: рейтинг ниже ${threshold}`;
 }
 
 /**
@@ -175,7 +200,7 @@ export async function generateMonthlyInvoices(
           continue;
         }
 
-        await createInvoice(
+        const invoice = await createInvoice(
           actor,
           {
             residencyId: residency.id,
@@ -187,6 +212,16 @@ export async function generateMonthlyInvoices(
           },
           { executor, today: month },
         );
+
+        // Штраф, попавший в счёт, больше не ждёт своей очереди (§3).
+        for (const fineId of draft.fineIds) {
+          await updateFine(
+            actor.context,
+            fineId,
+            { status: 'applied', invoiceId: invoice.id },
+            executor,
+          );
+        }
 
         created += 1;
       }

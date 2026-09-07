@@ -178,13 +178,30 @@ function assertMoney(amount: number): void {
   }
 }
 
+/**
+ * Отрицательной бывает только строка, которая вычитает: скидка за рейтинг
+ * (§5.4) и сторно штрафа (§5.5). Остальным минус запрещён — начисление
+ * с минусом означает ошибку ввода, а не возврат.
+ */
+function assertLineAmount(kind: InvoiceLineKind, amount: number): void {
+  if (kind === 'discount' || kind === 'fine') {
+    if (!Number.isSafeInteger(amount)) {
+      throw new ValidationError('invoices.errors.amountInvalid');
+    }
+
+    return;
+  }
+
+  assertMoney(amount);
+}
+
 function assertLines(lines: readonly InvoiceLineInput[]): void {
   if (lines.length === 0) {
     throw new ValidationError('invoices.errors.noLines');
   }
 
   for (const line of lines) {
-    assertMoney(line.amount);
+    assertLineAmount(line.kind, line.amount);
 
     if (line.title.trim() === '') {
       throw new ValidationError('invoices.errors.titleRequired');

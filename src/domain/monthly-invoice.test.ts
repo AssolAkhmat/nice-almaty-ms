@@ -147,3 +147,61 @@ describe('состав месячного счёта', () => {
     ).toThrow(/тенге/i);
   });
 });
+
+describe('штрафы и скидка за рейтинг (§3, §5.4)', () => {
+  it('штрафы идут отдельными строками в порядке начисления', () => {
+    const draft = buildMonthlyInvoice({
+      month: parseBusinessDate('2026-10-01'),
+      rent: 100_000,
+      fines: [
+        { title: 'Штраф: рейтинг ниже 30', amount: 2_500 },
+        { title: 'Штраф: рейтинг ниже 20', amount: 5_000 },
+      ],
+    });
+
+    expect(draft.lines.map((line) => [line.kind, line.amount])).toEqual([
+      ['rent', 100_000],
+      ['fine', 2_500],
+      ['fine', 5_000],
+    ]);
+    expect(draft.total).toBe(107_500);
+  });
+
+  it('скидка идёт последней строкой и вычитается', () => {
+    const draft = buildMonthlyInvoice({
+      month: parseBusinessDate('2026-10-01'),
+      rent: 100_000,
+      discount: { title: 'Скидка за рейтинг', amount: 2_500 },
+    });
+
+    expect(draft.lines[draft.lines.length - 1]).toEqual({
+      kind: 'discount',
+      title: 'Скидка за рейтинг',
+      amount: -2_500,
+    });
+    expect(draft.total).toBe(97_500);
+  });
+
+  it('скидка не делает проживание отрицательным (§5.4)', () => {
+    const draft = buildMonthlyInvoice({
+      month: parseBusinessDate('2026-10-01'),
+      rent: 2_000,
+      utilities: { amount: 12_000, title: 'Коммуналка' },
+      discount: { title: 'Скидка за рейтинг', amount: 5_000 },
+    });
+
+    // Скидка режется до цены проживания: коммуналку и штрафы она не уменьшает.
+    expect(draft.lines[draft.lines.length - 1]?.amount).toBe(-2_000);
+    expect(draft.total).toBe(12_000);
+  });
+
+  it('нулевая скидка строки не создаёт', () => {
+    const draft = buildMonthlyInvoice({
+      month: parseBusinessDate('2026-10-01'),
+      rent: 100_000,
+      discount: { title: 'Скидка за рейтинг', amount: 0 },
+    });
+
+    expect(draft.lines.map((line) => line.kind)).toEqual(['rent']);
+  });
+});

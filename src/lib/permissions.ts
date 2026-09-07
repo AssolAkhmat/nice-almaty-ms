@@ -60,6 +60,10 @@ export const ACTIONS = [
   'rating.read',
   'rating.event',
   'rating.history',
+  'fine.read',
+  'fine.create',
+  'fine.cancel',
+  'discount.approve',
   'utility.reopen',
   'accounting.read',
   'accounting.write',
@@ -126,6 +130,10 @@ export const PERMISSIONS: PermissionMatrix = {
     'rating.read': 'org',
     'rating.event': 'org',
     'rating.history': 'org',
+    'fine.read': 'org',
+    'fine.create': 'org',
+    'fine.cancel': 'org',
+    'discount.approve': 'org',
     'utility.reopen': 'org',
     'accounting.read': 'org',
     'accounting.write': 'org',
@@ -186,6 +194,14 @@ export const PERMISSIONS: PermissionMatrix = {
     'rating.read': 'house',
     'rating.event': 'house',
     'rating.history': 'house',
+    'fine.read': 'house',
+    'fine.create': 'house',
+    /*
+     * Штраф отменяет и сторнирует только суперадмин (§5.5): админ его
+     * начислил, и он же не должен уметь его снять.
+     */
+    'fine.cancel': 'none',
+    'discount.approve': 'none',
     /*
      * Переоткрытие закрытого периода меняет уже выставленные счета
      * (§4, модуль 6), поэтому остаётся за суперадмином и пишется в журнал.
@@ -298,6 +314,11 @@ export const PERMISSIONS: PermissionMatrix = {
     'rating.read': 'self',
     'rating.event': 'none',
     'rating.history': 'none',
+    /** Свой штраф жилец видит: он приходит ему строкой в счёте (§3). */
+    'fine.read': 'self',
+    'fine.create': 'none',
+    'fine.cancel': 'none',
+    'discount.approve': 'none',
     'utility.reopen': 'none',
     'accounting.read': 'none',
     'accounting.write': 'none',

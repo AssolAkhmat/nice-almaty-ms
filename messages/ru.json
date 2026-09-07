@@ -42,7 +42,9 @@
       "rotation_occurrence": "Ротация",
       "rotation_template": "Шаблон ротаций",
       "absence": "Отсутствие",
-      "rating_event": "Событие рейтинга"
+      "rating_event": "Событие рейтинга",
+      "fine": "Штраф",
+      "discount": "Скидка"
     }
   },
   "auth": {
@@ -1305,7 +1307,9 @@
     "title": "Рейтинг",
     "errors": {
       "reasonRequired": "Укажите причину",
-      "unknownAction": "Такого действия нет в правилах"
+      "unknownAction": "Такого действия нет в правилах",
+      "fineCancelled": "Штраф уже отменён",
+      "fineAmount": "Сумма штрафа — целые тенге больше нуля"
     }
   }
 }

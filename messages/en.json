@@ -42,7 +42,9 @@
       "rotation_occurrence": "Rotation",
       "rotation_template": "Rotation template",
       "absence": "Absence",
-      "rating_event": "Rating event"
+      "rating_event": "Rating event",
+      "fine": "Fine",
+      "discount": "Discount"
     }
   },
   "auth": {
@@ -1305,7 +1307,9 @@
     "title": "Rating",
     "errors": {
       "reasonRequired": "State the reason",
-      "unknownAction": "No such action in the rules"
+      "unknownAction": "No such action in the rules",
+      "fineCancelled": "The fine is already cancelled",
+      "fineAmount": "Fine amount must be whole tenge above zero"
     }
   }
 }
