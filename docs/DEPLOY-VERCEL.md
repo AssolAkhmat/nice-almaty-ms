@@ -132,7 +132,7 @@ Production и Preview.
 | `LOCAL_STORAGE_PATH` | `/tmp/storage` | **да, при `STORAGE_DRIVER=local`** |
 | `DEFAULT_LOCALE` | `ru` | нет, по умолчанию `ru` |
 | `TZ` | `Asia/Almaty` | нет |
-| `GDRIVE_*` | четыре ключа OAuth | только при `STORAGE_DRIVER=gdrive` |
+| `GDRIVE_*` | три ключа OAuth; `GDRIVE_ROOT_FOLDER_ID` необязателен | только при `STORAGE_DRIVER=gdrive` |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` | — | только при `STORAGE_DRIVER=supabase` |
 | `WEBPUSH_*` | три ключа | нет; задаются все три или ни одного |
 

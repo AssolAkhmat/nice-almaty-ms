@@ -47,6 +47,11 @@ export const envSchema = z.object({
   GDRIVE_CLIENT_ID: z.string().min(1).optional(),
   GDRIVE_CLIENT_SECRET: z.string().min(1).optional(),
   GDRIVE_REFRESH_TOKEN: z.string().min(1).optional(),
+  /**
+   * Корневая папка Drive. Необязательна: без неё драйвер заводит папку сам
+   * и сообщает её идентификатор в журнал. Папку, созданную владельцем руками,
+   * область `drive.file` не видит вовсе (P7-20).
+   */
   GDRIVE_ROOT_FOLDER_ID: z.string().min(1).optional(),
   LOCAL_STORAGE_PATH: z.string().min(1).default('./storage'),
 
@@ -70,12 +75,8 @@ export const envSchema = z.object({
 
 export type Env = z.infer<typeof envSchema>;
 
-const GDRIVE_KEYS = [
-  'GDRIVE_CLIENT_ID',
-  'GDRIVE_CLIENT_SECRET',
-  'GDRIVE_REFRESH_TOKEN',
-  'GDRIVE_ROOT_FOLDER_ID',
-] as const;
+/** Ключи доступа. Корневая папка сюда не входит: драйвер заводит её сам. */
+const GDRIVE_KEYS = ['GDRIVE_CLIENT_ID', 'GDRIVE_CLIENT_SECRET', 'GDRIVE_REFRESH_TOKEN'] as const;
 
 const SUPABASE_KEYS = [
   'SUPABASE_URL',

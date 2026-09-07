@@ -20,8 +20,12 @@ import type {
  *
  * Drive не знает путей: у него есть только имена внутри родителя. Ключ вида
  * `{house_slug}/{residency_id}/{document_type}/{file_id}.{ext}` разворачивается
- * в цепочку папок от `rootFolderId`; найденные папки запоминаются, иначе каждая
+ * в цепочку папок от корневой; найденные папки запоминаются, иначе каждая
  * загрузка стоила бы трёх лишних запросов.
+ *
+ * Корневая папка берётся из `rootFolderId`, а без него заводится сама: область
+ * `drive.file` видит только объекты, созданные приложением, поэтому папку,
+ * созданную владельцем в браузере, драйверу не отдать (P7-20).
  *
  * Публичные ссылки не выдаются никогда: права на файлы Drive не меняются,
  * запросов к `permissions` в драйвере нет вовсе.
@@ -31,16 +35,40 @@ const FILES_URL = 'https://www.googleapis.com/drive/v3/files';
 const UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files';
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
 
+/**
+ * Папка приложения, когда её идентификатор не задан в окружении.
+ * Заводится самим драйвером: область `drive.file` не видит папку, созданную
+ * владельцем в браузере, и обращение к ней отвечает 404 (P7-20).
+ */
+const ROOT_FOLDER_NAME = 'Nice Almaty';
+
+/** Псевдоним «Моего диска» в запросах Drive: у корня нет обычного идентификатора. */
+const MY_DRIVE = 'root';
+
 /** Запас на дорогу: токен, который истекает через секунду, уже бесполезен. */
 const TOKEN_EXPIRY_MARGIN_MS = 60_000;
+
+/** Корневая папка, о которой драйвер сообщает один раз за процесс. */
+export interface GdriveRootFolder {
+  id: string;
+  /** `true` — папку завёл этот запуск, `false` — нашлась созданная раньше. */
+  created: boolean;
+}
 
 export interface GdriveConfig {
   clientId: string;
   clientSecret: string;
   refreshToken: string;
-  rootFolderId: string;
+  /** Пусто — драйвер заведёт «Nice Almaty» в «Моём диске» сам. */
+  rootFolderId?: string | undefined;
   /** Подмена сети: в тестах Drive поднимается локально. */
   fetch?: typeof fetch;
+  /**
+   * Куда сообщить идентификатор папки, найденной без окружения.
+   * Зовётся один раз за процесс: владельцу он нужен, чтобы положить его
+   * в `GDRIVE_ROOT_FOLDER_ID` и не искать папку при каждом запуске.
+   */
+  onRootFolder?: (folder: GdriveRootFolder) => void;
 }
 
 interface DriveFile {
@@ -67,6 +95,9 @@ export function createGdriveStorage(config: GdriveConfig): StorageProvider {
   let token: { value: string; expiresAt: number } | null = null;
   /** Найденные папки: ключ — `родитель/имя`. */
   const folders = new Map<string, string>();
+  const configuredRoot = config.rootFolderId ?? '';
+  /** Одно обещание на процесс: параллельные загрузки не должны завести две папки. */
+  let rootLookup: Promise<string> | null = null;
 
   async function accessToken(): Promise<string> {
     if (token !== null && token.expiresAt > now().getTime()) {
@@ -144,20 +175,7 @@ export function createGdriveStorage(config: GdriveConfig): StorageProvider {
     return body.files?.[0]?.id ?? null;
   }
 
-  async function ensureFolder(name: string, parentId: string): Promise<string> {
-    const cacheKey = `${parentId}/${name}`;
-    const remembered = folders.get(cacheKey);
-    if (remembered !== undefined) {
-      return remembered;
-    }
-
-    const existing = await findChild(name, parentId, true);
-    if (existing !== null) {
-      folders.set(cacheKey, existing);
-
-      return existing;
-    }
-
+  async function createFolder(name: string, parentId: string): Promise<string> {
     const response = await authorized(FILES_URL, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -168,10 +186,62 @@ export function createGdriveStorage(config: GdriveConfig): StorageProvider {
       throw await driveError(response, `создание папки «${name}»`);
     }
 
-    const created = (await response.json()) as DriveFile;
-    folders.set(cacheKey, created.id);
+    return ((await response.json()) as DriveFile).id;
+  }
 
-    return created.id;
+  async function ensureFolder(name: string, parentId: string): Promise<string> {
+    const cacheKey = `${parentId}/${name}`;
+    const remembered = folders.get(cacheKey);
+    if (remembered !== undefined) {
+      return remembered;
+    }
+
+    const existing = await findChild(name, parentId, true);
+    const id = existing ?? (await createFolder(name, parentId));
+    folders.set(cacheKey, id);
+
+    return id;
+  }
+
+  /** Корневая папка приложения: найденная или заведённая этим запуском. */
+  async function discoverRoot(): Promise<string> {
+    const cacheKey = `${MY_DRIVE}/${ROOT_FOLDER_NAME}`;
+    const existing = folders.get(cacheKey) ?? (await findChild(ROOT_FOLDER_NAME, MY_DRIVE, true));
+    const id = existing ?? (await createFolder(ROOT_FOLDER_NAME, MY_DRIVE));
+
+    folders.set(cacheKey, id);
+    config.onRootFolder?.({ id, created: existing === null });
+
+    return id;
+  }
+
+  /**
+   * Идентификатор корневой папки. Задан в окружении — берётся как есть.
+   *
+   * `create = false` — путь чтения: пустой диск остаётся пустым. Заводить
+   * папку на промахе `exists` или `delete` незачем: файлов под ней всё равно нет.
+   */
+  async function rootFolder(create: true): Promise<string>;
+  async function rootFolder(create: boolean): Promise<string | null>;
+  async function rootFolder(create: boolean): Promise<string | null> {
+    if (configuredRoot !== '') {
+      return configuredRoot;
+    }
+
+    if (create) {
+      // Неудачную попытку не запоминаем: следующая начнёт с чистого листа.
+      rootLookup ??= discoverRoot().catch((error: unknown) => {
+        rootLookup = null;
+
+        throw error;
+      });
+
+      return rootLookup;
+    }
+
+    const cacheKey = `${MY_DRIVE}/${ROOT_FOLDER_NAME}`;
+
+    return folders.get(cacheKey) ?? (await findChild(ROOT_FOLDER_NAME, MY_DRIVE, true));
   }
 
   /** Разбор ключа: цепочка папок и имя файла в последней из них. */
@@ -183,11 +253,22 @@ export function createGdriveStorage(config: GdriveConfig): StorageProvider {
   }
 
   /** Папка под ключ. `create = false` — по дороге ничего не создаётся. */
+  async function resolveParent(directories: readonly string[], create: true): Promise<string>;
+  async function resolveParent(
+    directories: readonly string[],
+    create: boolean,
+  ): Promise<string | null>;
   async function resolveParent(
     directories: readonly string[],
     create: boolean,
   ): Promise<string | null> {
-    let parentId = config.rootFolderId;
+    const root = await rootFolder(create);
+
+    if (root === null) {
+      return null;
+    }
+
+    let parentId: string = root;
 
     for (const directory of directories) {
       if (create) {
@@ -252,7 +333,7 @@ export function createGdriveStorage(config: GdriveConfig): StorageProvider {
 
     async checkHealth(): Promise<StorageHealth> {
       try {
-        const response = await authorized(`${FILES_URL}/${config.rootFolderId}?fields=id`);
+        const response = await authorized(`${FILES_URL}/${await rootFolder(true)}?fields=id`);
         if (!response.ok) {
           throw await driveError(response, 'корневая папка недоступна');
         }
@@ -275,7 +356,7 @@ export function createGdriveStorage(config: GdriveConfig): StorageProvider {
     async put(key: string, data: Uint8Array): Promise<StoredObject> {
       const { directories, name } = splitKey(key);
       const parentId = await resolveParent(directories, true);
-      const existing = parentId === null ? null : await findChild(name, parentId, false);
+      const existing = await findChild(name, parentId, false);
 
       if (existing !== null) {
         const updated = await authorized(`${UPLOAD_URL}/${existing}?uploadType=media`, {
@@ -291,7 +372,7 @@ export function createGdriveStorage(config: GdriveConfig): StorageProvider {
       }
 
       const boundary = `nice-${crypto.randomUUID()}`;
-      const metadataPart = JSON.stringify({ name, parents: [parentId ?? config.rootFolderId] });
+      const metadataPart = JSON.stringify({ name, parents: [parentId] });
       const encoder = new TextEncoder();
       const head = encoder.encode(
         `--${boundary}\r\ncontent-type: application/json; charset=UTF-8\r\n\r\n${metadataPart}\r\n--${boundary}\r\ncontent-type: application/octet-stream\r\n\r\n`,
@@ -350,11 +431,7 @@ export function createGdriveStorage(config: GdriveConfig): StorageProvider {
           'x-upload-content-type': meta.mime,
           'x-upload-content-length': String(meta.sizeBytes),
         },
-        body: JSON.stringify({
-          name,
-          parents: [parentId ?? config.rootFolderId],
-          mimeType: meta.mime,
-        }),
+        body: JSON.stringify({ name, parents: [parentId], mimeType: meta.mime }),
       });
 
       if (!response.ok) {

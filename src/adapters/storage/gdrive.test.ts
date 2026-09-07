@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createGdriveStorage, type GdriveConfig } from './gdrive';
+import { createGdriveStorage, type GdriveConfig, type GdriveRootFolder } from './gdrive';
 
 /**
  * Драйвер Google Drive (docs/01-ARCHITECTURE.md, «Google Drive: как именно», D3).
@@ -473,5 +473,133 @@ describe('отказы Google', () => {
 
     expect(health.status).toBe('error');
     expect(health.status === 'error' ? health.reason : '').toContain('root-folder');
+  });
+});
+
+/**
+ * Корневая папка, когда `GDRIVE_ROOT_FOLDER_ID` не задан.
+ *
+ * Область `drive.file` видит только объекты, созданные самим приложением:
+ * папка, заведённая владельцем руками в браузере, для драйвера не существует —
+ * обращение к ней отвечает 404. Поэтому папку заводит сам драйвер, а её
+ * идентификатор сообщает один раз, чтобы владелец положил его в окружение
+ * и следующий запуск не искал папку заново.
+ */
+describe('корневая папка, когда её идентификатор не задан', () => {
+  const KEYS = { clientId: 'client', clientSecret: 'secret', refreshToken: 'refresh' };
+  const OTHER_KEY = 'dom-b/residency-2/photo_3x4/file-2.jpg';
+  const UPLOAD = { mime: 'image/jpeg', sizeBytes: 10 } as const;
+
+  function withoutRoot(drive: ReturnType<typeof fakeDrive>, reported: GdriveRootFolder[] = []) {
+    return createGdriveStorage({
+      ...KEYS,
+      fetch: drive.fetcher,
+      onRootFolder: (folder) => reported.push(folder),
+    });
+  }
+
+  function namedFolders(drive: ReturnType<typeof fakeDrive>) {
+    return [...drive.nodes.values()].filter(
+      (node) => node.name === 'Nice Almaty' && node.parent === 'root',
+    );
+  }
+
+  it('заводится в «Мой диск», и цепочка ключа растёт из неё', async () => {
+    const drive = fakeDrive();
+
+    await withoutRoot(drive).createUploadTarget(KEY, UPLOAD);
+
+    const [folder] = namedFolders(drive);
+    expect(folder?.mime).toBe(FOLDER_MIME);
+
+    const house = [...drive.nodes.values()].find((node) => node.name === 'dom-a');
+    expect(house?.parent).toBe(folder?.id);
+  });
+
+  it('идентификатор новой папки сообщается один раз, сколько бы загрузок ни было', async () => {
+    const drive = fakeDrive();
+    const reported: GdriveRootFolder[] = [];
+    const storage = withoutRoot(drive, reported);
+
+    await storage.createUploadTarget(KEY, UPLOAD);
+    await storage.createUploadTarget(OTHER_KEY, UPLOAD);
+
+    expect(namedFolders(drive)).toHaveLength(1);
+    expect(reported).toEqual([{ id: namedFolders(drive)[0]?.id, created: true }]);
+  });
+
+  it('папка прошлого запуска находится, а не дублируется', async () => {
+    const drive = fakeDrive();
+    drive.nodes.set('nice-almaty', {
+      id: 'nice-almaty',
+      name: 'Nice Almaty',
+      parent: 'root',
+      mime: FOLDER_MIME,
+    });
+    const reported: GdriveRootFolder[] = [];
+
+    await withoutRoot(drive, reported).createUploadTarget(KEY, UPLOAD);
+
+    expect(namedFolders(drive)).toHaveLength(1);
+    expect(reported).toEqual([{ id: 'nice-almaty', created: false }]);
+  });
+
+  it('одновременные загрузки не заводят две папки', async () => {
+    const drive = fakeDrive();
+    const storage = withoutRoot(drive);
+
+    await Promise.all([
+      storage.createUploadTarget(KEY, UPLOAD),
+      storage.createUploadTarget(OTHER_KEY, UPLOAD),
+    ]);
+
+    expect(namedFolders(drive)).toHaveLength(1);
+  });
+
+  it('чтение ничего не создаёт: пустой диск — это просто пустой ответ', async () => {
+    const drive = fakeDrive();
+    const reported: GdriveRootFolder[] = [];
+    const storage = withoutRoot(drive, reported);
+
+    expect(await storage.exists(KEY)).toBe(false);
+    expect(await storage.get(KEY)).toBeNull();
+    expect(await storage.head(KEY)).toBeNull();
+    await storage.delete(KEY);
+
+    expect(drive.nodes.size).toBe(0);
+    expect(reported).toEqual([]);
+  });
+
+  it('проверка живости поднимает папку сама: с неё начинается первый запуск', async () => {
+    const drive = fakeDrive();
+    const reported: GdriveRootFolder[] = [];
+
+    expect(await withoutRoot(drive, reported).checkHealth()).toEqual({
+      status: 'ok',
+      driver: 'gdrive',
+    });
+    expect(namedFolders(drive)).toHaveLength(1);
+    expect(reported[0]?.created).toBe(true);
+  });
+
+  it('заданный идентификатор используется как есть: папку по имени никто не ищет', async () => {
+    const drive = fakeDrive();
+    drive.nodes.set('root-folder', {
+      id: 'root-folder',
+      name: 'root',
+      parent: '',
+      mime: FOLDER_MIME,
+    });
+    const reported: GdriveRootFolder[] = [];
+    const storage = createGdriveStorage({
+      ...CONFIG,
+      fetch: drive.fetcher,
+      onRootFolder: (folder) => reported.push(folder),
+    });
+
+    await storage.createUploadTarget(KEY, UPLOAD);
+
+    expect(drive.calls.some((call) => /Nice(\+|%20)Almaty/.test(call.url))).toBe(false);
+    expect(reported).toEqual([]);
   });
 });

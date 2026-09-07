@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { gdriveFromEnv } from './index';
 
@@ -31,14 +31,44 @@ describe('драйвер gdrive из окружения', () => {
 
   it('без ключей отвечает ошибкой, а не молчит', async () => {
     const storage = gdriveFromEnv(
-      envWith({ GDRIVE_REFRESH_TOKEN: undefined, GDRIVE_ROOT_FOLDER_ID: undefined }),
+      envWith({ GDRIVE_REFRESH_TOKEN: undefined, GDRIVE_CLIENT_SECRET: undefined }),
     );
 
     const health = await storage.checkHealth();
 
     expect(health.status).toBe('error');
     expect(health.status === 'error' ? health.reason : '').toContain('GDRIVE_REFRESH_TOKEN');
-    expect(health.status === 'error' ? health.reason : '').toContain('GDRIVE_ROOT_FOLDER_ID');
+    expect(health.status === 'error' ? health.reason : '').toContain('GDRIVE_CLIENT_SECRET');
+  });
+
+  /*
+   * Папка, созданная владельцем в браузере, драйверу не видна: область
+   * `drive.file` показывает только объекты самого приложения. Поэтому
+   * `GDRIVE_ROOT_FOLDER_ID` перестал быть обязательным — без него драйвер
+   * заводит папку сам, и собираться он обязан как полноценный.
+   */
+  it('без GDRIVE_ROOT_FOLDER_ID драйвер собирается и идёт в Google', async () => {
+    const requested: string[] = [];
+
+    vi.stubGlobal('fetch', (input: string | URL | Request) => {
+      requested.push(
+        typeof input === 'string' ? input : input instanceof URL ? input.href : input.url,
+      );
+
+      return Promise.resolve(new Response('{}', { status: 500 }));
+    });
+
+    try {
+      const storage = gdriveFromEnv(envWith({ GDRIVE_ROOT_FOLDER_ID: undefined }));
+
+      // Отказ приходит от Google, а не от драйвера: ключей ему хватает.
+      await expect(storage.head('dom-a/residency-1/photo_3x4/file.jpg')).rejects.toThrow(
+        /access_token/,
+      );
+      expect(requested).toContain('https://oauth2.googleapis.com/token');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('каждая операция без ключей отказывает, а не возвращает пустоту', async () => {

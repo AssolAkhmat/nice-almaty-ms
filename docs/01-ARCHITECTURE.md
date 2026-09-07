@@ -76,7 +76,9 @@ src/
 - одноразовая авторизация Google-аккаунта владельца (scope `drive.file`),
   полученный `refresh_token` кладётся в `GDRIVE_REFRESH_TOKEN`;
 - файлы создаются от имени этого аккаунта, лежат в его квоте, видны ему в «Мой диск»;
-- корневая папка `GDRIVE_ROOT_FOLDER_ID`, внутри автоматически
+- корневая папка — `GDRIVE_ROOT_FOLDER_ID` либо заведённая самим приложением
+  «Nice Almaty» в «Моём диске»: область `drive.file` не видит папку, созданную
+  владельцем в браузере, поэтому руками её не задать (P7-20). Внутри автоматически
   `/{house_slug}/{residency_id}/{document_type}/`;
 - если однажды появится Workspace — включается ветка service account + Shared Drive
   без изменения интерфейса `StorageProvider`.
@@ -168,7 +170,7 @@ STORAGE_DRIVER=gdrive|local|supabase
 GDRIVE_CLIENT_ID=
 GDRIVE_CLIENT_SECRET=
 GDRIVE_REFRESH_TOKEN=
-GDRIVE_ROOT_FOLDER_ID=
+GDRIVE_ROOT_FOLDER_ID=        # необязательна: без неё драйвер заведёт папку сам
 LOCAL_STORAGE_PATH=./storage
 
 SUPABASE_URL=                 # задел

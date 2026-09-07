@@ -1,4 +1,5 @@
 import { loadEnv } from '@/lib/env/load';
+import { logger } from '@/lib/logger';
 
 import type { Env } from '@/lib/env/schema';
 
@@ -46,20 +47,21 @@ function createUnavailableStorage(driver: StorageDriver, reason: string): Storag
  * при `STORAGE_DRIVER=gdrive`. Здесь она повторена по другой причине: драйвер
  * должен объяснять нехватку ключей словами в тот момент, когда его зовут,
  * а не падать где-то внутри запроса к Google с невнятным текстом (P2-9).
+ *
+ * `GDRIVE_ROOT_FOLDER_ID` в этот список не входит: папку драйвер заводит сам,
+ * а её идентификатор сообщает сюда — один раз за процесс (P7-20).
  */
 export function gdriveFromEnv(env: Env): StorageProvider {
   const keys = {
     clientId: env.GDRIVE_CLIENT_ID,
     clientSecret: env.GDRIVE_CLIENT_SECRET,
     refreshToken: env.GDRIVE_REFRESH_TOKEN,
-    rootFolderId: env.GDRIVE_ROOT_FOLDER_ID,
   };
 
   const variables: Readonly<Record<keyof typeof keys, string>> = {
     clientId: 'GDRIVE_CLIENT_ID',
     clientSecret: 'GDRIVE_CLIENT_SECRET',
     refreshToken: 'GDRIVE_REFRESH_TOKEN',
-    rootFolderId: 'GDRIVE_ROOT_FOLDER_ID',
   };
 
   const absent = Object.entries(keys)
@@ -74,7 +76,16 @@ export function gdriveFromEnv(env: Env): StorageProvider {
     clientId: keys.clientId ?? '',
     clientSecret: keys.clientSecret ?? '',
     refreshToken: keys.refreshToken ?? '',
-    rootFolderId: keys.rootFolderId ?? '',
+    rootFolderId: env.GDRIVE_ROOT_FOLDER_ID,
+    onRootFolder: ({ id, created }) => {
+      // Строка нужна владельцу целиком: из неё он и берёт идентификатор.
+      logger.info(
+        { folder_id: id, created },
+        `Google Drive: корневая папка «Nice Almaty» ${created ? 'создана' : 'найдена'}, ` +
+          `её идентификатор ${id} — задайте GDRIVE_ROOT_FOLDER_ID, чтобы следующий ` +
+          'запуск не искал её заново',
+      );
+    },
   });
 }
 

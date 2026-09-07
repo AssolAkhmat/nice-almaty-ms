@@ -74,7 +74,7 @@ describe('разбор окружения', () => {
   });
 
   describe('условные требования', () => {
-    it('gdrive требует все четыре ключа', () => {
+    it('gdrive требует три ключа: корневую папку драйвер заводит сам', () => {
       expect(() => parseEnv(baseEnv({ STORAGE_DRIVER: 'gdrive' }))).toThrow(/GDRIVE_CLIENT_ID/);
 
       const env = parseEnv(
@@ -83,11 +83,11 @@ describe('разбор окружения', () => {
           GDRIVE_CLIENT_ID: 'id',
           GDRIVE_CLIENT_SECRET: 'secret',
           GDRIVE_REFRESH_TOKEN: 'token',
-          GDRIVE_ROOT_FOLDER_ID: 'folder',
         }),
       );
 
       expect(env.STORAGE_DRIVER).toBe('gdrive');
+      expect(env.GDRIVE_ROOT_FOLDER_ID).toBeUndefined();
     });
 
     it('supabase требует url, ключ и бакет', () => {
