@@ -1186,7 +1186,8 @@
     "score": "Score: {score}",
     "scorePlaceholder": "1–10",
     "setStatus": "Change status",
-    "statusChanged": "Status changed"
+    "statusChanged": "Status changed",
+    "toStats": "Statistics"
   },
   "generalCleaning": {
     "title": "Deep cleaning",
@@ -1224,5 +1225,34 @@
     "templateTitle": "Text for the group",
     "empty": "No rotations today",
     "unassigned": "unassigned"
+  },
+  "rotationStats": {
+    "title": "Rotation statistics",
+    "toCalendar": "Back to calendar",
+    "byPerson": "By resident",
+    "byArea": "By zone",
+    "byWeekday": "By weekday",
+    "byMonth": "By month",
+    "person": "Resident",
+    "area": "Zone",
+    "weekday": "Weekday",
+    "month": "Month",
+    "done": "Done",
+    "missed": "Missed",
+    "average": "Average score",
+    "missRate": "Miss rate",
+    "total": "Rotations counted: {count}",
+    "empty": "No data for the period",
+    "noHouse": "No house selected",
+    "noHouseHint": "Statistics are calculated per house",
+    "weekdays": {
+      "0": "Sunday",
+      "1": "Monday",
+      "2": "Tuesday",
+      "3": "Wednesday",
+      "4": "Thursday",
+      "5": "Friday",
+      "6": "Saturday"
+    }
   }
 }

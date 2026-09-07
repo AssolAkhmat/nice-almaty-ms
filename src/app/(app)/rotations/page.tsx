@@ -216,6 +216,15 @@ export default async function RotationsPage({
           </Link>
           <Link
             className="text-accent underline"
+            data-testid="to-stats"
+            href="/rotations/stats"
+            prefetch={false}
+          >
+            {t('toStats')}
+          </Link>
+
+          <Link
+            className="text-accent underline"
             data-testid="calendar-next"
             href={{ pathname: '/rotations', query: { mode, date: shift(mode, anchor, 1) } }}
             prefetch={false}

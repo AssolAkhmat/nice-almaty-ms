@@ -51,6 +51,20 @@ test.describe('календарь ротаций', () => {
     await expect(page.getByTestId('day-template-text')).toHaveCount(0);
   });
 
+  test('статистика открывается из календаря и показывает своды', async ({ page }) => {
+    await login(page, E2E_ACCOUNTS.adminHouse1);
+    await page.goto('/rotations');
+
+    await page.getByTestId('to-stats').click();
+
+    const main = page.locator('main');
+    await expect(main).toContainText('Статистика ротаций');
+    await expect(main).toContainText('По жильцам');
+    await expect(main).toContainText('По зонам');
+    await expect(main).toContainText('По дням недели');
+    await expect(main).toContainText('По месяцам');
+  });
+
   test('админ видит действия над периодом, если у дома есть зоны с чек-листами', async ({
     page,
   }) => {
