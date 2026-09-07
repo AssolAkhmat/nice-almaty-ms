@@ -1342,6 +1342,54 @@
         "reprimand": "Reprimand",
         "severe_reprimand": "Severe reprimand"
       }
+    },
+    "subtitle": "Cleaning scores, admin actions and thresholds",
+    "residentSubtitle": "Event history, thresholds, debts and fines",
+    "mine": "My rating",
+    "hidden": "The rating is hidden for now",
+    "house": "House residents",
+    "empty": "Nobody to show yet",
+    "columns": {
+      "name": "Resident",
+      "rating": "Rating",
+      "debts": "Debts",
+      "fines": "Fines"
+    },
+    "addEvent": "Add an event",
+    "eventType": "Event",
+    "reason": "Reason",
+    "note": "Comment",
+    "submit": "Record",
+    "done": "Recorded",
+    "failed": "Did not work",
+    "history": "Event history",
+    "noEvents": "No events yet",
+    "thresholds": "Thresholds",
+    "armed": "armed",
+    "disarmed": "triggered",
+    "fines": "Fines",
+    "noFines": "No fines",
+    "cancelFine": "Cancel",
+    "cancelReason": "Reason for cancelling",
+    "discounts": "Discounts",
+    "approveDiscount": "Approve",
+    "debtsCount": "Extra rotation debts: {count}",
+    "fineStatus": {
+      "pending": "awaiting invoice",
+      "applied": "in the invoice",
+      "cancelled": "cancelled"
+    },
+    "discountStatus": {
+      "proposed": "proposed",
+      "approved": "approved",
+      "revoked": "revoked"
+    },
+    "action": {
+      "help": "Act of help",
+      "violation": "Violation",
+      "warning": "Warning",
+      "reprimand": "Reprimand",
+      "severe_reprimand": "Severe reprimand"
     }
   }
 }

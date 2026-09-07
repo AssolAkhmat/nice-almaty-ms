@@ -35,6 +35,29 @@ export async function listSettings(
     .where(and(eq(settings.scope, scope), eq(settings.scopeId, scopeId)));
 }
 
+/**
+ * Значение настройки без проверки прав.
+ *
+ * Нужна флагам, которые читает сам владелец данных: жилец обязан знать,
+ * показывать ли ему собственный рейтинг (§5.6), а права на настройки сети
+ * у него нет и быть не должно. Секретов в настройках сети не хранится —
+ * это переключатели поведения, а не ключи.
+ */
+export async function readSettingValue(
+  scope: SettingsScope,
+  scopeId: string,
+  key: string,
+  executor: Executor = getDb(),
+): Promise<unknown> {
+  const [setting] = await executor
+    .select({ value: settings.value })
+    .from(settings)
+    .where(and(eq(settings.scope, scope), eq(settings.scopeId, scopeId), eq(settings.key, key)))
+    .limit(1);
+
+  return setting?.value;
+}
+
 export async function getSetting(
   context: AccessContext,
   scope: SettingsScope,

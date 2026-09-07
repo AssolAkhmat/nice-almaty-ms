@@ -1342,6 +1342,54 @@
         "reprimand": "Сөгіс",
         "severe_reprimand": "Қатаң сөгіс"
       }
+    },
+    "subtitle": "Жинау бағалары, әкімші әрекеттері және шектер",
+    "residentSubtitle": "Оқиғалар тарихы, шектер, қарыздар және айыппұлдар",
+    "mine": "Менің рейтингім",
+    "hidden": "Рейтинг қазір жасырылған",
+    "house": "Үй тұрғындары",
+    "empty": "Әзірге көрсететін ешкім жоқ",
+    "columns": {
+      "name": "Тұрғын",
+      "rating": "Рейтинг",
+      "debts": "Қарыздар",
+      "fines": "Айыппұлдар"
+    },
+    "addEvent": "Оқиға қосу",
+    "eventType": "Оқиға",
+    "reason": "Себеп",
+    "note": "Түсініктеме",
+    "submit": "Жазу",
+    "done": "Жазылды",
+    "failed": "Болмады",
+    "history": "Оқиғалар тарихы",
+    "noEvents": "Оқиға әзірге жоқ",
+    "thresholds": "Шектер",
+    "armed": "дайын",
+    "disarmed": "іске қосылған",
+    "fines": "Айыппұлдар",
+    "noFines": "Айыппұл жоқ",
+    "cancelFine": "Жою",
+    "cancelReason": "Жою себебі",
+    "discounts": "Жеңілдіктер",
+    "approveDiscount": "Растау",
+    "debtsCount": "Қосымша кезекшілік қарызы: {count}",
+    "fineStatus": {
+      "pending": "шотты күтуде",
+      "applied": "шотта",
+      "cancelled": "жойылды"
+    },
+    "discountStatus": {
+      "proposed": "ұсынылды",
+      "approved": "расталды",
+      "revoked": "қайтарылды"
+    },
+    "action": {
+      "help": "Көмек актісі",
+      "violation": "Тәртіп бұзу",
+      "warning": "Ескерту",
+      "reprimand": "Сөгіс",
+      "severe_reprimand": "Қатаң сөгіс"
     }
   }
 }

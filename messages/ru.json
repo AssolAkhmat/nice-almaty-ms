@@ -1342,6 +1342,54 @@
         "reprimand": "Выговор",
         "severe_reprimand": "Строгий выговор"
       }
+    },
+    "subtitle": "Оценки уборок, действия админа и пороги",
+    "residentSubtitle": "История событий, пороги, долги и штрафы",
+    "mine": "Мой рейтинг",
+    "hidden": "Рейтинг сейчас скрыт",
+    "house": "Жильцы дома",
+    "empty": "Пока некого показывать",
+    "columns": {
+      "name": "Жилец",
+      "rating": "Рейтинг",
+      "debts": "Долги",
+      "fines": "Штрафы"
+    },
+    "addEvent": "Добавить событие",
+    "eventType": "Событие",
+    "reason": "Причина",
+    "note": "Комментарий",
+    "submit": "Записать",
+    "done": "Записано",
+    "failed": "Не получилось",
+    "history": "История событий",
+    "noEvents": "Событий пока нет",
+    "thresholds": "Пороги",
+    "armed": "взведён",
+    "disarmed": "сработал",
+    "fines": "Штрафы",
+    "noFines": "Штрафов нет",
+    "cancelFine": "Отменить",
+    "cancelReason": "Причина отмены",
+    "discounts": "Скидки",
+    "approveDiscount": "Подтвердить",
+    "debtsCount": "Долгов по дополнительным ротациям: {count}",
+    "fineStatus": {
+      "pending": "ждёт счёта",
+      "applied": "в счёте",
+      "cancelled": "отменён"
+    },
+    "discountStatus": {
+      "proposed": "предложена",
+      "approved": "подтверждена",
+      "revoked": "отозвана"
+    },
+    "action": {
+      "help": "Акт помощи",
+      "violation": "Нарушение",
+      "warning": "Предупреждение",
+      "reprimand": "Выговор",
+      "severe_reprimand": "Строгий выговор"
     }
   }
 }

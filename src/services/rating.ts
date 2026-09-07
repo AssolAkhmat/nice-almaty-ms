@@ -1,5 +1,5 @@
 import { getDb, type Executor } from '@/db/client';
-import { rotationDebts } from '@/db/schema';
+import { createRotationDebt } from '@/db/repositories/rotations';
 import {
   createDiscount,
   createFine,
@@ -374,6 +374,33 @@ export async function readRatingHistory(
   return listRatingEvents(actor.context, { userId, periodStart: ratingYearStart(today) }, executor);
 }
 
+/**
+ * Какая строка правила отвечает за код в этом доме: дом поверх сети.
+ *
+ * Ничего не заводит — этим занимается `thresholdRuleIds` там, где порог
+ * действительно срабатывает. Чтение экрана правил не создаёт.
+ */
+export async function readRuleIdsByCode(
+  context: AccessContext,
+  houseId: string | null,
+  executor: Executor = getDb(),
+): Promise<Map<string, string>> {
+  const [network, house] = await Promise.all([
+    listRatingRules(context, { networkOnly: true }, executor),
+    houseId === null
+      ? Promise.resolve<RatingRule[]>([])
+      : listRatingRules(context, { houseId }, executor),
+  ]);
+
+  const idByCode = new Map<string, string>();
+
+  for (const rule of [...network, ...house]) {
+    idByCode.set(rule.code, rule.id);
+  }
+
+  return idByCode;
+}
+
 /** Строки правил порогов: состоянию и скидке нужно, на что сослаться. */
 async function thresholdRuleIds(
   context: AccessContext,
@@ -494,12 +521,15 @@ export async function applyThresholds(
     const ruleId = ids.get(`down:${String(triggered.threshold)}`) ?? null;
 
     if (triggered.actions.includes('extra_rotation')) {
-      await executor.insert(rotationDebts).values({
-        userId: input.userId,
-        reason: `rating.threshold:${String(triggered.threshold)}`,
-        // Долг не сгорает и обнуляется 1 июля — вместе с годом рейтинга (§7).
-        expiresAt: contractEndDate(input.today),
-      });
+      await createRotationDebt(
+        {
+          userId: input.userId,
+          reason: `rating.threshold:${String(triggered.threshold)}`,
+          // Долг не сгорает и обнуляется 1 июля — вместе с годом рейтинга (§7).
+          expiresAt: contractEndDate(input.today),
+        },
+        executor,
+      );
     }
 
     if (triggered.fineAmount > 0) {

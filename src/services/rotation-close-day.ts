@@ -3,12 +3,13 @@ import { and, asc, eq } from 'drizzle-orm';
 import { getDb, type Executor } from '@/db/client';
 import { claimJobRun, finishJobRun } from '@/db/repositories/job-runs';
 import {
+  createRotationDebt,
   listAssignmentsFor,
   listOccurrencesOfDate,
   updateAssignment,
   updateOccurrence,
 } from '@/db/repositories/rotations';
-import { organizations, rotationDebts, users } from '@/db/schema';
+import { organizations, users } from '@/db/schema';
 import { contractEndDate } from '@/domain/contract';
 import { logger } from '@/lib/logger';
 import { addDays, now, todayInAlmaty, type BusinessDate } from '@/lib/time';
@@ -144,14 +145,17 @@ export async function closeRotationDay(deps: CloseDayDeps = {}): Promise<CloseDa
               { executor, instant },
             );
 
-            await executor.insert(rotationDebts).values({
-              userId: assignment.userId,
-              reason: 'rotation.missed',
-              sourceAssignmentId: assignment.id,
-              // Долг не сгорает и живёт до 1 июля — той же границы, что
-              // и год рейтинга (§7).
-              expiresAt: contractEndDate(date),
-            });
+            await createRotationDebt(
+              {
+                userId: assignment.userId,
+                reason: 'rotation.missed',
+                sourceAssignmentId: assignment.id,
+                // Долг не сгорает и живёт до 1 июля — той же границы, что
+                // и год рейтинга (§7).
+                expiresAt: contractEndDate(date),
+              },
+              executor,
+            );
 
             debts += 1;
           }

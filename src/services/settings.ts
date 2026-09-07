@@ -1,6 +1,6 @@
 import { getDb, type Executor } from '@/db/client';
 import { requireHouse } from '@/db/repositories/houses';
-import { getSetting, listSettings, putSetting } from '@/db/repositories/settings';
+import { getSetting, listSettings, putSetting, readSettingValue } from '@/db/repositories/settings';
 import { updateUser } from '@/db/repositories/users';
 import { assertCan } from '@/lib/authz';
 import { LOCALES, type Locale } from '@/lib/i18n/config';
@@ -9,6 +9,7 @@ import { ValidationError } from '@/lib/errors';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
 
+import type { AccessContext } from '@/db/access';
 import type { User } from '@/db/schema';
 import type { UserActor } from './users';
 
@@ -51,6 +52,24 @@ function isLocale(value: unknown): value is Locale {
 
 function isTheme(value: unknown): value is Theme {
   return typeof value === 'string' && (THEMES as readonly string[]).includes(value);
+}
+
+/**
+ * Показывать ли жильцам рейтинг (§5.6): флаг нужен самому жильцу, чтобы
+ * понять, рисовать ли ему число, а права на настройки сети у него нет.
+ */
+export async function isRatingVisibleToResidents(
+  context: AccessContext,
+  executor: Executor = getDb(),
+): Promise<boolean> {
+  const value = await readSettingValue(
+    'org',
+    context.orgId,
+    ORG_SETTINGS.ratingVisibleToResidents.key,
+    executor,
+  );
+
+  return typeof value === 'boolean' ? value : ORG_SETTINGS.ratingVisibleToResidents.defaultValue;
 }
 
 export async function readOrgSettings(

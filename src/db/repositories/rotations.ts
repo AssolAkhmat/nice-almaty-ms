@@ -16,6 +16,7 @@ import {
   residentProfiles,
   rotationAssignments,
   rotationOccurrences,
+  rotationDebts,
   rotationRowSlots,
   rotationRowZones,
   rotationRows,
@@ -28,6 +29,7 @@ import {
   type RotationOccurrence,
   type RotationRow,
   type RotationRowSlot,
+  type RotationDebt,
   type RotationRowZone,
   type RotationTemplateSettings,
 } from '../schema';
@@ -107,6 +109,47 @@ async function requireVisibleArea(
   }
 
   return area;
+}
+
+/**
+ * Долг по дополнительной ротации (§7): его заводят закрытие дня и порог
+ * рейтинга. Дом у долга не хранится — человек может переехать, а долг
+ * остаётся при нём до 1 июля.
+ */
+export async function createRotationDebt(
+  input: {
+    userId: string;
+    reason: string;
+    sourceAssignmentId?: string | null;
+    expiresAt: BusinessDate;
+  },
+  executor: Executor = getDb(),
+): Promise<void> {
+  await executor.insert(rotationDebts).values({
+    userId: input.userId,
+    reason: input.reason,
+    sourceAssignmentId: input.sourceAssignmentId ?? null,
+    expiresAt: input.expiresAt,
+  });
+}
+
+/** Непогашенные долги жильцов: видимость идёт через проживание. */
+export async function listRotationDebts(
+  context: AccessContext,
+  filter: { userIds: readonly string[] },
+  executor: Executor = getDb(),
+): Promise<RotationDebt[]> {
+  if (filter.userIds.length === 0) {
+    return [];
+  }
+
+  const own = context.role === 'resident' ? [context.userId] : [...filter.userIds];
+
+  return executor
+    .select()
+    .from(rotationDebts)
+    .where(and(inArray(rotationDebts.userId, own), isNull(rotationDebts.resolvedByAssignmentId)))
+    .orderBy(asc(rotationDebts.expiresAt), asc(rotationDebts.id));
 }
 
 export interface CreateChecklistInput {
