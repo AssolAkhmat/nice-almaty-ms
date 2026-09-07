@@ -1,4 +1,5 @@
 import { getDb, type Executor } from '@/db/client';
+import { listApprovedAbsences } from '@/db/repositories/rating';
 import {
   createAssignment,
   createOccurrence,
@@ -42,6 +43,36 @@ function executorOf(deps: ScheduleDeps): Executor {
 }
 
 const DAYS_IN_WEEK = 7;
+
+/**
+ * Кто отсутствует в этот день по одобренному отъезду или болезни (§9).
+ *
+ * Освобождение касается только общих зон: комнатные и генеральные уборки
+ * админ переносит или переназначает руками, и снимать их автоматически
+ * значило бы решать за него.
+ */
+async function absentOn(
+  actor: UserActor,
+  houseId: string,
+  date: BusinessDate,
+  executor: Executor,
+): Promise<Set<string>> {
+  const rows = await listApprovedAbsences(
+    actor.context,
+    houseId,
+    { from: date, to: date },
+    executor,
+  );
+
+  return new Set(
+    rows.filter((row) => row.type === 'long' || row.type === 'sick').map((row) => row.userId),
+  );
+}
+
+/** Освобождает ли отсутствие от этой уборки: только обычная общая зона (§9). */
+function freedByAbsence(type: 'regular' | 'room' | 'general' | 'extra'): boolean {
+  return type === 'regular';
+}
 
 export interface OccurrenceView {
   occurrence: RotationOccurrence;
@@ -147,6 +178,8 @@ export async function generateSchedule(
         ]),
       );
 
+      const absent = await absentOn(actor, houseId, date, executor);
+
       /** Слоты, которым на этой неделе выпала зона: ключ — зона с чек-листом. */
       const byZone = new Map<string, { areaId: string; checklistId: string; slots: number[] }>();
 
@@ -202,7 +235,14 @@ export async function generateSchedule(
 
         for (const position of group.slots) {
           const bedId = slots.find((slot) => slot.position === position)?.bedId ?? '';
-          const userId = occupants.get(bedId) ?? null;
+          const living = occupants.get(bedId) ?? null;
+          /*
+           * Отсутствующий на эту дату общую зону не убирает: назначение
+           * достаётся не ему, а задаче админа «отмени или назначь вручную».
+           */
+          const occurrenceType = row.type === 'room' ? 'room' : 'regular';
+          const userId =
+            living !== null && freedByAbsence(occurrenceType) && absent.has(living) ? null : living;
 
           await createAssignment(
             actor.context,
@@ -281,6 +321,7 @@ export async function syncFutureAssignments(
 
   const slotsByRow = new Map<string, Map<number, string>>();
   const occupantsByDate = new Map<string, Map<string, string>>();
+  const absentByDate = new Map<string, Set<string>>();
   let changed = 0;
 
   for (const occurrence of scheduled) {
@@ -292,12 +333,12 @@ export async function syncFutureAssignments(
     }
 
     if (!occupantsByDate.has(occurrence.date)) {
-      const occupants = await listBedOccupantsOn(
-        actor.context,
-        houseId,
-        occurrence.date as BusinessDate,
-        executor,
-      );
+      const [occupants, absent] = await Promise.all([
+        listBedOccupantsOn(actor.context, houseId, occurrence.date as BusinessDate, executor),
+        absentOn(actor, houseId, occurrence.date as BusinessDate, executor),
+      ]);
+
+      absentByDate.set(occurrence.date, absent);
       occupantsByDate.set(
         occurrence.date,
         new Map(occupants.map((row) => [row.bedId, row.userId])),
@@ -317,7 +358,12 @@ export async function syncFutureAssignments(
       }
 
       const bedId = slots?.get(assignment.slotPosition ?? -1) ?? '';
-      const userId = occupants?.get(bedId) ?? null;
+      const living = occupants?.get(bedId) ?? null;
+      const absent = absentByDate.get(occurrence.date);
+      const userId =
+        living !== null && freedByAbsence(occurrence.type) && absent?.has(living) === true
+          ? null
+          : living;
 
       if (userId === assignment.userId) {
         continue;

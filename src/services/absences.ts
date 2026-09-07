@@ -12,6 +12,7 @@ import { NotFoundError, ValidationError } from '@/lib/errors';
 import { compareBusinessDates, now, todayInAlmaty, type BusinessDate } from '@/lib/time';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
+import { syncFutureAssignments } from './rotation-schedule';
 
 import type { Absence } from '@/db/schema';
 import type { UserActor } from './users';
@@ -186,6 +187,7 @@ async function review(
 ): Promise<Absence> {
   const executor = executorOf(deps);
   const instant = deps.instant ?? now();
+  const today = deps.today ?? todayInAlmaty();
 
   const existing = await requireAbsence(actor.context, absenceId, executor);
 
@@ -216,6 +218,18 @@ async function review(
       },
       tx,
     );
+
+    /*
+     * Решение по отъезду или болезни меняет, кто убирает общие зоны (§6.3),
+     * поэтому будущие занятия пересчитываются тут же: иначе задача «отмени
+     * или назначь вручную» дошла бы до админа только со следующей правкой
+     * расписания, то есть уже после пропущенной уборки. Отказ по той же
+     * причине возвращает человека в сетку. Путь системный, без права на
+     * настройку дома (P3-1): его уже проверили на самом решении.
+     */
+    if (existing.type !== 'short') {
+      await syncFutureAssignments(actor, existing.houseId, today, { executor: tx, today });
+    }
 
     return updated;
   });

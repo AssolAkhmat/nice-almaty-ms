@@ -1,5 +1,6 @@
 import { getDb, type Executor } from '@/db/client';
 import { listInvoices } from '@/db/repositories/invoices';
+import { listApprovedAbsences } from '@/db/repositories/rating';
 import { listResidencies } from '@/db/repositories/residencies';
 import {
   addUtilityLine,
@@ -17,6 +18,7 @@ import {
   updateUtilityPeriod,
 } from '@/db/repositories/utilities';
 import {
+  absentDaysInMonth,
   daysLivedInMonth,
   distributeUtilities,
   monthOf,
@@ -24,7 +26,14 @@ import {
 } from '@/domain/utilities';
 import { assertCan } from '@/lib/authz';
 import { ConflictError, NotFoundError, ValidationError } from '@/lib/errors';
-import { addMonths, now, startOfMonth, todayInAlmaty, type BusinessDate } from '@/lib/time';
+import {
+  addMonths,
+  endOfMonth,
+  now,
+  startOfMonth,
+  todayInAlmaty,
+  type BusinessDate,
+} from '@/lib/time';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
 import { appendInvoiceLine, createInvoice } from './invoices';
@@ -107,18 +116,46 @@ async function participantsOf(
   month: BusinessDate,
   executor: Executor,
 ): Promise<{ userId: string; residency: Residency; days: number }[]> {
-  const residencies = await listResidencies(actor.context, { houseId }, executor);
+  const [residencies, absences] = await Promise.all([
+    listResidencies(actor.context, { houseId }, executor),
+    listApprovedAbsences(
+      actor.context,
+      houseId,
+      { from: startOfMonth(month), to: endOfMonth(month) },
+      executor,
+    ),
+  ]);
+
+  /*
+   * Из дней вычитается только одобренный отъезд (§4.2): болезнь идёт
+   * полностью, краткосрочное — тем более. День отъезда и день возвращения
+   * прожиты, не считаются лишь дни строго между ними — это и делает
+   * `absentDaysInMonth`.
+   */
+  const tripsByUser = new Map<string, { from: BusinessDate; to: BusinessDate }[]>();
+
+  for (const absence of absences) {
+    if (absence.type !== 'long' || absence.endDate === null) {
+      continue;
+    }
+
+    const trips = tripsByUser.get(absence.userId) ?? [];
+    trips.push({ from: absence.startDate as BusinessDate, to: absence.endDate as BusinessDate });
+    tripsByUser.set(absence.userId, trips);
+  }
 
   return (
     residencies
       .map((residency) => ({
         userId: residency.userId,
         residency,
-        days: daysLivedInMonth({
-          month,
-          moveIn: residency.moveInDate === null ? null : (residency.moveInDate as BusinessDate),
-          moveOut: residency.moveOutDate === null ? null : (residency.moveOutDate as BusinessDate),
-        }),
+        days:
+          daysLivedInMonth({
+            month,
+            moveIn: residency.moveInDate === null ? null : (residency.moveInDate as BusinessDate),
+            moveOut:
+              residency.moveOutDate === null ? null : (residency.moveOutDate as BusinessDate),
+          }) - absentDaysInMonth(month, tripsByUser.get(residency.userId) ?? []),
       }))
       .filter((entry) => entry.days > 0)
       /*

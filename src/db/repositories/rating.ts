@@ -186,6 +186,34 @@ export async function updateAbsence(
   return absence;
 }
 
+/**
+ * Одобренные отсутствия дома, пересекающиеся с периодом.
+ *
+ * Читают их коммуналка и расписание ротаций, поэтому проверка права идёт
+ * по самой операции, а не по разделу отсутствий: расчёт коммуналки делает
+ * тот, кто вправе её считать (P3-1).
+ */
+export async function listApprovedAbsences(
+  context: AccessContext,
+  houseId: string,
+  range: { from: BusinessDate; to: BusinessDate },
+  executor: Executor = getDb(),
+): Promise<Absence[]> {
+  return executor
+    .select()
+    .from(absences)
+    .where(
+      and(
+        eq(absences.orgId, context.orgId),
+        eq(absences.houseId, houseId),
+        eq(absences.status, 'approved'),
+        sql`${absences.startDate} <= ${range.to}::date`,
+        sql`coalesce(${absences.endDate}, ${absences.startDate}) >= ${range.from}::date`,
+      ),
+    )
+    .orderBy(asc(absences.startDate), asc(absences.id));
+}
+
 export interface RatingRuleInput {
   /** `null` — правило сети; дом переопределяет его по тому же коду (§5.5). */
   houseId: string | null;
