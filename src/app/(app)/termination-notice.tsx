@@ -1,5 +1,5 @@
+import { AppLink } from '@/components/ui/app-link';
 import { getFormatter, getTranslations } from 'next-intl/server';
-import Link from 'next/link';
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
@@ -88,12 +88,12 @@ export async function TerminationNotice({
         )}
 
         <div className="flex flex-wrap gap-3 pt-2">
-          <Link className="text-accent underline" href="/profile">
+          <AppLink className="text-accent underline" href="/profile">
             {t('links.profile')}
-          </Link>
-          <Link className="text-accent underline" href="/deposit">
+          </AppLink>
+          <AppLink className="text-accent underline" href="/deposit">
             {t('links.deposit')}
-          </Link>
+          </AppLink>
         </div>
       </div>
     </Card>

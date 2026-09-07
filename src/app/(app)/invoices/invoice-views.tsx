@@ -1,7 +1,7 @@
 'use client';
 
+import { AppLink } from '@/components/ui/app-link';
 import { useFormatter, useTranslations } from 'next-intl';
-import Link from 'next/link';
 import { useActionState, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
@@ -222,9 +222,9 @@ export function HouseInvoicesTable({ rows }: { rows: readonly InvoiceRowView[] }
           key: 'resident',
           header: t('invoices.resident'),
           cell: (row) => (
-            <Link className="underline-offset-2 hover:underline" href={`/invoices/${row.id}`}>
+            <AppLink className="underline-offset-2 hover:underline" href={`/invoices/${row.id}`}>
               {row.residentName}
-            </Link>
+            </AppLink>
           ),
         },
         {

@@ -1,5 +1,5 @@
+import { AppLink } from '@/components/ui/app-link';
 import { getLocale, getTranslations } from 'next-intl/server';
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
@@ -185,52 +185,43 @@ export default async function RotationsPage({
 
         <div className="flex flex-wrap items-center gap-3 text-[13px]">
           {MODES.map((item) => (
-            <Link
+            <AppLink
               className={item === mode ? 'font-medium' : 'text-accent underline'}
               data-testid={`mode-${item}`}
               href={{ pathname: '/rotations', query: { mode: item, date: anchor } }}
               key={item}
-              prefetch={false}
             >
               {t(`modes.${item}`)}
-            </Link>
+            </AppLink>
           ))}
 
           <span className="text-text-muted">·</span>
 
-          <Link
+          <AppLink
             className="text-accent underline"
             data-testid="calendar-prev"
             href={{ pathname: '/rotations', query: { mode, date: shift(mode, anchor, -1) } }}
-            prefetch={false}
           >
             {t('previous')}
-          </Link>
-          <Link
+          </AppLink>
+          <AppLink
             className="text-accent underline"
             data-testid="calendar-today"
             href={{ pathname: '/rotations', query: { mode } }}
-            prefetch={false}
           >
             {t('today')}
-          </Link>
-          <Link
-            className="text-accent underline"
-            data-testid="to-stats"
-            href="/rotations/stats"
-            prefetch={false}
-          >
+          </AppLink>
+          <AppLink className="text-accent underline" data-testid="to-stats" href="/rotations/stats">
             {t('toStats')}
-          </Link>
+          </AppLink>
 
-          <Link
+          <AppLink
             className="text-accent underline"
             data-testid="calendar-next"
             href={{ pathname: '/rotations', query: { mode, date: shift(mode, anchor, 1) } }}
-            prefetch={false}
           >
             {t('next')}
-          </Link>
+          </AppLink>
         </div>
       </Card>
 

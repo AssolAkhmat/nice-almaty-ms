@@ -72,6 +72,29 @@ export default tseslint.config(
     },
   },
 
+  /*
+   * Ссылки приложения идут через `AppLink`: `Link` из Next предзагружает
+   * страницу, и после действия на ней экран показывает снимок, снятый
+   * до правки. Единственное место, где берётся `next/link`, — сама обёртка.
+   */
+  {
+    files: ['src/app/**/*.tsx', 'src/components/**/*.tsx'],
+    ignores: ['src/components/ui/app-link.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'next/link',
+              message: 'Ссылки приложения идут через @/components/ui/app-link.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // Расчётные ядра: чистые функции без БД, приложения, адаптеров и сервисов.
   {
     files: ['src/domain/**/*.ts'],

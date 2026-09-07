@@ -1,5 +1,5 @@
+import { AppLink } from '@/components/ui/app-link';
 import { getTranslations } from 'next-intl/server';
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { listHouses } from '@/db/repositories/houses';
@@ -38,9 +38,9 @@ export default async function RemotePage({
 
   const header = (
     <div className="flex flex-col gap-1">
-      <Link className="text-text-muted text-[13px] hover:underline" href="/invoices">
+      <AppLink className="text-text-muted text-[13px] hover:underline" href="/invoices">
         {(await getTranslations('invoices'))('backToList')}
-      </Link>
+      </AppLink>
       <h1>{t('title')}</h1>
       <p className="text-text-muted text-[13px]">{t('subtitle')}</p>
     </div>
@@ -102,7 +102,7 @@ export default async function RemotePage({
       {houses.length > 1 && (
         <nav className="flex flex-wrap gap-2 text-[13px]">
           {houses.map((house) => (
-            <Link
+            <AppLink
               className={
                 house.id === houseId ? 'text-text font-medium' : 'text-text-muted hover:text-text'
               }
@@ -110,14 +110,14 @@ export default async function RemotePage({
               key={house.id}
             >
               {house.name}
-            </Link>
+            </AppLink>
           ))}
         </nav>
       )}
 
       <nav className="flex flex-wrap gap-2 text-[13px]">
         {months.map((value) => (
-          <Link
+          <AppLink
             className={
               value === month ? 'text-text font-medium' : 'text-text-muted hover:text-text'
             }
@@ -128,7 +128,7 @@ export default async function RemotePage({
             key={value}
           >
             {value.slice(0, 7)}
-          </Link>
+          </AppLink>
         ))}
       </nav>
 

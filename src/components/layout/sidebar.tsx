@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { AppLink } from '@/components/ui/app-link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
@@ -29,7 +29,7 @@ export function Sidebar() {
 
           return (
             <li key={item.key}>
-              <Link
+              <AppLink
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
                   'rounded-control flex h-11 items-center gap-3 px-3 text-[15px] transition-colors duration-150',
@@ -43,7 +43,7 @@ export function Sidebar() {
               >
                 <Icon aria-hidden="true" className="shrink-0" size={20} strokeWidth={1.5} />
                 <span className="hidden lg:inline">{t(item.key)}</span>
-              </Link>
+              </AppLink>
             </li>
           );
         })}

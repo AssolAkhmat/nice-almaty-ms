@@ -1,5 +1,5 @@
+import { AppLink } from '@/components/ui/app-link';
 import { getTranslations } from 'next-intl/server';
-import Link from 'next/link';
 
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusPill } from '@/components/ui/badge';
@@ -51,9 +51,9 @@ export async function OnboardingWizard({ steps }: { steps: readonly OnboardingSt
 
               <span className="flex items-center gap-3">
                 {href !== undefined && !step.done && (
-                  <Link className="text-accent text-[13px] underline" href={href}>
+                  <AppLink className="text-accent text-[13px] underline" href={href}>
                     {t('open')}
-                  </Link>
+                  </AppLink>
                 )}
                 <StatusPill kind={step.done ? 'done' : isCurrent ? 'attention' : 'muted'}>
                   {step.done ? t('done') : isCurrent ? t('now') : t('waiting')}

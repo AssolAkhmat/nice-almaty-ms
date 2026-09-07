@@ -1,7 +1,7 @@
 'use client';
 
+import { AppLink } from '@/components/ui/app-link';
 import { useFormatter, useTranslations } from 'next-intl';
-import Link from 'next/link';
 import { useActionState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
@@ -36,9 +36,9 @@ function TaskCard({ task }: { task: RemoteTaskView }) {
     <Card data-testid="remote-task">
       <CardHeader>
         <CardTitle>
-          <Link className="hover:underline" href={`/invoices/${task.invoiceId}`}>
+          <AppLink className="hover:underline" href={`/invoices/${task.invoiceId}`}>
             {task.residentName}
-          </Link>
+          </AppLink>
         </CardTitle>
         <Money amount={task.remaining} />
       </CardHeader>

@@ -1,5 +1,5 @@
+import { AppLink } from '@/components/ui/app-link';
 import { getLocale, getTranslations } from 'next-intl/server';
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
@@ -158,9 +158,9 @@ export default async function RotationSetupPage({
       <div className="flex flex-col gap-1">
         <h1>{t('title')}</h1>
         <p className="text-text-muted text-[13px]">{setup.houseName}</p>
-        <Link className="text-accent text-[13px] underline" href="/settings/house">
+        <AppLink className="text-accent text-[13px] underline" href="/settings/house">
           {t('backToHouse')}
-        </Link>
+        </AppLink>
       </div>
 
       {houses.length > 1 && (
@@ -171,13 +171,13 @@ export default async function RotationSetupPage({
 
           <div className="flex flex-wrap gap-3 text-[13px]">
             {houses.map((house) => (
-              <Link
+              <AppLink
                 className={house.id === houseId ? 'font-medium' : 'text-accent underline'}
                 href={{ pathname: '/settings/house/rotations', query: { house: house.id } }}
                 key={house.id}
               >
                 {house.name}
-              </Link>
+              </AppLink>
             ))}
           </div>
         </Card>

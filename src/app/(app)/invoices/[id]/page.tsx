@@ -1,5 +1,5 @@
+import { AppLink } from '@/components/ui/app-link';
 import { getTranslations } from 'next-intl/server';
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
@@ -81,9 +81,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   return (
     <section className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <Link className="text-text-muted text-[13px] hover:underline" href="/invoices">
+        <AppLink className="text-text-muted text-[13px] hover:underline" href="/invoices">
           {t('backToList')}
-        </Link>
+        </AppLink>
         <h1>{card.residentName ?? t('title')}</h1>
       </div>
 

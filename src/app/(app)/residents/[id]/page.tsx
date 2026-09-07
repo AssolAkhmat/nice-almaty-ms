@@ -1,5 +1,5 @@
+import { AppLink } from '@/components/ui/app-link';
 import { getTranslations } from 'next-intl/server';
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { listHouses } from '@/db/repositories/houses';
@@ -94,15 +94,15 @@ export default async function ResidentCardPage({ params }: { params: Promise<{ i
           </div>
 
           <div className="flex flex-wrap gap-3 pt-2">
-            <Link className="text-accent underline" href="/documents">
+            <AppLink className="text-accent underline" href="/documents">
               {t('links.documents')}
-            </Link>
-            <Link className="text-accent underline" href="/contract">
+            </AppLink>
+            <AppLink className="text-accent underline" href="/contract">
               {t('links.contract')}
-            </Link>
-            <Link className="text-accent underline" href="/deposit">
+            </AppLink>
+            <AppLink className="text-accent underline" href="/deposit">
               {t('links.deposit')}
-            </Link>
+            </AppLink>
           </div>
         </div>
       </Card>

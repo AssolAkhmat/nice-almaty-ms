@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { AppLink } from '@/components/ui/app-link';
 import { getTranslations } from 'next-intl/server';
 import { redirect } from 'next/navigation';
 
@@ -26,9 +26,9 @@ export default async function SettingsPage() {
       }) ? (
         <Card>
           <CardTitle>
-            <Link className="text-primary hover:underline" href="/settings/users">
+            <AppLink className="text-primary hover:underline" href="/settings/users">
               {t('users.title')}
-            </Link>
+            </AppLink>
           </CardTitle>
           <p className="text-text-muted mt-1 text-[13px]">{t('users.subtitle')}</p>
         </Card>
@@ -38,9 +38,9 @@ export default async function SettingsPage() {
       can(session.context, 'house.create') ? (
         <Card>
           <CardTitle>
-            <Link className="text-primary hover:underline" href="/settings/houses">
+            <AppLink className="text-primary hover:underline" href="/settings/houses">
               {t('houses.title')}
-            </Link>
+            </AppLink>
           </CardTitle>
           <p className="text-text-muted mt-1 text-[13px]">{t('houses.subtitle')}</p>
         </Card>
@@ -49,9 +49,9 @@ export default async function SettingsPage() {
       {can(session.context, 'settings.house.read', { houseId: session.context.houseId }) ? (
         <Card>
           <CardTitle>
-            <Link className="text-primary hover:underline" href="/settings/house">
+            <AppLink className="text-primary hover:underline" href="/settings/house">
               {t('houseSetup.title')}
-            </Link>
+            </AppLink>
           </CardTitle>
           <p className="text-text-muted mt-1 text-[13px]">{t('houseSetup.subtitle')}</p>
         </Card>
@@ -60,9 +60,9 @@ export default async function SettingsPage() {
       {can(session.context, 'settings.org.read') ? (
         <Card>
           <CardTitle>
-            <Link className="text-primary hover:underline" href="/settings/network">
+            <AppLink className="text-primary hover:underline" href="/settings/network">
               {t('settings.network.title')}
-            </Link>
+            </AppLink>
           </CardTitle>
           <p className="text-text-muted mt-1 text-[13px]">{t('settings.network.subtitle')}</p>
         </Card>
@@ -71,9 +71,9 @@ export default async function SettingsPage() {
       {can(session.context, 'audit.read') ? (
         <Card>
           <CardTitle>
-            <Link className="text-primary hover:underline" href="/settings/audit">
+            <AppLink className="text-primary hover:underline" href="/settings/audit">
               {t('audit.title')}
-            </Link>
+            </AppLink>
           </CardTitle>
           <p className="text-text-muted mt-1 text-[13px]">{t('audit.subtitle')}</p>
         </Card>
@@ -81,18 +81,18 @@ export default async function SettingsPage() {
 
       <Card>
         <CardTitle>
-          <Link className="text-primary hover:underline" href="/profile">
+          <AppLink className="text-primary hover:underline" href="/profile">
             {t('profile.title')}
-          </Link>
+          </AppLink>
         </CardTitle>
         <p className="text-text-muted mt-1 text-[13px]">{t('profile.subtitle')}</p>
       </Card>
 
       <Card>
         <CardTitle>
-          <Link className="text-primary hover:underline" href="/settings/personal">
+          <AppLink className="text-primary hover:underline" href="/settings/personal">
             {t('settings.personal.title')}
-          </Link>
+          </AppLink>
         </CardTitle>
         <p className="text-text-muted mt-1 text-[13px]">{t('settings.personal.subtitle')}</p>
       </Card>

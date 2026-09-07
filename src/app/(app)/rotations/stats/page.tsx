@@ -1,5 +1,5 @@
+import { AppLink } from '@/components/ui/app-link';
 import { getTranslations } from 'next-intl/server';
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { Badge } from '@/components/ui/badge';
@@ -73,9 +73,9 @@ export default async function RotationStatsPage({
           </span>
           <Badge tone="neutral">{t('total', { count: stats.total })}</Badge>
         </p>
-        <Link className="text-accent text-[13px] underline" href="/rotations" prefetch={false}>
+        <AppLink className="text-accent text-[13px] underline" href="/rotations">
           {t('toCalendar')}
-        </Link>
+        </AppLink>
       </div>
 
       <StatsView

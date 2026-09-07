@@ -1,5 +1,5 @@
+import { AppLink } from '@/components/ui/app-link';
 import { getTranslations } from 'next-intl/server';
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { listHouses } from '@/db/repositories/houses';
@@ -135,13 +135,13 @@ export default async function BedsPage({
 
           <div className="flex flex-wrap gap-3 text-[13px]">
             {houses.map((house) => (
-              <Link
+              <AppLink
                 className={house.id === houseId ? 'font-medium' : 'text-accent underline'}
                 href={{ pathname: '/beds', query: { house: house.id } }}
                 key={house.id}
               >
                 {house.name}
-              </Link>
+              </AppLink>
             ))}
           </div>
         </Card>

@@ -220,15 +220,18 @@ describe('генерация 1 числа', () => {
         .set({ period: '[2026-01-01,2026-10-10)' })
         .where(eq(schema.bedAssignments.residencyId, fixture.active));
 
-      const [bed] = await tx
+      // Место берётся у самого проживания, а не «первое в доме»: в доме их
+      // несколько, порядок без сортировки не определён, и новое назначение
+      // однажды легло на чужое место с открытым периодом.
+      const [previous] = await tx
         .select()
-        .from(schema.beds)
-        .where(eq(schema.beds.houseId, fixture.houseId))
+        .from(schema.bedAssignments)
+        .where(eq(schema.bedAssignments.residencyId, fixture.active))
         .limit(1);
 
       await tx.insert(schema.bedAssignments).values({
         residencyId: fixture.active,
-        bedId: bed?.id ?? '',
+        bedId: previous?.bedId ?? '',
         price: 120_000,
         period: '[2026-10-10,)',
       });

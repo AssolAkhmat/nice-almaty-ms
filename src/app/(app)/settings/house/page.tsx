@@ -1,5 +1,5 @@
+import { AppLink } from '@/components/ui/app-link';
 import { getTranslations } from 'next-intl/server';
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { listHouses } from '@/db/repositories/houses';
@@ -84,14 +84,13 @@ export default async function HouseSettingsPage({
           после сохранения показывала прежние данные — ответ брался
           из кеша маршрутизатора, снятого до правки.
         */}
-        <Link
+        <AppLink
           className="text-accent text-[13px] underline"
           data-testid="to-rotation-setup"
           href="/settings/house/rotations"
-          prefetch={false}
         >
           {t('toRotations')}
-        </Link>
+        </AppLink>
       </div>
 
       {houses.length > 1 && (
@@ -102,13 +101,13 @@ export default async function HouseSettingsPage({
 
           <div className="flex flex-wrap gap-3 text-[13px]">
             {houses.map((house) => (
-              <Link
+              <AppLink
                 className={house.id === houseId ? 'font-medium' : 'text-accent underline'}
                 href={{ pathname: '/settings/house', query: { house: house.id } }}
                 key={house.id}
               >
                 {house.name}
-              </Link>
+              </AppLink>
             ))}
           </div>
         </Card>

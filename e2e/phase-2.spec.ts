@@ -69,6 +69,12 @@ async function signContract(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Сохранить подпись' }).click();
   await page.getByTestId('sign-submit').click();
 
+  /*
+   * Ждём исчезновения самой формы, а не текста рядом с ней: подпись уходит
+   * файлом, и на загруженной машине шаг не укладывается в общее ожидание.
+   * Форма пропадает ровно тогда, когда подпись сохранена.
+   */
+  await expect(page.getByTestId('sign-submit')).toHaveCount(0, { timeout: 45_000 });
   await expect(page.locator('main')).toContainText('Договор подписан');
 }
 

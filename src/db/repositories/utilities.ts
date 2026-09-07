@@ -191,6 +191,13 @@ export async function deleteUtilityLine(
   await executor.delete(utilityLines).where(eq(utilityLines.id, lineId));
 }
 
+/**
+ * Доли периода: сначала те, кто прожил меньше, потом — кто дольше.
+ *
+ * Порядок по времени создания не годился: все доли пишутся одной
+ * транзакцией и получают от `now()` одно и то же время, после чего
+ * их порядок оставался на усмотрение планировщика, а список читает человек.
+ */
 export async function listUtilityAllocations(
   periodId: string,
   executor: Executor = getDb(),
@@ -199,7 +206,7 @@ export async function listUtilityAllocations(
     .select()
     .from(utilityAllocations)
     .where(eq(utilityAllocations.periodId, periodId))
-    .orderBy(asc(utilityAllocations.createdAt));
+    .orderBy(asc(utilityAllocations.days), asc(utilityAllocations.userId));
 }
 
 /**

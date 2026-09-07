@@ -1,5 +1,5 @@
+import { AppLink } from '@/components/ui/app-link';
 import { getTranslations } from 'next-intl/server';
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { listHouses } from '@/db/repositories/houses';
@@ -166,7 +166,7 @@ export default async function InvoicesPage({
       {houses.length > 1 && (
         <nav className="flex flex-wrap gap-2 text-[13px]">
           {houses.map((house) => (
-            <Link
+            <AppLink
               className={
                 house.id === houseId ? 'text-text font-medium' : 'text-text-muted hover:text-text'
               }
@@ -174,15 +174,15 @@ export default async function InvoicesPage({
               key={house.id}
             >
               {house.name}
-            </Link>
+            </AppLink>
           ))}
         </nav>
       )}
 
       <nav className="flex flex-wrap gap-2 text-[13px]">
-        <Link className="text-text-muted hover:text-text" href="/invoices/remote">
+        <AppLink className="text-text-muted hover:text-text" href="/invoices/remote">
           {t('remote.title')}
-        </Link>
+        </AppLink>
       </nav>
 
       <SummaryCard summary={summary} />

@@ -1,7 +1,7 @@
 'use client';
 
+import { AppLink } from '@/components/ui/app-link';
 import { MoreHorizontal } from 'lucide-react';
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
@@ -32,7 +32,7 @@ export function BottomNav() {
           const isActive = isActiveHref(item.href, pathname);
 
           return (
-            <Link
+            <AppLink
               aria-current={isActive ? 'page' : undefined}
               className={cn(ITEM_CLASSES, isActive ? 'text-primary' : 'text-text-muted')}
               href={item.href}
@@ -40,7 +40,7 @@ export function BottomNav() {
             >
               <Icon aria-hidden="true" size={20} strokeWidth={1.5} />
               <span className="max-w-full truncate">{t(item.key)}</span>
-            </Link>
+            </AppLink>
           );
         })}
 
@@ -65,7 +65,7 @@ export function BottomNav() {
 
             return (
               <li key={item.key}>
-                <Link
+                <AppLink
                   aria-current={isActive ? 'page' : undefined}
                   className={cn(
                     'rounded-control flex h-11 items-center gap-3 px-3 text-[15px]',
@@ -78,7 +78,7 @@ export function BottomNav() {
                 >
                   <Icon aria-hidden="true" size={20} strokeWidth={1.5} />
                   {t(item.key)}
-                </Link>
+                </AppLink>
               </li>
             );
           })}

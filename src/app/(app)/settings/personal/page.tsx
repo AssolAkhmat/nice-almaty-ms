@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { AppLink } from '@/components/ui/app-link';
 import { getTranslations } from 'next-intl/server';
 import { redirect } from 'next/navigation';
 
@@ -32,9 +32,9 @@ export default async function PersonalSettingsPage() {
         <CardHeader>
           <CardTitle>{t('auth.changePassword.title')}</CardTitle>
         </CardHeader>
-        <Link className="text-primary text-[15px] hover:underline" href="/change-password">
+        <AppLink className="text-primary text-[15px] hover:underline" href="/change-password">
           {t('settings.personal.changePassword')}
-        </Link>
+        </AppLink>
       </Card>
     </section>
   );

@@ -1,5 +1,5 @@
+import { AppLink } from '@/components/ui/app-link';
 import { getTranslations } from 'next-intl/server';
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { listAreas } from '@/db/repositories/areas';
@@ -124,12 +124,12 @@ export default async function ResidentsPage({
             <Card data-testid="resident-row" key={row.residencyId}>
               <CardHeader>
                 <CardTitle>
-                  <Link
+                  <AppLink
                     className="underline-offset-2 hover:underline"
                     href={`/residents/${row.residencyId}` as Route}
                   >
                     {row.fullName}
-                  </Link>
+                  </AppLink>
                 </CardTitle>
                 <Badge tone={row.status === 'active' ? 'success' : 'neutral'}>
                   {t(`statuses.${row.status}`)}

@@ -109,17 +109,28 @@ async function participantsOf(
 ): Promise<{ userId: string; residency: Residency; days: number }[]> {
   const residencies = await listResidencies(actor.context, { houseId }, executor);
 
-  return residencies
-    .map((residency) => ({
-      userId: residency.userId,
-      residency,
-      days: daysLivedInMonth({
-        month,
-        moveIn: residency.moveInDate === null ? null : (residency.moveInDate as BusinessDate),
-        moveOut: residency.moveOutDate === null ? null : (residency.moveOutDate as BusinessDate),
-      }),
-    }))
-    .filter((entry) => entry.days > 0);
+  return (
+    residencies
+      .map((residency) => ({
+        userId: residency.userId,
+        residency,
+        days: daysLivedInMonth({
+          month,
+          moveIn: residency.moveInDate === null ? null : (residency.moveInDate as BusinessDate),
+          moveOut: residency.moveOutDate === null ? null : (residency.moveOutDate as BusinessDate),
+        }),
+      }))
+      .filter((entry) => entry.days > 0)
+      /*
+       * Порядок участников — по числу прожитых дней, затем по жильцу. Проживания
+       * приходят отсортированными по времени создания, а у заведённых одной
+       * транзакцией оно одно на всех: порядок оставался на усмотрение планировщика,
+       * и распределение показывалось людям каждый раз в новом виде.
+       */
+      .sort((left, right) =>
+        left.days === right.days ? left.userId.localeCompare(right.userId) : left.days - right.days,
+      )
+  );
 }
 
 /** Период дома за месяц; заводится пустым, если его ещё нет (модуль 6). */

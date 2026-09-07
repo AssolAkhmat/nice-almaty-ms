@@ -33,6 +33,20 @@ describe('запрет прямого обращения к системным �
   }, 60_000);
 });
 
+describe('запрет прямого next/link в компонентах', () => {
+  it('срабатывает на импорт next/link мимо обёртки', async () => {
+    const ruleIds = await ruleIdsFor('src/components/__fixtures__/direct-link.fixture.tsx');
+
+    expect(ruleIds).toContain('no-restricted-imports');
+  }, 60_000);
+
+  it('не срабатывает в самой обёртке — единственном разрешённом месте', async () => {
+    const ruleIds = await ruleIdsFor('src/components/ui/app-link.tsx');
+
+    expect(ruleIds).not.toContain('no-restricted-imports');
+  }, 60_000);
+});
+
 describe('запрет зависимостей расчётных ядер', () => {
   it('срабатывает на импорт базы данных из src/domain', async () => {
     const ruleIds = await ruleIdsFor('src/domain/__fixtures__/forbidden-import.fixture.ts');

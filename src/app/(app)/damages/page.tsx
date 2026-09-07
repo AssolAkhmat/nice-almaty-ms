@@ -1,5 +1,5 @@
+import { AppLink } from '@/components/ui/app-link';
 import { getTranslations } from 'next-intl/server';
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { listAreas } from '@/db/repositories/areas';
@@ -119,7 +119,7 @@ export default async function DamagesPage({
       {houses.length > 1 && (
         <nav className="flex flex-wrap gap-2 text-[13px]">
           {houses.map((house) => (
-            <Link
+            <AppLink
               className={
                 house.id === houseId ? 'text-text font-medium' : 'text-text-muted hover:text-text'
               }
@@ -127,7 +127,7 @@ export default async function DamagesPage({
               key={house.id}
             >
               {house.name}
-            </Link>
+            </AppLink>
           ))}
         </nav>
       )}
