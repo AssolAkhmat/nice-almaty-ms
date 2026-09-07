@@ -40,7 +40,8 @@
       "eligibility_group": "Eligibility group",
       "rotation_row": "Rotation row",
       "rotation_occurrence": "Rotation",
-      "rotation_template": "Rotation template"
+      "rotation_template": "Rotation template",
+      "absence": "Absence"
     }
   },
   "auth": {
@@ -1253,6 +1254,50 @@
       "4": "Thursday",
       "5": "Friday",
       "6": "Saturday"
+    }
+  },
+  "absences": {
+    "title": "Absences",
+    "subtitle": "Tell in advance: a trip needs at least one day",
+    "submitTitle": "Report an absence",
+    "mineTitle": "My notices",
+    "mineEmpty": "No notices yet",
+    "queueTitle": "Awaiting a decision",
+    "queueEmpty": "Nothing is awaiting a decision",
+    "calendarTitle": "House calendar",
+    "calendarEmpty": "No absences in the house",
+    "nothing": "The section is empty",
+    "type": "Type",
+    "startDate": "Start date",
+    "endDate": "End date",
+    "returnAt": "Back at",
+    "reason": "Reason",
+    "reasonHint": "Required for every type",
+    "longHint": "Tomorrow at the earliest",
+    "submit": "Send",
+    "submitted": "Notice sent",
+    "approve": "Approve",
+    "approved": "Absence approved",
+    "reject": "Reject",
+    "rejected": "Absence rejected",
+    "rejectNote": "Rejection reason",
+    "types": {
+      "short": "Late tonight",
+      "long": "Away",
+      "sick": "Sick"
+    },
+    "statuses": {
+      "pending": "Awaiting",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    },
+    "errors": {
+      "reasonRequired": "A reason is required",
+      "longTooLate": "A trip is reported at least one day ahead",
+      "endBeforeStart": "The end date is before the start",
+      "rejectReasonRequired": "Rejection needs a reason",
+      "startRequired": "Set the start date",
+      "unknown": "Could not complete"
     }
   }
 }

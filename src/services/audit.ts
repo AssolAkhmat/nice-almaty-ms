@@ -79,6 +79,9 @@ export const AUDIT_ACTIONS = {
   rotationMarked: 'rotation.marked',
   rotationScored: 'rotation.scored',
   rotationTemplateSaved: 'rotation_template.saved',
+  absenceSubmitted: 'absence.submitted',
+  absenceApproved: 'absence.approved',
+  absenceRejected: 'absence.rejected',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
