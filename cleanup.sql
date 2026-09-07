@@ -15,16 +15,47 @@ begin;
 -- 1. Данные: все таблицы схемы public, кроме скелета сети.
 do $$
 declare
+  -- По одному имени в строке намеренно. Список — единственное, что стоит между
+  -- скелетом сети и truncate: 8 сентября 2026 он потерял хвост при переносе,
+  -- остался «organizations, houses, users» — и счета, типы документов и шаблон
+  -- договора на боевой базе были стёрты. Урезанный массив остаётся правильным
+  -- SQL, поэтому ниже он проверяется явно, а не принимается на веру.
   keep constant text[] := array[
-    'organizations', 'houses', 'users', 'accounts', 'document_types', 'contract_templates'
+    'organizations',
+    'houses',
+    'users',
+    'accounts',
+    'document_types',
+    'contract_templates'
   ];
+  expected constant integer := 6;
+  absent text[];
   list text;
 begin
-  select string_agg(format('public.%I', tablename), ', ')
+  if coalesce(array_length(keep, 1), 0) <> expected then
+    raise exception 'Список сохраняемых таблиц урезан: % имён вместо %. Очистка отменена.',
+      coalesce(array_length(keep, 1), 0), expected;
+  end if;
+
+  select array_agg(name order by name)
+    into absent
+    from unnest(keep) as name
+   where not exists (
+     select 1 from pg_tables where schemaname = 'public' and tablename = name
+   );
+
+  if absent is not null then
+    raise exception 'В схеме public нет таблиц: %. Имя изменилось или база не та — очистка отменена.',
+      absent;
+  end if;
+
+  select string_agg(format('public.%I', tablename), ', ' order by tablename)
     into list
     from pg_tables
    where schemaname = 'public'
      and tablename <> all (keep);
+
+  raise notice 'Очищаются таблицы: %', list;
 
   execute format('truncate table %s restart identity', list);
 end

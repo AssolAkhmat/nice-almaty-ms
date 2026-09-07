@@ -1,13 +1,14 @@
 /* eslint-disable no-console -- это консольная утилита, её вывод и есть результат */
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 
 import { endOfMonth, startOfMonth, todayInAlmaty } from '@/lib/time';
 import { generateSchedule } from '@/services/rotation-schedule';
 
 import { closeDb, getDb } from './client';
-import { users } from './schema';
+import { accounts, contractTemplates, documentTypes, users } from './schema';
 import { seedNetwork, SUPERADMIN_PHONE } from './seed';
 import { FURNISHED_HOUSES } from './seed-content';
+import { parseSeedArguments } from './seed-options';
 
 import type { UserActor } from '@/services/users';
 
@@ -53,10 +54,37 @@ async function scheduleRotations(houseIds: readonly string[]): Promise<number> {
   return created;
 }
 
-async function main(): Promise<void> {
-  const result = await seedNetwork();
+/**
+ * Что есть в сети помимо домов. Печатается после `--skeleton`: восстановление
+ * без отчёта пришлось бы проверять запросом вручную, а ради этих трёх строк
+ * скелет и запускают (модули 10 и 11 — экранов у них нет).
+ */
+async function reportSkeleton(orgId: string): Promise<void> {
+  const db = getDb();
 
-  console.log('Сеть и дома готовы.');
+  const types = await db.select().from(documentTypes).where(eq(documentTypes.orgId, orgId));
+  const templates = await db
+    .select()
+    .from(contractTemplates)
+    .where(eq(contractTemplates.orgId, orgId));
+  const networkAccounts = await db
+    .select()
+    .from(accounts)
+    .where(and(eq(accounts.orgId, orgId), isNull(accounts.houseId)));
+
+  console.log('');
+  console.log('Скелет сети на месте:');
+  console.log(`  типов документов: ${String(types.length)}`);
+  console.log(`  шаблонов договора: ${String(templates.length)}`);
+  console.log(`  счетов сети: ${String(networkAccounts.length)}`);
+  console.log('Домов, жильцов и расписания скелет не заводит.');
+}
+
+async function main(): Promise<void> {
+  const options = parseSeedArguments(process.argv.slice(2));
+  const result = await seedNetwork(options);
+
+  console.log(options.houses === 0 ? 'Сеть готова, домов сид не заводил.' : 'Сеть и дома готовы.');
   console.log('');
   console.log('Учётные записи (пароль меняется при первом входе):');
 
@@ -65,6 +93,12 @@ async function main(): Promise<void> {
     const password = account.temporaryPassword ?? 'уже существует, пароль не менялся';
 
     console.log(`  ${account.phone}  ${account.role}  ${where}  ${password}`);
+  }
+
+  if (options.houses === 0) {
+    await reportSkeleton(result.orgId);
+
+    return;
   }
 
   const occurrences = await scheduleRotations(result.houseIds);
