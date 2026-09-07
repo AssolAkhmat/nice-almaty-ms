@@ -49,8 +49,23 @@ function houseScope(
     | typeof rotationRows.houseId
     | typeof rotationOccurrences.houseId
     | typeof eligibilityGroups.houseId
+    | typeof residencies.houseId
     | typeof rotationTemplatesSettings.houseId,
 ) {
+  /*
+   * Жилец не привязан к дому колонкой (D11), но своё расписание видит:
+   * модуль 3 отдаёт ему календарь дома в режиме чтения. Связь идёт через
+   * проживание — то же, чем видимость жильца устроена в остальных списках.
+   */
+  if (context.role === 'resident') {
+    return sql`exists (
+      select 1 from ${residencies}
+      where ${residencies.userId} = ${context.userId}
+        and ${residencies.houseId} = ${column}
+        and ${residencies.status} in ('active', 'terminating')
+    )`;
+  }
+
   const visible = visibleHouseIds(context);
 
   if (visible === 'all') {
@@ -58,6 +73,21 @@ function houseScope(
   }
 
   return visible.length === 0 ? sql`false` : inArray(column, [...visible]);
+}
+
+/**
+ * Дом, который контексту вообще позволено читать.
+ *
+ * Жильца проверяет не эта функция, а `houseScope`: у него дом не в контексте,
+ * а в проживании, и чужой дом просто не даёт строк — вместо ответа «такого
+ * дома нет», по которому перебором читался бы состав сети (P1-1).
+ */
+function assertHouseReadable(context: AccessContext, houseId: string): void {
+  if (context.role === 'resident') {
+    return;
+  }
+
+  assertHouseVisible(context, houseId);
 }
 
 /** Зона видимого дома. Чужая и несуществующая неотличимы (P1-1). */
@@ -655,7 +685,7 @@ export async function listOccurrences(
   range: { from: BusinessDate; to: BusinessDate },
   executor: Executor = getDb(),
 ): Promise<RotationOccurrence[]> {
-  assertHouseVisible(context, houseId);
+  assertHouseReadable(context, houseId);
 
   return executor
     .select()
@@ -796,6 +826,125 @@ export async function listAssignmentsFor(
     .from(rotationAssignments)
     .where(inArray(rotationAssignments.occurrenceId, [...occurrenceIds]))
     .orderBy(asc(rotationAssignments.slotPosition), asc(rotationAssignments.createdAt));
+}
+
+export interface UpdateOccurrenceInput {
+  date?: BusinessDate;
+  movedFromDate?: BusinessDate | null;
+  status?: 'scheduled' | 'done' | 'missed' | 'cancelled';
+}
+
+export async function updateOccurrence(
+  context: AccessContext,
+  occurrenceId: string,
+  patch: UpdateOccurrenceInput,
+  executor: Executor = getDb(),
+): Promise<RotationOccurrence> {
+  await requireOccurrence(context, occurrenceId, executor);
+
+  const [occurrence] = await executor
+    .update(rotationOccurrences)
+    .set({ ...patch, updatedAt: now() })
+    .where(eq(rotationOccurrences.id, occurrenceId))
+    .returning();
+
+  if (occurrence === undefined) {
+    throw new NotFoundError('Занятие не найдено');
+  }
+
+  return occurrence;
+}
+
+/** Назначения по их собственным идентификаторам. */
+export async function listAssignmentsById(
+  ids: readonly string[],
+  executor: Executor = getDb(),
+): Promise<RotationAssignment[]> {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  return executor
+    .select()
+    .from(rotationAssignments)
+    .where(inArray(rotationAssignments.id, [...ids]));
+}
+
+export interface CalendarDictionaries {
+  areas: { id: string; name: string }[];
+  checklists: { id: string; areaId: string; title: string; peopleNeeded: number }[];
+  members: { userId: string; name: string }[];
+}
+
+/**
+ * Справочники календаря: названия зон, чек-листов и жильцов дома.
+ *
+ * Живут здесь, а не в настройке дома, потому что календарь читает и жилец:
+ * права на настройки у него нет, а имя убирающего он видеть должен.
+ */
+export async function listCalendarDictionaries(
+  context: AccessContext,
+  houseId: string,
+  executor: Executor = getDb(),
+): Promise<CalendarDictionaries> {
+  assertHouseReadable(context, houseId);
+
+  const areaRows = await executor
+    .select({ id: areas.id, name: areas.name })
+    .from(areas)
+    .where(and(eq(areas.houseId, houseId), houseScope(context, areas.houseId)))
+    .orderBy(asc(areas.sortOrder), asc(areas.name));
+
+  const checklistRows = await executor
+    .select({
+      id: areaChecklists.id,
+      areaId: areaChecklists.areaId,
+      title: areaChecklists.title,
+      peopleNeeded: areaChecklists.peopleNeeded,
+    })
+    .from(areaChecklists)
+    .innerJoin(areas, eq(areas.id, areaChecklists.areaId))
+    .where(
+      and(
+        eq(areas.houseId, houseId),
+        houseScope(context, areas.houseId),
+        isNull(areaChecklists.archivedAt),
+      ),
+    );
+
+  const memberRows = await executor
+    .select({
+      userId: residencies.userId,
+      lastName: residentProfiles.lastName,
+      firstName: residentProfiles.firstName,
+      phone: users.phone,
+    })
+    .from(residencies)
+    .leftJoin(residentProfiles, eq(residentProfiles.userId, residencies.userId))
+    .innerJoin(users, eq(users.id, residencies.userId))
+    .where(
+      and(
+        eq(residencies.houseId, houseId),
+        // Жилец получает имена соседей только своего дома: та же связь
+        // через проживание, что и у остального его чтения.
+        houseScope(context, residencies.houseId),
+        inArray(residencies.status, ['active', 'terminating']),
+      ),
+    )
+    .orderBy(asc(residencies.createdAt));
+
+  return {
+    areas: areaRows,
+    checklists: checklistRows,
+    members: memberRows.map((row) => {
+      const name = [row.lastName, row.firstName]
+        .filter((part) => part !== null)
+        .join(' ')
+        .trim();
+
+      return { userId: row.userId, name: name === '' ? row.phone : name };
+    }),
+  };
 }
 
 export interface TemplateSettingsInput {

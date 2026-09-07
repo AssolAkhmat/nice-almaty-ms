@@ -50,6 +50,8 @@ export const ACTIONS = [
   'damage.reverse',
   'utility.read',
   'utility.manage',
+  'rotation.read',
+  'rotation.manage',
   'utility.reopen',
   'accounting.read',
   'accounting.write',
@@ -106,6 +108,8 @@ export const PERMISSIONS: PermissionMatrix = {
     'damage.reverse': 'org',
     'utility.read': 'org',
     'utility.manage': 'org',
+    'rotation.read': 'org',
+    'rotation.manage': 'org',
     'utility.reopen': 'org',
     'accounting.read': 'org',
     'accounting.write': 'org',
@@ -156,6 +160,8 @@ export const PERMISSIONS: PermissionMatrix = {
     'damage.reverse': 'none',
     'utility.read': 'house',
     'utility.manage': 'house',
+    'rotation.read': 'house',
+    'rotation.manage': 'house',
     /*
      * Переоткрытие закрытого периода меняет уже выставленные счета
      * (§4, модуль 6), поэтому остаётся за суперадмином и пишется в журнал.
@@ -243,6 +249,14 @@ export const PERMISSIONS: PermissionMatrix = {
     // Свою долю коммуналки жилец видит строкой счёта, а не экраном периода.
     'utility.read': 'none',
     'utility.manage': 'none',
+    /*
+     * Жилец видит расписание своего дома целиком (модуль 3, «Права»):
+     * ротации соседей — это и его неделя тоже. Область — «своё»: дом
+     * берётся из проживания, а не из запроса, иначе перебором домов
+     * читался бы состав сети.
+     */
+    'rotation.read': 'self',
+    'rotation.manage': 'none',
     'utility.reopen': 'none',
     'accounting.read': 'none',
     'accounting.write': 'none',

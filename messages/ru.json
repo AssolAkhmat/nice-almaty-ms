@@ -38,7 +38,8 @@
       "utility_period": "Период коммуналки",
       "area_checklist": "Чек-лист зоны",
       "eligibility_group": "Группа допуска",
-      "rotation_row": "Ряд ротаций"
+      "rotation_row": "Ряд ротаций",
+      "rotation_occurrence": "Ротация"
     }
   },
   "auth": {
@@ -1111,6 +1112,60 @@
     "scheduled": "Занятий впереди: {count}",
     "errors": {
       "untilInvalid": "Укажите дату, до которой генерировать"
+    }
+  },
+  "rotationCalendar": {
+    "title": "Ротации",
+    "view": "Режим",
+    "empty": "Ротаций на этот период нет",
+    "emptyHint": "Расписание генерируется в настройке ротаций дома",
+    "modes": {
+      "day": "День",
+      "week": "Неделя",
+      "month": "Месяц"
+    },
+    "previous": "Назад",
+    "today": "Сегодня",
+    "next": "Вперёд",
+    "statuses": {
+      "scheduled": "Запланирована",
+      "done": "Выполнена",
+      "missed": "Не выполнена",
+      "cancelled": "Отменена"
+    },
+    "types": {
+      "regular": "Обычная",
+      "room": "Комната",
+      "general": "Генеральная",
+      "extra": "Внеплановая"
+    },
+    "moved": "Перенесена",
+    "nobody": "Не назначен",
+    "needsDecision": "Требует решения",
+    "mine": "Моя",
+    "assign": "Назначить",
+    "moveTo": "Перенести на",
+    "move": "Перенести",
+    "cancel": "Отменить",
+    "periodTitle": "Внеплановая ротация и каникулы",
+    "extraZone": "Зона",
+    "extraDate": "Дата",
+    "extraWho": "Исполнитель",
+    "extraWhoHint": "Можно оставить пустым: ротация будет ждать решения",
+    "extraCreate": "Добавить ротацию",
+    "holidaysFrom": "Каникулы с",
+    "holidaysTo": "по",
+    "holidaysCancel": "Отменить ротации",
+    "moved_done": "Ротация перенесена",
+    "cancelled": "Ротация отменена",
+    "reassigned": "Исполнитель изменён",
+    "extraCreated": "Внеплановая ротация добавлена",
+    "rangeCancelled": "Ротации периода отменены",
+    "errors": {
+      "dateInvalid": "Укажите дату",
+      "dateTaken": "На эту дату такая ротация уже стоит",
+      "checklistArea": "Чек-лист принадлежит другой зоне",
+      "unknown": "Не получилось выполнить"
     }
   }
 }

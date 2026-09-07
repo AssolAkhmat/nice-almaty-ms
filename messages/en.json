@@ -38,7 +38,8 @@
       "utility_period": "Utility period",
       "area_checklist": "Area checklist",
       "eligibility_group": "Eligibility group",
-      "rotation_row": "Rotation row"
+      "rotation_row": "Rotation row",
+      "rotation_occurrence": "Rotation"
     }
   },
   "auth": {
@@ -1111,6 +1112,60 @@
     "scheduled": "Upcoming occurrences: {count}",
     "errors": {
       "untilInvalid": "Set the date to generate until"
+    }
+  },
+  "rotationCalendar": {
+    "title": "Rotations",
+    "view": "View",
+    "empty": "No rotations in this period",
+    "emptyHint": "The schedule is generated in the house rotation setup",
+    "modes": {
+      "day": "Day",
+      "week": "Week",
+      "month": "Month"
+    },
+    "previous": "Back",
+    "today": "Today",
+    "next": "Forward",
+    "statuses": {
+      "scheduled": "Scheduled",
+      "done": "Done",
+      "missed": "Missed",
+      "cancelled": "Cancelled"
+    },
+    "types": {
+      "regular": "Regular",
+      "room": "Room",
+      "general": "Deep",
+      "extra": "Extra"
+    },
+    "moved": "Moved",
+    "nobody": "Unassigned",
+    "needsDecision": "Needs a decision",
+    "mine": "Mine",
+    "assign": "Assign",
+    "moveTo": "Move to",
+    "move": "Move",
+    "cancel": "Cancel",
+    "periodTitle": "Extra rotation and holidays",
+    "extraZone": "Zone",
+    "extraDate": "Date",
+    "extraWho": "Assignee",
+    "extraWhoHint": "May be left empty: the rotation will wait for a decision",
+    "extraCreate": "Add rotation",
+    "holidaysFrom": "Holidays from",
+    "holidaysTo": "to",
+    "holidaysCancel": "Cancel rotations",
+    "moved_done": "Rotation moved",
+    "cancelled": "Rotation cancelled",
+    "reassigned": "Assignee changed",
+    "extraCreated": "Extra rotation added",
+    "rangeCancelled": "Rotations in the period cancelled",
+    "errors": {
+      "dateInvalid": "Set the date",
+      "dateTaken": "This rotation already exists on that date",
+      "checklistArea": "The checklist belongs to another zone",
+      "unknown": "Could not complete"
     }
   }
 }

@@ -1,5 +1,219 @@
-import { ModuleStub } from '@/components/layout/module-stub';
+import { getTranslations } from 'next-intl/server';
+import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
-export default function RotationsPage() {
-  return <ModuleStub navKey="rotations" />;
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
+import { can } from '@/lib/authz';
+import { getCurrentSession } from '@/lib/session';
+import {
+  addDays,
+  addMonths,
+  businessDate,
+  businessDateToParts,
+  daysInMonth,
+  differenceInDays,
+  startOfMonth,
+  todayInAlmaty,
+  toAlmatyParts,
+  startOfDayUtc,
+  tryParseBusinessDate,
+  type BusinessDate,
+} from '@/lib/time';
+import { readCalendar } from '@/services/rotation-calendar';
+
+import {
+  RotationCalendarView,
+  type CalendarMode,
+  type MemberOption,
+  type OccurrenceCard,
+  type ZoneOption,
+} from './rotation-calendar-view';
+
+import type { UserActor } from '@/services/users';
+
+export const dynamic = 'force-dynamic';
+
+const MODES: CalendarMode[] = ['day', 'week', 'month'];
+
+function isMode(value: string | undefined): value is CalendarMode {
+  return value !== undefined && MODES.includes(value as CalendarMode);
+}
+
+/** Начало недели — понедельник: так неделю считает и сетка ротаций. */
+function startOfWeek(date: BusinessDate): BusinessDate {
+  const weekday = toAlmatyParts(startOfDayUtc(date)).weekday;
+
+  return addDays(date, weekday === 0 ? -6 : 1 - weekday);
+}
+
+function rangeOf(mode: CalendarMode, date: BusinessDate): { from: BusinessDate; to: BusinessDate } {
+  if (mode === 'day') {
+    return { from: date, to: date };
+  }
+
+  if (mode === 'week') {
+    const from = startOfWeek(date);
+
+    return { from, to: addDays(from, 6) };
+  }
+
+  const from = startOfMonth(date);
+  const { year, month } = businessDateToParts(from);
+
+  return { from, to: businessDate(year, month, daysInMonth(year, month)) };
+}
+
+/** Шаг «назад» и «вперёд» по календарю: сутки, неделя или месяц. */
+function shift(mode: CalendarMode, date: BusinessDate, direction: -1 | 1): BusinessDate {
+  if (mode === 'day') {
+    return addDays(date, direction);
+  }
+
+  if (mode === 'week') {
+    return addDays(date, direction * 7);
+  }
+
+  return startOfMonth(addMonths(date, direction));
+}
+
+/**
+ * Календарь ротаций (docs/04-MODULES/03-rotations.md, «Календарь»).
+ *
+ * Три режима — день, неделя, месяц. Админ правит расписание прямо здесь;
+ * жилец видит то же самое в режиме чтения, и своя ротация помечена.
+ */
+export default async function RotationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mode?: string; date?: string }>;
+}) {
+  const session = await getCurrentSession();
+  if (session === null) {
+    redirect('/login');
+  }
+
+  const { context } = session;
+
+  if (!can(context, 'rotation.read', { houseId: context.houseId, userId: context.userId })) {
+    redirect('/');
+  }
+
+  const t = await getTranslations('rotationCalendar');
+  const actor: UserActor = { context };
+
+  const params = await searchParams;
+  const mode: CalendarMode = isMode(params.mode) ? params.mode : 'week';
+  const anchor = tryParseBusinessDate(params.date ?? '') ?? todayInAlmaty();
+  const range = rangeOf(mode, anchor);
+
+  const calendar = await readCalendar(actor, range);
+  const canManage = can(context, 'rotation.manage', { houseId: calendar.houseId });
+
+  const areaNames = new Map(calendar.dictionaries.areas.map((area) => [area.id, area.name]));
+  const checklistTitles = new Map(
+    calendar.dictionaries.checklists.map((checklist) => [checklist.id, checklist.title]),
+  );
+  const memberNames = new Map(
+    calendar.dictionaries.members.map((member) => [member.userId, member.name]),
+  );
+
+  const cards: OccurrenceCard[] = calendar.occurrences.map((item) => ({
+    occurrenceId: item.occurrence.id,
+    date: item.occurrence.date,
+    areaName: areaNames.get(item.occurrence.areaId) ?? '—',
+    checklistTitle: checklistTitles.get(item.occurrence.checklistId) ?? '—',
+    status: item.occurrence.status,
+    type: item.occurrence.type,
+    movedFromDate: item.occurrence.movedFromDate,
+    assignments: item.assignments.map((assignment) => ({
+      assignmentId: assignment.id,
+      userId: assignment.userId,
+      userName: assignment.userId === null ? null : (memberNames.get(assignment.userId) ?? '—'),
+      state: assignment.state,
+      isMine: assignment.userId === context.userId,
+    })),
+  }));
+
+  const days = Array.from({ length: differenceInDays(range.from, range.to) + 1 }, (_, offset) =>
+    addDays(range.from, offset),
+  ).map((date) => ({
+    date,
+    occurrences: cards.filter((card) => card.date === date),
+  }));
+
+  const members: MemberOption[] = calendar.dictionaries.members;
+  const zones: ZoneOption[] = calendar.dictionaries.checklists.map((checklist) => ({
+    areaId: checklist.areaId,
+    checklistId: checklist.id,
+    label: `${areaNames.get(checklist.areaId) ?? '—'} · ${checklist.title}`,
+  }));
+
+  return (
+    <section className="flex flex-col gap-6">
+      <div className="flex flex-col gap-1">
+        <h1>{t('title')}</h1>
+        <p className="text-text-muted text-[13px]">
+          {range.from} — {range.to}
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('view')}</CardTitle>
+        </CardHeader>
+
+        <div className="flex flex-wrap items-center gap-3 text-[13px]">
+          {MODES.map((item) => (
+            <Link
+              className={item === mode ? 'font-medium' : 'text-accent underline'}
+              data-testid={`mode-${item}`}
+              href={{ pathname: '/rotations', query: { mode: item, date: anchor } }}
+              key={item}
+              prefetch={false}
+            >
+              {t(`modes.${item}`)}
+            </Link>
+          ))}
+
+          <span className="text-text-muted">·</span>
+
+          <Link
+            className="text-accent underline"
+            data-testid="calendar-prev"
+            href={{ pathname: '/rotations', query: { mode, date: shift(mode, anchor, -1) } }}
+            prefetch={false}
+          >
+            {t('previous')}
+          </Link>
+          <Link
+            className="text-accent underline"
+            data-testid="calendar-today"
+            href={{ pathname: '/rotations', query: { mode } }}
+            prefetch={false}
+          >
+            {t('today')}
+          </Link>
+          <Link
+            className="text-accent underline"
+            data-testid="calendar-next"
+            href={{ pathname: '/rotations', query: { mode, date: shift(mode, anchor, 1) } }}
+            prefetch={false}
+          >
+            {t('next')}
+          </Link>
+        </div>
+      </Card>
+
+      <RotationCalendarView
+        canManage={canManage}
+        days={days}
+        from={range.from}
+        houseId={calendar.houseId}
+        members={members}
+        mode={mode}
+        to={range.to}
+        zones={zones}
+      />
+    </section>
+  );
 }

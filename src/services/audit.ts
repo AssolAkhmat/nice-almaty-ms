@@ -69,6 +69,11 @@ export const AUDIT_ACTIONS = {
   areaEligibilitySet: 'area_eligibility.set',
   rotationRowSaved: 'rotation_row.saved',
   rotationRowArchived: 'rotation_row.archived',
+  rotationMoved: 'rotation.moved',
+  rotationCancelled: 'rotation.cancelled',
+  rotationReassigned: 'rotation.reassigned',
+  rotationExtraCreated: 'rotation.extra_created',
+  rotationRangeCancelled: 'rotation.range_cancelled',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
