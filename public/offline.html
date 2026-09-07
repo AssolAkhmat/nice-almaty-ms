@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1" name="viewport" />
+    <title>Nice Almaty</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --text: #0b0b0c;
+        --muted: #5b6270;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0b0f17;
+          --text: #f2f4f8;
+          --muted: #9aa4b2;
+        }
+      }
+
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: var(--bg);
+        color: var(--text);
+        font-family: Montserrat, system-ui, sans-serif;
+      }
+
+      main {
+        max-width: 420px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 600;
+      }
+
+      p {
+        margin: 0;
+        font-size: 15px;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <!--
+      Страница живёт вне приложения: её отдаёт service worker, когда сети нет,
+      и до словарей интерфейса он не дотягивается. Поэтому текст здесь на всех
+      трёх языках сразу — так же, как объявление на двери (решение P6-27).
+    -->
+    <main>
+      <h1>Нет соединения</h1>
+      <p>Проверьте сеть и обновите страницу.</p>
+      <p lang="kk">Байланыс жоқ. Желіні тексеріп, бетті жаңартыңыз.</p>
+      <p lang="en">No connection. Check the network and reload the page.</p>
+    </main>
+  </body>
+</html>

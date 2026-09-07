@@ -42,6 +42,15 @@ export function middleware(request: NextRequest): NextResponse {
 }
 
 export const config = {
-  /** Статика, здоровье и служебные пути проверку не проходят. */
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+  /**
+   * Статика, здоровье и служебные пути проверку не проходят.
+   *
+   * Отдельно — файлы установки на телефон: манифест, service worker,
+   * иконки и страница обрыва связи. Браузер просит их и без сессии,
+   * а редирект на вход отдавал бы вместо картинки и JSON страницу
+   * входа: значок не ставился, worker не регистрировался (P6-29).
+   */
+  matcher: [
+    '/((?!api|_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|offline.html|icons/).*)',
+  ],
 };

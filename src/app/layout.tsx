@@ -2,6 +2,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { Montserrat } from 'next/font/google';
 
+import { RegisterServiceWorker } from '@/components/pwa/register-service-worker';
 import { ThemeProvider } from '@/components/theme/theme-provider';
 import { getCurrentSession } from '@/lib/session';
 import { ThemeScript } from '@/components/theme/theme-script';
@@ -29,6 +30,15 @@ export async function generateMetadata(): Promise<Metadata> {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  /*
+   * Цвет строки состояния в установленном приложении. Значений два:
+   * в тёмной теме синий `#004AAD` на тёмном фоне даёт полтора к одному
+   * и выглядит грязным пятном (docs/05-DESIGN-SYSTEM.md).
+   */
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#004aad' },
+    { media: '(prefers-color-scheme: dark)', color: '#0b0f17' },
+  ],
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -45,6 +55,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             {children}
           </ThemeProvider>
         </NextIntlClientProvider>
+        <RegisterServiceWorker />
       </body>
     </html>
   );
