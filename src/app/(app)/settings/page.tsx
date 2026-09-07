@@ -79,6 +79,17 @@ export default async function SettingsPage() {
         </Card>
       ) : null}
 
+      {can(session.context, 'settings.org.read', {}) ? (
+        <Card>
+          <CardTitle>
+            <AppLink className="text-primary hover:underline" href="/settings/api-tokens">
+              {t('apiTokens.title')}
+            </AppLink>
+          </CardTitle>
+          <p className="text-text-muted mt-1 text-[13px]">{t('apiTokens.subtitle')}</p>
+        </Card>
+      ) : null}
+
       {can(session.context, 'audit.read') ? (
         <Card>
           <CardTitle>

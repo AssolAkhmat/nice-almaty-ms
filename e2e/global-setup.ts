@@ -406,6 +406,57 @@ async function resetPhaseSixJobs(db: ReturnType<typeof drizzle>): Promise<void> 
   await db.delete(schema.pushSubscriptions);
 }
 
+/**
+ * Жильцы сида (`+7702…`) и всё, что за ними тянется.
+ *
+ * Прогон вызывает сид без наполнения, но живая база могла увидеть и полный
+ * `pnpm db:seed`: тогда в домах приёмок появляются чужие жильцы, и доля
+ * коммуналки делится не на тех. Приёмка обязана считать только своих.
+ */
+async function removeSeededResidents(db: ReturnType<typeof drizzle>): Promise<void> {
+  const seeded = await db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(like(schema.users.phone, '+7702%'));
+
+  if (seeded.length === 0) {
+    return;
+  }
+
+  const userIds = seeded.map((row) => row.id);
+
+  const residencyIds = (
+    await db
+      .select({ id: schema.residencies.id })
+      .from(schema.residencies)
+      .where(inArray(schema.residencies.userId, userIds))
+  ).map((row) => row.id);
+
+  if (residencyIds.length > 0) {
+    await db
+      .delete(schema.bedAssignments)
+      .where(inArray(schema.bedAssignments.residencyId, residencyIds));
+    await db.delete(schema.residencies).where(inArray(schema.residencies.id, residencyIds));
+  }
+
+  await db
+    .delete(schema.rotationAssignments)
+    .where(inArray(schema.rotationAssignments.userId, userIds));
+  await db.delete(schema.rotationDebts).where(inArray(schema.rotationDebts.userId, userIds));
+  await db
+    .delete(schema.utilityAllocations)
+    .where(inArray(schema.utilityAllocations.userId, userIds));
+  await db.delete(schema.absences).where(inArray(schema.absences.userId, userIds));
+  await db.delete(schema.ratingEvents).where(inArray(schema.ratingEvents.userId, userIds));
+  await db
+    .delete(schema.ratingThresholdStates)
+    .where(inArray(schema.ratingThresholdStates.userId, userIds));
+  await db.delete(schema.discounts).where(inArray(schema.discounts.userId, userIds));
+  await db.delete(schema.fines).where(inArray(schema.fines.userId, userIds));
+  await db.delete(schema.residentProfiles).where(inArray(schema.residentProfiles.userId, userIds));
+  await db.delete(schema.users).where(inArray(schema.users.id, userIds));
+}
+
 async function removeAcceptanceHouseData(db: ReturnType<typeof drizzle>): Promise<void> {
   const houses = await db
     .select({ id: schema.houses.id })
@@ -538,6 +589,8 @@ export default async function globalSetup(): Promise<void> {
       executor: db as unknown as Executor,
       passwordFor: () => E2E_PASSWORD,
       withContent: false,
+      // Дома с третьего по одиннадцатый отданы приёмкам, по одному на ширину.
+      houses: 11,
     });
 
     /*
@@ -553,6 +606,7 @@ export default async function globalSetup(): Promise<void> {
      * а прошлые учётные записи прогона удаляются следующим шагом.
      */
     await resetPhaseSixJobs(db);
+    await removeSeededResidents(db);
     await removeLeftoverAccounts(db);
     await removeLeftoverEligibilityGroups(db);
     await removeLeftoverAreas(db);

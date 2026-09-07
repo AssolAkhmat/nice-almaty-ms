@@ -26,7 +26,14 @@ import {
  */
 export const ORG_SLUG = 'nice-almaty';
 
-export const HOUSE_COUNT = 11;
+/**
+ * Домов в сети по умолчанию — пять, как в сид-данных роадмапа.
+ *
+ * Прогон приёмок просит больше: дома с третьего по одиннадцатый отданы
+ * приёмкам фаз 3–7, по одному на ширину. В живой установке лишние дома
+ * незачем — там их заводит владелец (P7-19).
+ */
+export const HOUSE_COUNT = 5;
 
 export const SUPERADMIN_PHONE = '+77010000000';
 
@@ -124,6 +131,8 @@ export interface SeedOptions {
    * а чужие жильцы мешали бы его проверкам (P7-13).
    */
   withContent?: boolean;
+  /** Сколько домов завести. По умолчанию — `HOUSE_COUNT`. */
+  houses?: number;
 }
 
 async function ensureOrganization(executor: Executor): Promise<string> {
@@ -322,7 +331,9 @@ export async function seedNetwork(options: SeedOptions = {}): Promise<SeedResult
   const houseIds: string[] = [];
   const accounts: SeedAccount[] = [];
 
-  for (let number = 1; number <= HOUSE_COUNT; number += 1) {
+  const houseCount = options.houses ?? HOUSE_COUNT;
+
+  for (let number = 1; number <= houseCount; number += 1) {
     houseIds.push(await ensureHouse(executor, orgId, number));
   }
 
@@ -341,7 +352,7 @@ export async function seedNetwork(options: SeedOptions = {}): Promise<SeedResult
     ...(superadmin.created ? { temporaryPassword: superadminPassword } : {}),
   });
 
-  for (let number = 1; number <= HOUSE_COUNT; number += 1) {
+  for (let number = 1; number <= houseCount; number += 1) {
     const phone = adminPhone(number);
     const password = passwordFor(phone);
     const admin = await ensureUser(executor, {

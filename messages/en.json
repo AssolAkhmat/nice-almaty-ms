@@ -1625,5 +1625,29 @@
       "houseRequired": "House is not specified",
       "format": "Unknown export format"
     }
+  },
+  "apiTokens": {
+    "title": "API tokens",
+    "subtitle": "Keys for bots: a scope narrows the issuer's rights",
+    "name": "Name",
+    "scopes": "Scopes",
+    "house": "House",
+    "wholeNetwork": "Whole network",
+    "issue": "Issue a token",
+    "issued": "Token issued. The value is shown once",
+    "value": "Token value",
+    "copyHint": "Copy it now: only a hash is stored, there is nowhere to show it again",
+    "revoke": "Revoke",
+    "revoked": "Token revoked",
+    "empty": "No tokens",
+    "expires": "Valid until",
+    "lastUsed": "Last used",
+    "never": "never used",
+    "errors": {
+      "unknown": "It did not work. Try again",
+      "nameRequired": "Name is required",
+      "scopesRequired": "Choose at least one scope",
+      "unknownScope": "Unknown scope"
+    }
   }
 }
