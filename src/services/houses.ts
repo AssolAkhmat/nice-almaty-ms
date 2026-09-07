@@ -11,6 +11,7 @@ import { ValidationError } from '@/lib/errors';
 import { now } from '@/lib/time';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
+import { ensureHouseFund } from './ledger';
 
 import type { House } from '@/db/schema';
 import type { UserActor } from './users';
@@ -79,6 +80,9 @@ export async function createHouse(
       },
       tx,
     );
+
+    // Дом без своего фонда не примет ни ущерб, ни сгоревший депозит (§10.1).
+    await ensureHouseFund(actor, house, tx);
 
     await recordAudit(
       { context: actor.context, ip: actor.ip, requestId: actor.requestId },

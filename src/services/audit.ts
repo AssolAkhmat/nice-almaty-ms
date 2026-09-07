@@ -53,6 +53,8 @@ export const AUDIT_ACTIONS = {
   depositRefundIssued: 'deposit.refund_issued',
   depositRefunded: 'deposit.refunded',
   depositBurned: 'deposit.burned',
+  damageCreated: 'damage.created',
+  damageReversed: 'damage.reversed',
   ledgerEntryPosted: 'ledger.entry_posted',
   ledgerEntryReversed: 'ledger.entry_reversed',
 } as const;

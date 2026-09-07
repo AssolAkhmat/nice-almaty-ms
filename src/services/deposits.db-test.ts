@@ -4,6 +4,7 @@ import postgres from 'postgres';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import * as schema from '@/db/schema';
+import { seedChartOfAccounts } from '@/db/testing/chart-of-accounts';
 import { testDatabaseUrl } from '@/db/testing/database-url';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { parseBusinessDate } from '@/lib/time';
@@ -86,6 +87,11 @@ async function seed(tx: Transaction, suffix: string) {
       houseId: houseA?.id ?? '',
     })
     .returning();
+
+  await seedChartOfAccounts(tx, orgId, [
+    { id: houseA?.id ?? '', slug: `dep-a-${suffix}`, name: 'Дом A' },
+    { id: houseB?.id ?? '', slug: `dep-b-${suffix}`, name: 'Дом B' },
+  ]);
 
   const a = await resident(1, houseA?.id ?? '');
   const b = await resident(2, houseB?.id ?? '');
@@ -493,3 +499,100 @@ describe('экран депозита', () => {
 function eqId(residencyId: string) {
   return eq(schema.residencies.id, residencyId);
 }
+
+/**
+ * Оплата депозита в книге проводок (§10.1). Проверяется не форма проводки,
+ * а инвариант 4: депозитный фонд обязан получить ровно ту сумму, которая
+ * стала депозитом жильца, — иначе сверка разойдётся на первой же доплате.
+ */
+describe('проводка при оплате депозита', () => {
+  async function ledgerOf(tx: Transaction, orgId: string) {
+    const rows = await tx
+      .select({
+        code: schema.accounts.code,
+        direction: schema.ledgerLines.direction,
+        amount: schema.ledgerLines.amount,
+      })
+      .from(schema.ledgerLines)
+      .innerJoin(schema.ledgerEntries, eq(schema.ledgerEntries.id, schema.ledgerLines.entryId))
+      .innerJoin(schema.accounts, eq(schema.accounts.id, schema.ledgerLines.accountId))
+      .where(eq(schema.ledgerEntries.orgId, orgId));
+
+    return rows;
+  }
+
+  it('касса дебетуется, депозитный фонд кредитуется', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '7401');
+
+      const invoice = await issueDepositInvoice(
+        fixture.admin,
+        fixture.residencyA,
+        {},
+        { executor: tx, today: TODAY },
+      );
+      await recordPayment(
+        fixture.admin,
+        invoice.id,
+        { amount: 45_000, method: 'cash' },
+        { executor: tx, today: TODAY },
+      );
+
+      const lines = await ledgerOf(tx, fixture.orgId);
+
+      expect(lines).toHaveLength(2);
+      expect(lines).toContainEqual({ code: 'cash', direction: 'debit', amount: 45_000 });
+      expect(lines).toContainEqual({ code: 'deposit_fund', direction: 'credit', amount: 45_000 });
+    });
+  });
+
+  it('доплата за дни до 1 числа идёт в фонд дома, а не в депозитный', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '7402');
+
+      const invoice = await issueDepositInvoice(
+        fixture.admin,
+        fixture.residencyA,
+        { extraLines: [{ title: 'Дни до 1 числа', amount: 12_000 }] },
+        { executor: tx, today: TODAY },
+      );
+      await recordPayment(
+        fixture.admin,
+        invoice.id,
+        { amount: 57_000, method: 'kaspi' },
+        { executor: tx, today: TODAY },
+      );
+
+      const lines = await ledgerOf(tx, fixture.orgId);
+
+      expect(lines).toContainEqual({ code: 'kaspi', direction: 'debit', amount: 57_000 });
+      expect(lines).toContainEqual({ code: 'deposit_fund', direction: 'credit', amount: 45_000 });
+      expect(lines).toContainEqual({
+        code: `house_fund:dep-a-7402`,
+        direction: 'credit',
+        amount: 12_000,
+      });
+    });
+  });
+
+  it('до полной оплаты проводки нет: депозит ещё не стал депозитом', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '7403');
+
+      const invoice = await issueDepositInvoice(
+        fixture.admin,
+        fixture.residencyA,
+        {},
+        { executor: tx, today: TODAY },
+      );
+      await recordPayment(
+        fixture.admin,
+        invoice.id,
+        { amount: 20_000, method: 'cash' },
+        { executor: tx, today: TODAY },
+      );
+
+      expect(await ledgerOf(tx, fixture.orgId)).toHaveLength(0);
+    });
+  });
+});

@@ -4,9 +4,11 @@ import { generateTemporaryPassword, hashPassword } from '@/lib/password';
 
 import { getDb, type Executor } from './client';
 import {
+  ACCOUNT_CODES,
   accounts as accountsTable,
   contractTemplates,
   documentTypes,
+  houseFundCode,
   houses,
   organizations,
   users,
@@ -215,11 +217,11 @@ async function ensureDocumentTypes(executor: Executor, orgId: string): Promise<v
  * пяти домов слились бы в одну кучу, а §10.1 требует обратного.
  */
 const NETWORK_ACCOUNTS = [
-  { code: 'deposit_fund', name: 'Депозитный фонд', type: 'deposit_fund' as const },
-  { code: 'utility_fund', name: 'Коммунальный фонд', type: 'utility_fund' as const },
-  { code: 'common_fund', name: 'Общий счёт', type: 'common_fund' as const },
-  { code: 'cash', name: 'Касса', type: 'cash' as const },
-  { code: 'kaspi', name: 'Kaspi', type: 'kaspi' as const },
+  { code: ACCOUNT_CODES.depositFund, name: 'Депозитный фонд', type: 'deposit_fund' as const },
+  { code: ACCOUNT_CODES.utilityFund, name: 'Коммунальный фонд', type: 'utility_fund' as const },
+  { code: ACCOUNT_CODES.commonFund, name: 'Общий счёт', type: 'common_fund' as const },
+  { code: ACCOUNT_CODES.cash, name: 'Касса', type: 'cash' as const },
+  { code: ACCOUNT_CODES.kaspi, name: 'Kaspi', type: 'kaspi' as const },
 ];
 
 async function ensureAccount(
@@ -266,7 +268,7 @@ async function ensureAccounts(
 
     await ensureAccount(executor, {
       orgId,
-      code: `house_fund:${houseSlug(number)}`,
+      code: houseFundCode(houseSlug(number)),
       name: `Фонд дома ${String(number)}`,
       type: 'house_fund',
       houseId,

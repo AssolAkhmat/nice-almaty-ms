@@ -45,6 +45,9 @@ export const ACTIONS = [
   'invoice.issue',
   'payment.record',
   'deposit.read',
+  'damage.read',
+  'damage.create',
+  'damage.reverse',
   'accounting.read',
   'accounting.write',
   'settings.org.read',
@@ -95,6 +98,9 @@ export const PERMISSIONS: PermissionMatrix = {
     'invoice.issue': 'org',
     'payment.record': 'org',
     'deposit.read': 'org',
+    'damage.read': 'org',
+    'damage.create': 'org',
+    'damage.reverse': 'org',
     'accounting.read': 'org',
     'accounting.write': 'org',
     'settings.org.read': 'org',
@@ -134,6 +140,14 @@ export const PERMISSIONS: PermissionMatrix = {
     'invoice.issue': 'house',
     'payment.record': 'house',
     'deposit.read': 'house',
+    'damage.read': 'house',
+    'damage.create': 'house',
+    /*
+     * Сторно ущерба возвращает деньги на депозиты обратной проводкой (§8).
+     * Решение отменить уже проведённое списание принимает суперадмин:
+     * админ дома — тот же человек, который ущерб и завёл.
+     */
+    'damage.reverse': 'none',
     /*
      * Бухгалтерия — дело суперадмина (модуль 10): план счетов, проводки
      * и отчёты по сети. Админ ведёт деньги дома через счета и депозиты,
@@ -209,6 +223,10 @@ export const PERMISSIONS: PermissionMatrix = {
     'invoice.issue': 'none',
     'payment.record': 'none',
     'deposit.read': 'self',
+    // Свои списания жилец видит движением депозита (§8), а не списком ущербов.
+    'damage.read': 'none',
+    'damage.create': 'none',
+    'damage.reverse': 'none',
     'accounting.read': 'none',
     'accounting.write': 'none',
     'settings.org.read': 'none',

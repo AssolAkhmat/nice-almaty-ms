@@ -11,6 +11,7 @@ import {
   requireInvoice,
   updateInvoice,
 } from '@/db/repositories/invoices';
+import { countDamageShares } from '@/db/repositories/damages';
 import { requireResidency, updateResidency } from '@/db/repositories/residencies';
 import { depositBalance, invoiceStatus, remainingToPay } from '@/domain/invoice';
 import { assertCan } from '@/lib/authz';
@@ -18,6 +19,7 @@ import { ConflictError, NotFoundError, ValidationError } from '@/lib/errors';
 import { now, startOfDayUtc, todayInAlmaty, type BusinessDate } from '@/lib/time';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
+import { postDepositPayment } from './ledger';
 import { readHouseDepositDefault } from './settings';
 
 import type { DepositTransaction, Invoice, InvoiceLine, Payment, Residency } from '@/db/schema';
@@ -52,7 +54,35 @@ export interface DepositView {
   residency: Residency;
   balance: number;
   transactions: DepositTransaction[];
+  /**
+   * Сколько человек делили ущерб — по идентификатору движения (§8, модуль 7).
+   * Только для списаний и сторно ущерба; у остальных движений ключа нет.
+   */
+  participantsOf: Record<string, number>;
   invoice: (Invoice & { paid: number; remaining: number; lines: InvoiceLine[] }) | null;
+}
+
+/** Число участников по каждому движению, порождённому ущербом. */
+async function participantsOf(
+  transactions: readonly DepositTransaction[],
+  executor: Executor,
+): Promise<Record<string, number>> {
+  const damageIds = transactions
+    .filter((transaction) => transaction.refType === 'damage' && transaction.refId !== null)
+    .map((transaction) => transaction.refId ?? '');
+
+  const counts = await countDamageShares([...new Set(damageIds)], executor);
+  const result: Record<string, number> = {};
+
+  for (const transaction of transactions) {
+    const count = transaction.refId === null ? undefined : counts.get(transaction.refId);
+
+    if (count !== undefined) {
+      result[transaction.id] = count;
+    }
+  }
+
+  return result;
 }
 
 export interface PaymentInput {
@@ -242,6 +272,26 @@ export async function recordPayment(
     const lines = await listInvoiceLines(invoice.id, tx);
     const charge = depositPart(lines);
 
+    /*
+     * Деньги входят в книгу тем же движением, что и на депозитный счёт
+     * жильца (§10.1, инвариант 4). Проводка идёт по полной оплате, а не
+     * по каждому платежу: до неё депозит депозитом не стал — §1.2 п.8
+     * не считает жильца заселённым, и остаток фонда разошёлся бы
+     * с суммой депозитов ровно на недоплату.
+     */
+    await postDepositPayment(
+      actor,
+      {
+        houseId: residency.houseId,
+        invoiceId: invoice.id,
+        method: input.method,
+        deposit: charge,
+        other: invoice.total - charge,
+        date: today,
+      },
+      { executor: tx, today },
+    );
+
     await createDepositTransaction(
       actor.context,
       {
@@ -332,6 +382,7 @@ export async function readDepositView(
         ),
       ),
       transactions,
+      participantsOf: await participantsOf(transactions, executor),
       invoice: null,
     };
   }
@@ -348,6 +399,7 @@ export async function readDepositView(
     residency,
     balance: depositBalance(allTransactions.map((transaction) => transaction.amount)),
     transactions,
+    participantsOf: await participantsOf(transactions, executor),
     invoice: { ...invoice, paid, remaining: remainingToPay(invoice.total, paid), lines },
   };
 }

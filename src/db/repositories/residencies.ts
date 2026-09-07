@@ -67,6 +67,55 @@ export async function listResidencies(
     .orderBy(desc(residencies.createdAt));
 }
 
+export interface HouseRosterEntry {
+  residencyId: string;
+  userId: string;
+  /** Комната жильца сейчас; пусто — место не назначено (§8, режим «по комнате»). */
+  areaId: string | null;
+}
+
+/**
+ * Кто живёт в доме сейчас и в какой комнате — для деления ущерба (§8).
+ *
+ * Расторгающиеся входят наравне с действующими: §2.3 п.5 разрешает
+ * проводить ущерб все 30 дней до возврата депозита. Архивные не входят:
+ * их депозит уже разобран.
+ */
+export async function listHouseRoster(
+  context: AccessContext,
+  houseId: string,
+  executor: Executor = getDb(),
+): Promise<HouseRosterEntry[]> {
+  assertHouseVisible(context, houseId);
+
+  const rows = await executor
+    .select({
+      residencyId: residencies.id,
+      userId: residencies.userId,
+      areaId: beds.areaId,
+    })
+    .from(residencies)
+    .leftJoin(
+      bedAssignments,
+      and(eq(bedAssignments.residencyId, residencies.id), sql`upper_inf(${bedAssignments.period})`),
+    )
+    .leftJoin(beds, eq(beds.id, bedAssignments.bedId))
+    .where(
+      and(
+        residencyVisibility(context),
+        eq(residencies.houseId, houseId),
+        inArray(residencies.status, ['active', 'terminating']),
+      ),
+    )
+    .orderBy(residencies.createdAt);
+
+  return rows.map((row) => ({
+    residencyId: row.residencyId,
+    userId: row.userId,
+    areaId: row.areaId,
+  }));
+}
+
 export async function findResidency(
   context: AccessContext,
   residencyId: string,

@@ -33,7 +33,8 @@
       "document": "Document",
       "file": "File",
       "invoice": "Invoice",
-      "ledger_entry": "Ledger entry"
+      "ledger_entry": "Ledger entry",
+      "damage": "Damage"
     }
   },
   "auth": {
@@ -453,7 +454,8 @@
       "unauthorized": "Sign-in required",
       "unknown": "The action could not be completed",
       "method": "Choose a payment method"
-    }
+    },
+    "participants": "split by {count}"
   },
   "deposits": {
     "amountInvalid": "The amount must be a whole number of tenge",
@@ -689,6 +691,56 @@
       "tooFewLines": "An entry needs at least two lines",
       "amountInvalid": "A line amount is a positive whole number of tenge",
       "alreadyReversed": "The entry has already been reversed"
+    }
+  },
+  "damages": {
+    "title": "Damage",
+    "subtitle": "Repairs charged to residents’ deposits",
+    "errors": {
+      "amountInvalid": "Damage amount must be a whole number of tenge above zero",
+      "titleRequired": "Enter a damage title",
+      "noParticipants": "No participants selected for the split",
+      "alreadyReversed": "This damage has already been reversed",
+      "notUpdated": "Damage was not updated",
+      "unauthorized": "Sign in required",
+      "forbidden": "This action is not available to your role",
+      "not_found": "Not found",
+      "unknown": "The action could not be completed"
+    },
+    "create": "Record damage",
+    "titleField": "Title",
+    "descriptionField": "Description",
+    "amountField": "Damage amount",
+    "amountHint": "Whole tenge",
+    "mode": "How to split",
+    "modes": {
+      "single": "One person",
+      "room": "By room",
+      "all": "Everyone in the house",
+      "all_except": "Everyone except selected",
+      "custom": "Custom list"
+    },
+    "room": "Room",
+    "participants": "Participants",
+    "exclude": "Who to leave out",
+    "preview": "Preview",
+    "previewEmpty": "Enter an amount and participants — the split appears here",
+    "participantsCount": "Participants: {count}, each pays",
+    "surplus": "Rounding surplus",
+    "surplusHint": "The surplus stays in the house fund",
+    "charged": "Charged to deposits",
+    "submit": "Record and charge",
+    "reverse": "Reverse",
+    "reversed": "Reversed",
+    "empty": "No damage recorded yet",
+    "emptyHint": "Recorded repairs and charges will appear here",
+    "noHouse": "No house selected",
+    "noHouseHint": "Add a house in the network settings",
+    "residentTitle": "Admin section",
+    "residentHint": "Your own charges are in the Deposit section",
+    "done": {
+      "created": "Damage recorded",
+      "reversed": "Damage reversed"
     }
   }
 }

@@ -193,3 +193,23 @@ describe('цель действия', () => {
     expect(can(resident, 'user.read')).toBe(false);
   });
 });
+
+/**
+ * Ущерб (§8). Заводит его админ своего дома — он же видит поломку;
+ * сторнирует только суперадмин: обратная проводка возвращает деньги
+ * на депозиты, и такое решение не должно приниматься на месте.
+ */
+describe('ущерб', () => {
+  it('заводит админ своего дома, сторнирует только суперадмин', () => {
+    expect(scopeOf('admin', 'damage.read')).toBe('house');
+    expect(scopeOf('admin', 'damage.create')).toBe('house');
+    expect(scopeOf('admin', 'damage.reverse')).toBe('none');
+
+    expect(scopeOf('superadmin', 'damage.reverse')).toBe('org');
+  });
+
+  it('жилец списания видит движением депозита, а не списком ущербов', () => {
+    expect(scopeOf('resident', 'damage.read')).toBe('none');
+    expect(scopeOf('resident', 'damage.create')).toBe('none');
+  });
+});

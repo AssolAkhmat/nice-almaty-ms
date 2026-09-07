@@ -19,6 +19,8 @@ export interface DepositMovementView {
   amount: number;
   note: string | null;
   createdAt: string;
+  /** Сколько человек делили ущерб; у остальных движений пусто (§8). */
+  participants: number | null;
 }
 
 export interface DepositInvoiceView {
@@ -63,6 +65,11 @@ function Movements({ movements }: { movements: readonly DepositMovementView[] })
                 year: 'numeric',
               })}
             </span>
+            {movement.participants !== null && (
+              <span className="text-text-muted ml-2">
+                {t('deposit.participants', { count: movement.participants })}
+              </span>
+            )}
           </span>
           <Money amount={movement.amount} />
         </li>

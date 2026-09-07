@@ -77,6 +77,35 @@ export async function findAccountByCode(
   return account ?? null;
 }
 
+/**
+ * Счёт дома нужного вида: фонд дома ищется по дому, а не по коду. Слаг дома
+ * в код счёта заложен один раз при заведении, и повторять его сборку
+ * в каждом месте вызова значило бы держать формат кода в двух головах.
+ */
+export async function findHouseAccount(
+  context: AccessContext,
+  houseId: string,
+  type: Account['type'],
+  executor: Executor = getDb(),
+): Promise<Account | null> {
+  assertHouseVisible(context, houseId);
+
+  const [account] = await executor
+    .select()
+    .from(accounts)
+    .where(
+      and(
+        accountScope(context),
+        eq(accounts.houseId, houseId),
+        eq(accounts.type, type),
+        isNull(accounts.archivedAt),
+      ),
+    )
+    .limit(1);
+
+  return account ?? null;
+}
+
 export async function requireAccount(
   context: AccessContext,
   accountId: string,
@@ -203,6 +232,34 @@ export async function findLedgerEntry(
     .select()
     .from(ledgerEntries)
     .where(and(eq(ledgerEntries.orgId, context.orgId), eq(ledgerEntries.id, entryId)))
+    .limit(1);
+
+  return entry ?? null;
+}
+
+/**
+ * Действующая проводка операции: ищется по источнику, а не по ссылке
+ * из самой операции. Сторнированная пропускается — иначе сторно ущерба
+ * попыталось бы отменить уже отменённое.
+ */
+export async function findLedgerEntryBySource(
+  context: AccessContext,
+  sourceType: string,
+  sourceId: string,
+  executor: Executor = getDb(),
+): Promise<LedgerEntry | null> {
+  const [entry] = await executor
+    .select()
+    .from(ledgerEntries)
+    .where(
+      and(
+        eq(ledgerEntries.orgId, context.orgId),
+        eq(ledgerEntries.sourceType, sourceType),
+        eq(ledgerEntries.sourceId, sourceId),
+        isNull(ledgerEntries.reversedByEntryId),
+      ),
+    )
+    .orderBy(asc(ledgerEntries.createdAt))
     .limit(1);
 
   return entry ?? null;

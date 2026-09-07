@@ -34,6 +34,23 @@ export const accountTypeEnum = pgEnum('account_type', [
   'external',
 ]);
 
+/**
+ * Коды системных счетов. Живут рядом с типами, а не в сервисе: их называют
+ * и сид, и заведение дома — а `src/db` не вправе смотреть в `src/services`.
+ * Фонд свой у каждого дома, отсюда суффикс со слагом.
+ */
+export const ACCOUNT_CODES = {
+  depositFund: 'deposit_fund',
+  utilityFund: 'utility_fund',
+  commonFund: 'common_fund',
+  cash: 'cash',
+  kaspi: 'kaspi',
+} as const;
+
+export function houseFundCode(houseSlug: string): string {
+  return `house_fund:${houseSlug}`;
+}
+
 export const accounts = pgTable(
   'accounts',
   {

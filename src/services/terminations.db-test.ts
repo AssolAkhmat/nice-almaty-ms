@@ -4,6 +4,7 @@ import postgres from 'postgres';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import * as schema from '@/db/schema';
+import { seedChartOfAccounts } from '@/db/testing/chart-of-accounts';
 import { testDatabaseUrl } from '@/db/testing/database-url';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { parseBusinessDate, parseInstant } from '@/lib/time';
@@ -122,6 +123,11 @@ async function seed(tx: Transaction, suffix: string) {
     })
     .returning();
 
+  await seedChartOfAccounts(tx, orgId, [
+    { id: houseA?.id ?? '', slug: `term-a-${suffix}`, name: 'Дом A' },
+    { id: houseB?.id ?? '', slug: `term-b-${suffix}`, name: 'Дом B' },
+  ]);
+
   const a = await resident(1, houseA?.id ?? '', MOVE_IN);
   const b = await resident(2, houseB?.id ?? '', MOVE_IN);
   const next = await resident(3, houseA?.id ?? '', null);
@@ -136,6 +142,8 @@ async function seed(tx: Transaction, suffix: string) {
 
   return {
     orgId,
+    houseA: houseA?.id ?? '',
+    houseSlugA: `term-a-${suffix}`,
     bedId: bed?.id ?? '',
     residencyA: a.residencyId,
     residencyB: b.residencyId,
@@ -502,10 +510,12 @@ describe('счёт возврата депозита', () => {
         instant: INSTANT,
       });
 
-      const settled = await settleRefund(fixture.admin, invoice?.id ?? '', {
-        executor: tx,
-        instant: INSTANT,
-      });
+      const settled = await settleRefund(
+        fixture.admin,
+        invoice?.id ?? '',
+        {},
+        { executor: tx, instant: INSTANT },
+      );
 
       expect(settled.status).toBe('returned');
 
@@ -535,10 +545,10 @@ describe('счёт возврата депозита', () => {
         instant: INSTANT,
       });
 
-      await settleRefund(fixture.admin, invoice?.id ?? '', { executor: tx, instant: INSTANT });
+      await settleRefund(fixture.admin, invoice?.id ?? '', {}, { executor: tx, instant: INSTANT });
 
       await expect(
-        settleRefund(fixture.admin, invoice?.id ?? '', { executor: tx, instant: INSTANT }),
+        settleRefund(fixture.admin, invoice?.id ?? '', {}, { executor: tx, instant: INSTANT }),
       ).rejects.toBeInstanceOf(ConflictError);
     });
   });
@@ -650,7 +660,7 @@ describe('архивация проживания', () => {
         executor: tx,
         instant: INSTANT,
       });
-      await settleRefund(fixture.admin, invoice?.id ?? '', { executor: tx, instant: INSTANT });
+      await settleRefund(fixture.admin, invoice?.id ?? '', {}, { executor: tx, instant: INSTANT });
 
       const archived = await archiveResidency(fixture.admin, fixture.residencyA, {
         executor: tx,
@@ -686,6 +696,93 @@ describe('архивация проживания', () => {
       });
 
       expect(archived.status).toBe('archived');
+    });
+  });
+});
+
+/**
+ * Депозит в книге проводок (§10.1). Возврат и сгорание — разные события:
+ * сгоревший депозит остаётся в сети и уходит в фонд дома, возвращённый
+ * покидает её через кассу. Обе стороны обязаны сойтись в сверке фонда.
+ */
+describe('проводки по депозиту', () => {
+  async function ledgerOf(tx: Transaction, orgId: string) {
+    return tx
+      .select({
+        code: schema.accounts.code,
+        direction: schema.ledgerLines.direction,
+        amount: schema.ledgerLines.amount,
+      })
+      .from(schema.ledgerLines)
+      .innerJoin(schema.ledgerEntries, eq(schema.ledgerEntries.id, schema.ledgerLines.entryId))
+      .innerJoin(schema.accounts, eq(schema.accounts.id, schema.ledgerLines.accountId))
+      .where(eq(schema.ledgerEntries.orgId, orgId));
+  }
+
+  it('сгорание списывает депозитный фонд в фонд дома', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '8401');
+
+      // Заезд 1 декабря: к 15 декабря полных месяцев ноль, депозит сгорает.
+      await tx
+        .update(schema.residencies)
+        .set({ moveInDate: '2026-12-01' })
+        .where(eq(schema.residencies.id, fixture.residencyA));
+      await chargeDeposit(tx, fixture.orgId, fixture.residencyA, 45_000);
+      await terminateResidency(
+        fixture.admin,
+        fixture.residencyA,
+        { moveOutDate: TODAY, reason: 'Съезжает' },
+        { executor: tx, instant: INSTANT },
+      );
+
+      await createRefundInvoice(fixture.admin, fixture.residencyA, {
+        executor: tx,
+        instant: INSTANT,
+      });
+
+      const lines = await ledgerOf(tx, fixture.orgId);
+
+      expect(lines).toContainEqual({
+        code: 'deposit_fund',
+        direction: 'debit',
+        amount: 45_000,
+      });
+      expect(lines).toContainEqual({
+        code: `house_fund:${fixture.houseSlugA}`,
+        direction: 'credit',
+        amount: 45_000,
+      });
+    });
+  });
+
+  it('возврат уводит деньги из депозитного фонда в кассу, а не в фонд дома', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '8402');
+
+      await chargeDeposit(tx, fixture.orgId, fixture.residencyA, 45_000);
+      await terminateResidency(
+        fixture.admin,
+        fixture.residencyA,
+        { moveOutDate: TODAY, reason: 'Съезжает' },
+        { executor: tx, instant: INSTANT },
+      );
+
+      const invoice = await createRefundInvoice(fixture.admin, fixture.residencyA, {
+        executor: tx,
+        instant: INSTANT,
+      });
+
+      // Счёт «В ожидании» деньги ещё не двигает: проводка идёт по выплате.
+      expect(await ledgerOf(tx, fixture.orgId)).toHaveLength(0);
+
+      await settleRefund(fixture.admin, invoice?.id ?? '', {}, { executor: tx, instant: INSTANT });
+
+      const lines = await ledgerOf(tx, fixture.orgId);
+
+      expect(lines).toHaveLength(2);
+      expect(lines).toContainEqual({ code: 'deposit_fund', direction: 'debit', amount: 45_000 });
+      expect(lines).toContainEqual({ code: 'cash', direction: 'credit', amount: 45_000 });
     });
   });
 });

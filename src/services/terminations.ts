@@ -28,8 +28,9 @@ import {
 } from '@/lib/time';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
+import { postDepositBurn, postDepositRefund } from './ledger';
 
-import type { DepositTransaction, Invoice, Residency } from '@/db/schema';
+import type { DepositTransaction, Invoice, Payment, Residency } from '@/db/schema';
 import type { UserActor } from './users';
 
 /**
@@ -369,6 +370,13 @@ export async function createRefundInvoice(
         },
         tx,
       );
+
+      // Деньги остаются в сети и переходят в фонд дома (§10.1).
+      await postDepositBurn(
+        actor,
+        { houseId: residency.houseId, sourceId: invoice.id, amount: outcome.amount, date: today },
+        { executor: tx, today },
+      );
     }
 
     await recordAudit(
@@ -386,13 +394,22 @@ export async function createRefundInvoice(
   });
 }
 
+export interface SettleRefundInput {
+  /**
+   * Откуда выданы деньги. Правилами не задано, поэтому по умолчанию касса:
+   * депозит возвращают из рук в руки чаще, чем переводом ([ОТКРЫТО] P3-6).
+   */
+  method?: Payment['method'] | undefined;
+}
+
 /** Фактическая выплата: «В ожидании» → «Возвращён» (§2.2). */
 export async function settleRefund(
   actor: UserActor,
   invoiceId: string,
+  input: SettleRefundInput = {},
   deps: TerminationDeps = {},
 ): Promise<Invoice> {
-  const { executor } = resolve(deps);
+  const { executor, today } = resolve(deps);
 
   const invoice = await requireInvoice(actor.context, invoiceId, executor);
   const residency = await requireResidency(actor.context, invoice.residencyId, executor);
@@ -428,6 +445,18 @@ export async function settleRefund(
         createdBy: actor.context.userId,
       },
       tx,
+    );
+
+    // Деньги покидают сеть: депозитный фонд гасится кассой или Kaspi (§10.1).
+    await postDepositRefund(
+      actor,
+      {
+        invoiceId: invoice.id,
+        amount: invoice.total,
+        method: input.method ?? 'cash',
+        date: today,
+      },
+      { executor: tx, today },
     );
 
     await recordAudit(

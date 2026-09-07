@@ -1,8 +1,10 @@
 import { getDb, type Executor } from '@/db/client';
 import {
   accountBalances,
+  createAccount,
   createLedgerEntry,
   findAccountByCode,
+  findHouseAccount,
   findLedgerEntry,
   listAccounts,
   listLedgerLines,
@@ -11,6 +13,7 @@ import {
 } from '@/db/repositories/accounts';
 import { listDepositTransactions } from '@/db/repositories/invoices';
 import { listResidencies } from '@/db/repositories/residencies';
+import { ACCOUNT_CODES, houseFundCode } from '@/db/schema';
 import { depositBalance } from '@/domain/invoice';
 import { assertCan } from '@/lib/authz';
 import { ConflictError, NotFoundError, ValidationError } from '@/lib/errors';
@@ -18,7 +21,7 @@ import { todayInAlmaty, type BusinessDate } from '@/lib/time';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
 
-import type { Account, LedgerEntry } from '@/db/schema';
+import type { Account, House, LedgerEntry, Payment } from '@/db/schema';
 import type { UserActor } from './users';
 
 /**
@@ -39,19 +42,6 @@ export interface LedgerDeps {
 
 function resolve(deps: LedgerDeps): { executor: Executor; today: BusinessDate } {
   return { executor: deps.executor ?? getDb(), today: deps.today ?? todayInAlmaty() };
-}
-
-/** Коды системных счетов. Фонд дома — свой у каждого дома, отсюда суффикс. */
-export const ACCOUNT_CODES = {
-  depositFund: 'deposit_fund',
-  utilityFund: 'utility_fund',
-  commonFund: 'common_fund',
-  cash: 'cash',
-  kaspi: 'kaspi',
-} as const;
-
-export function houseFundCode(houseSlug: string): string {
-  return `house_fund:${houseSlug}`;
 }
 
 export interface PostLine {
@@ -98,15 +88,19 @@ function assertBalanced(lines: readonly PostLine[]): void {
 /**
  * Проводка целиком или никак. Счета проверяются на видимость до записи:
  * проводка по чужому счёту — не ошибка ввода, а выход за пределы сети.
+ *
+ * Прав на книгу проводок здесь не спрашивают: этот путь служит типовым
+ * проводкам ниже, где право проверено по самой операции — оплате, ущербу,
+ * возврату. Иначе админ дома, которому §10.1 книгу не открывает, не смог бы
+ * принять депозит, и деньги пошли бы мимо учёта.
  */
-export async function postEntry(
+async function postSystemEntry(
   actor: UserActor,
   input: PostEntryInput,
   deps: LedgerDeps = {},
 ): Promise<LedgerEntry> {
   const { executor, today } = resolve(deps);
 
-  assertCan(actor.context, 'accounting.write');
   assertBalanced(input.lines);
 
   for (const line of input.lines) {
@@ -146,6 +140,17 @@ export async function postEntry(
 
     return entry;
   });
+}
+
+/** Произвольная проводка руками суперадмина (модуль 10). */
+export async function postEntry(
+  actor: UserActor,
+  input: PostEntryInput,
+  deps: LedgerDeps = {},
+): Promise<LedgerEntry> {
+  assertCan(actor.context, 'accounting.write');
+
+  return postSystemEntry(actor, input, deps);
 }
 
 /**
@@ -220,6 +225,191 @@ export async function requireAccountByCode(
   }
 
   return account;
+}
+
+/**
+ * Фонд дома. Заводится вместе с домом: §10.1 требует по фонду на дом,
+ * и без него ущерб со сгоранием депозита провести некуда. Повторный вызов
+ * ничего не создаёт — сид и приложение заводят дома по-разному.
+ */
+export async function ensureHouseFund(
+  actor: UserActor,
+  house: Pick<House, 'id' | 'slug' | 'name'>,
+  executor: Executor,
+): Promise<Account> {
+  const existing = await findHouseAccount(actor.context, house.id, 'house_fund', executor);
+
+  if (existing !== null) {
+    return existing;
+  }
+
+  return createAccount(
+    actor.context,
+    {
+      houseId: house.id,
+      code: houseFundCode(house.slug),
+      name: `Фонд дома: ${house.name}`,
+      type: 'house_fund',
+      isSystem: true,
+    },
+    executor,
+  );
+}
+
+async function requireHouseFund(
+  actor: UserActor,
+  houseId: string,
+  executor: Executor,
+): Promise<Account> {
+  const fund = await findHouseAccount(actor.context, houseId, 'house_fund', executor);
+
+  if (fund === null) {
+    throw new NotFoundError('Фонд дома не заведён: проверьте план счетов');
+  }
+
+  return fund;
+}
+
+/** Куда физически легли деньги: касса или Kaspi (§10.1). */
+function moneyCode(method: Payment['method']): string {
+  return method === 'kaspi' ? ACCOUNT_CODES.kaspi : ACCOUNT_CODES.cash;
+}
+
+export interface DepositPaymentEntry {
+  houseId: string;
+  invoiceId: string;
+  method: Payment['method'];
+  /** Часть счёта, которая становится депозитом жильца. */
+  deposit: number;
+  /** Остальные строки счёта: доплата за дни до 1 числа — это проживание. */
+  other: number;
+  date?: BusinessDate | undefined;
+}
+
+/**
+ * Оплата депозита (§10.1): Касса/Kaspi → Депозитный фонд. Прочие строки
+ * депозитного счёта — плата за проживание, и она идёт в фонд дома:
+ * иначе остаток депозитного фонда разошёлся бы с суммой депозитов
+ * ровно на эту доплату (инвариант 4).
+ */
+export async function postDepositPayment(
+  actor: UserActor,
+  input: DepositPaymentEntry,
+  deps: LedgerDeps = {},
+): Promise<LedgerEntry> {
+  const { executor } = resolve(deps);
+
+  const money = await requireAccountByCode(actor, moneyCode(input.method), executor);
+  const depositFund = await requireAccountByCode(actor, ACCOUNT_CODES.depositFund, executor);
+
+  const lines: PostLine[] = [
+    { accountId: money.id, direction: 'debit', amount: input.deposit + input.other },
+    { accountId: depositFund.id, direction: 'credit', amount: input.deposit },
+  ];
+
+  if (input.other > 0) {
+    const houseFund = await requireHouseFund(actor, input.houseId, executor);
+    lines.push({ accountId: houseFund.id, direction: 'credit', amount: input.other });
+  }
+
+  return postSystemEntry(
+    actor,
+    {
+      description: 'Оплата депозита',
+      sourceType: 'deposit',
+      sourceId: input.invoiceId,
+      ...(input.date === undefined ? {} : { date: input.date }),
+      lines,
+    },
+    deps,
+  );
+}
+
+export interface DepositFundEntry {
+  houseId: string;
+  sourceId: string;
+  amount: number;
+  date?: BusinessDate | undefined;
+}
+
+/** Сгорание депозита (§10.1, §2.2): Депозитный фонд → Фонд дома. */
+export async function postDepositBurn(
+  actor: UserActor,
+  input: DepositFundEntry,
+  deps: LedgerDeps = {},
+): Promise<LedgerEntry> {
+  return postDepositFundToHouse(actor, input, 'Сгорание депозита', 'deposit', deps);
+}
+
+/** Списание ущерба (§10.1, §8): Депозитный фонд → Фонд дома. */
+export async function postDamageCharge(
+  actor: UserActor,
+  input: DepositFundEntry,
+  deps: LedgerDeps = {},
+): Promise<LedgerEntry> {
+  return postDepositFundToHouse(actor, input, 'Списание ущерба', 'damage', deps);
+}
+
+async function postDepositFundToHouse(
+  actor: UserActor,
+  input: DepositFundEntry,
+  description: string,
+  sourceType: string,
+  deps: LedgerDeps,
+): Promise<LedgerEntry> {
+  const { executor } = resolve(deps);
+
+  const depositFund = await requireAccountByCode(actor, ACCOUNT_CODES.depositFund, executor);
+  const houseFund = await requireHouseFund(actor, input.houseId, executor);
+
+  return postSystemEntry(
+    actor,
+    {
+      description,
+      sourceType,
+      sourceId: input.sourceId,
+      ...(input.date === undefined ? {} : { date: input.date }),
+      lines: [
+        { accountId: depositFund.id, direction: 'debit', amount: input.amount },
+        { accountId: houseFund.id, direction: 'credit', amount: input.amount },
+      ],
+    },
+    deps,
+  );
+}
+
+export interface DepositRefundEntry {
+  invoiceId: string;
+  amount: number;
+  method: Payment['method'];
+  date?: BusinessDate | undefined;
+}
+
+/** Возврат депозита (§10.1, §2.2): Депозитный фонд → Касса/Kaspi. */
+export async function postDepositRefund(
+  actor: UserActor,
+  input: DepositRefundEntry,
+  deps: LedgerDeps = {},
+): Promise<LedgerEntry> {
+  const { executor } = resolve(deps);
+
+  const depositFund = await requireAccountByCode(actor, ACCOUNT_CODES.depositFund, executor);
+  const money = await requireAccountByCode(actor, moneyCode(input.method), executor);
+
+  return postSystemEntry(
+    actor,
+    {
+      description: 'Возврат депозита',
+      sourceType: 'deposit',
+      sourceId: input.invoiceId,
+      ...(input.date === undefined ? {} : { date: input.date }),
+      lines: [
+        { accountId: depositFund.id, direction: 'debit', amount: input.amount },
+        { accountId: money.id, direction: 'credit', amount: input.amount },
+      ],
+    },
+    deps,
+  );
 }
 
 export interface ReconciliationRow {

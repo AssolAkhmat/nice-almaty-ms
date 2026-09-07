@@ -158,7 +158,7 @@ export async function settleRefundAction(
   }
 
   try {
-    await settleRefund(current, text(formData, 'invoiceId'));
+    await settleRefund(current, text(formData, 'invoiceId'), {});
   } catch (error) {
     return terminationFailure(error);
   }

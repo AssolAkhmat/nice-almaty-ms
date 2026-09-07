@@ -4,11 +4,12 @@ import postgres from 'postgres';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import * as schema from '@/db/schema';
-import { createAccount } from '@/db/repositories/accounts';
+import { createAccount, findHouseAccount } from '@/db/repositories/accounts';
 import { testDatabaseUrl } from '@/db/testing/database-url';
 import { ConflictError, ForbiddenError, ValidationError } from '@/lib/errors';
 import { parseBusinessDate } from '@/lib/time';
 
+import { createHouse } from './houses';
 import { postEntry, reconcileDepositFund, reverseEntry, trialBalance } from './ledger';
 
 import type { AccessContext } from '@/db/access';
@@ -370,6 +371,26 @@ describe('сверка депозитного фонда (инвариант 4)'
       const report = await reconcileDepositFund(fixture.superadmin, { executor: tx });
 
       expect(report.depositsTotal).toBe(0);
+    });
+  });
+});
+
+describe('фонд дома', () => {
+  /*
+   * Сид заводит фонды пяти домов, но дом заводится и через приложение.
+   * Без собственного фонда дому некуда провести ущерб и сгоревший депозит:
+   * §10.1 требует по фонду на дом, а не общую кучу на сеть.
+   */
+  it('появляется вместе с домом, а не только в сиде', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6030');
+
+      const house = await createHouse(fixture.superadmin, { name: 'Дом Б' }, tx);
+      const fund = await findHouseAccount(fixture.superadmin.context, house.id, 'house_fund', tx);
+
+      expect(fund?.code).toBe(`house_fund:${house.slug}`);
+      expect(fund?.isSystem).toBe(true);
+      expect(fund?.houseId).toBe(house.id);
     });
   });
 });

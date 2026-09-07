@@ -117,6 +117,31 @@ export async function addDamageShares(
     .returning();
 }
 
+/**
+ * Сколько человек участвовало в каждом ущербе. Нужно жильцу: §8 обещает
+ * ему не только сумму списания, но и с кем она разделена — иначе доля
+ * выглядела бы взятой с потолка.
+ */
+export async function countDamageShares(
+  damageIds: readonly string[],
+  executor: Executor = getDb(),
+): Promise<Map<string, number>> {
+  if (damageIds.length === 0) {
+    return new Map();
+  }
+
+  const rows = await executor
+    .select({
+      damageId: damageShares.damageId,
+      participants: sql<number>`count(*)::int`,
+    })
+    .from(damageShares)
+    .where(inArray(damageShares.damageId, [...damageIds]))
+    .groupBy(damageShares.damageId);
+
+  return new Map(rows.map((row) => [row.damageId, row.participants]));
+}
+
 export async function listDamageShares(
   damageId: string,
   executor: Executor = getDb(),
