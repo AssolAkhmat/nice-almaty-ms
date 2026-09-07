@@ -1,5 +1,5 @@
 import { getDb, type Executor } from '@/db/client';
-import { listAreas, requireArea } from '@/db/repositories/areas';
+import { listAreas, listBeds, requireArea } from '@/db/repositories/areas';
 import { requireHouse } from '@/db/repositories/houses';
 import {
   createChecklist,
@@ -22,8 +22,7 @@ import { now } from '@/lib/time';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
 
-import type { Area } from '@/db/schema';
-import type { AreaChecklist, EligibilityGroup } from '@/db/schema';
+import type { Area, AreaChecklist, Bed, EligibilityGroup } from '@/db/schema';
 import type { UserActor } from './users';
 
 /**
@@ -58,6 +57,8 @@ export interface RotationSetupView {
   groups: EligibilityGroup[];
   /** Жильцы дома: из них собираются включения и исключения групп. */
   members: EligibilityMemberRow[];
+  /** Места дома: из них собираются слоты ряда. */
+  beds: Bed[];
 }
 
 export async function readRotationSetup(
@@ -69,13 +70,14 @@ export async function readRotationSetup(
 
   assertCan(actor.context, 'settings.house.read', { houseId });
 
-  const [house, areas, checklists, groups, links, members] = await Promise.all([
+  const [house, areas, checklists, groups, links, members, beds] = await Promise.all([
     requireHouse(actor.context, houseId, executor),
     listAreas(actor.context, houseId, {}, executor),
     listChecklists(actor.context, houseId, {}, executor),
     listEligibilityGroups(actor.context, houseId, executor),
     listAreaEligibility(actor.context, houseId, executor),
     listEligibilityMembers(actor.context, houseId, executor),
+    listBeds(actor.context, houseId, {}, executor),
   ]);
 
   return {
@@ -95,6 +97,7 @@ export async function readRotationSetup(
     })),
     groups,
     members,
+    beds,
   };
 }
 

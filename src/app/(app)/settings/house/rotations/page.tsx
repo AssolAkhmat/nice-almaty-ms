@@ -8,8 +8,15 @@ import { listHouses } from '@/db/repositories/houses';
 import { parseEligibilityRule } from '@/domain/eligibility';
 import { can } from '@/lib/authz';
 import { getCurrentSession } from '@/lib/session';
+import { readRows } from '@/services/rotation-rows';
 import { readRotationSetup } from '@/services/rotation-setup';
 
+import {
+  RotationRowsManager,
+  type BedOption,
+  type RowBlock,
+  type ZoneOption,
+} from './rotation-rows-manager';
 import { RotationSetupManager, type AreaBlock, type GroupRow } from './rotation-setup-manager';
 
 import type { UserActor } from '@/services/users';
@@ -57,7 +64,10 @@ export default async function RotationSetupPage({
     );
   }
 
-  const setup = await readRotationSetup(actor, houseId);
+  const [setup, rows] = await Promise.all([
+    readRotationSetup(actor, houseId),
+    readRows(actor, houseId),
+  ]);
 
   const areas: AreaBlock[] = setup.areas.map((area) => ({
     areaId: area.area.id,
@@ -85,6 +95,40 @@ export default async function RotationSetupPage({
       excludeUserIds: rule.excludeUserIds,
     };
   });
+
+  const areaNames = new Map(setup.areas.map((area) => [area.area.id, area.area.name]));
+
+  const beds: BedOption[] = setup.beds.map((bed) => ({
+    bedId: bed.id,
+    label: bed.label,
+    areaId: bed.areaId,
+    areaName: areaNames.get(bed.areaId) ?? '',
+  }));
+
+  const zoneOptions: ZoneOption[] = setup.areas.flatMap((area) =>
+    area.checklists.map((checklist) => ({
+      areaId: area.area.id,
+      areaName: area.area.name,
+      areaType: area.area.type,
+      checklistId: checklist.id,
+      checklistTitle: checklist.title,
+      peopleNeeded: checklist.peopleNeeded,
+    })),
+  );
+
+  const rowBlocks: RowBlock[] = rows.map((view) => ({
+    rowId: view.row.id,
+    name: view.row.name,
+    type: view.row.type,
+    weekday: view.row.weekday,
+    startDate: view.row.startDate,
+    slots: view.slots.map((slot) => ({ bedId: slot.bedId, position: slot.position })),
+    zones: view.zones.map((zone) => ({
+      areaId: zone.areaId,
+      checklistId: zone.checklistId,
+      position: zone.position,
+    })),
+  }));
 
   return (
     <section className="flex flex-col gap-6">
@@ -122,6 +166,8 @@ export default async function RotationSetupPage({
         houseId={houseId}
         members={setup.members.map((member) => ({ userId: member.userId, name: member.name }))}
       />
+
+      <RotationRowsManager beds={beds} houseId={houseId} rows={rowBlocks} zones={zoneOptions} />
     </section>
   );
 }

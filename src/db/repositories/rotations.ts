@@ -481,6 +481,36 @@ export async function requireRotationRow(
   return row;
 }
 
+export interface UpdateRotationRowInput {
+  name?: string;
+  type?: 'common' | 'room';
+  weekday?: number;
+  startDate?: BusinessDate;
+  isActive?: boolean;
+  sortOrder?: number;
+}
+
+export async function updateRotationRow(
+  context: AccessContext,
+  rowId: string,
+  patch: UpdateRotationRowInput,
+  executor: Executor = getDb(),
+): Promise<RotationRow> {
+  await requireRotationRow(context, rowId, executor);
+
+  const [row] = await executor
+    .update(rotationRows)
+    .set({ ...patch, updatedAt: now() })
+    .where(eq(rotationRows.id, rowId))
+    .returning();
+
+  if (row === undefined) {
+    throw new NotFoundError('Ряд ротаций не найден');
+  }
+
+  return row;
+}
+
 export interface RowSlotInput {
   position: number;
   bedId: string;

@@ -105,6 +105,23 @@ test.describe('настройка ротаций', () => {
     await expect(page.locator(`input[value="${groupName}"]`)).toBeVisible();
   });
 
+  test('ряды ротаций собираются на экране настройки', async ({ page }) => {
+    await login(page, E2E_ACCOUNTS.adminHouse1);
+    await page.goto('/settings/house/rotations');
+
+    // Форма нового ряда на месте со всем, из чего ряд состоит (§6.1).
+    const form = page.getByTestId('row-form-new');
+    await expect(form).toBeVisible();
+    await expect(form.getByTestId('row-name-new')).toBeVisible();
+    await expect(form.getByTestId('row-type-new')).toBeVisible();
+    await expect(form.getByTestId('row-weekday-new')).toBeVisible();
+    await expect(form.getByTestId('row-start-new')).toBeVisible();
+
+    // Что ряд сохраняется и как он проверяется — интеграционные тесты
+    // `rotation-rows.db-test`; сквозной путь через интерфейс идёт в приёмке фазы.
+    await expect(page.locator('main')).toContainText('Ряды ротаций');
+  });
+
   test('суперадмин открывает настройку и выбирает дом', async ({ page }) => {
     await login(page, E2E_ACCOUNTS.superadmin);
     await page.goto('/settings/house/rotations');

@@ -37,7 +37,8 @@
       "damage": "Damage",
       "utility_period": "Utility period",
       "area_checklist": "Area checklist",
-      "eligibility_group": "Eligibility group"
+      "eligibility_group": "Eligibility group",
+      "rotation_row": "Rotation row"
     }
   },
   "auth": {
@@ -1055,6 +1056,49 @@
       "peopleNeededInvalid": "People count must be a whole number from one",
       "ruleInvalid": "The group rule is incomplete",
       "unknown": "Could not save"
+    },
+    "rowArchived": "Row turned off"
+  },
+  "rotationRows": {
+    "title": "Rotation rows",
+    "addRowTitle": "New row",
+    "addRow": "Add row",
+    "save": "Save",
+    "archiveRow": "Turn row off",
+    "name": "Name",
+    "type": "Type",
+    "weekday": "Weekday",
+    "startDate": "First rotation date",
+    "startDateHint": "Week number is counted from it",
+    "slots": "Beds and cycle order",
+    "zones": "Zones and order",
+    "types": {
+      "common": "Common zones",
+      "room": "Room"
+    },
+    "weekdays": {
+      "0": "Sunday",
+      "1": "Monday",
+      "2": "Tuesday",
+      "3": "Wednesday",
+      "4": "Thursday",
+      "5": "Friday",
+      "6": "Saturday"
+    },
+    "errors": {
+      "nameRequired": "Name cannot be empty",
+      "weekdayInvalid": "A week has seven days",
+      "roomRowSunday": "A room row runs on Sundays",
+      "startDateWeekday": "The first rotation date must fall on the row weekday",
+      "startDateInvalid": "Set the first rotation date",
+      "slotsRequired": "A row needs at least one bed",
+      "zonesRequired": "A row needs at least one zone",
+      "bedTwice": "The same bed is in the row twice",
+      "checklistArea": "The checklist belongs to another zone",
+      "roomRowSingleZone": "A room row has one zone — the room itself",
+      "roomRowLivingArea": "A room row zone must be a living room",
+      "roomRowSlots": "A room row uses beds of that same room",
+      "tooManyDuties": "Zones need more people than the row has beds"
     }
   }
 }

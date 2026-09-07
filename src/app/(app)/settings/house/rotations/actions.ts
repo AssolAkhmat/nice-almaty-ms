@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 
 import { AppError } from '@/lib/errors';
 import { getCurrentSession } from '@/lib/session';
+import { archiveRow, saveRow } from '@/services/rotation-rows';
 import {
   archiveChecklist,
   createGroup,
@@ -11,6 +12,8 @@ import {
   setAreaEligibility,
   updateGroup,
 } from '@/services/rotation-setup';
+
+import { tryParseBusinessDate } from '@/lib/time';
 
 import type { UserActor } from '@/services/users';
 
@@ -199,4 +202,98 @@ export async function setEligibilityAction(
   refresh();
 
   return { done: 'rotationSetup.saved' };
+}
+
+/**
+ * Порядок в ряду задаётся числом у каждого места и каждой зоны: пусто —
+ * не входит в ряд. Перетаскивания здесь нет намеренно — ряд собирают
+ * редко, а число видно и на узком экране.
+ */
+function ordered<T>(
+  formData: FormData,
+  prefix: string,
+  build: (key: string) => T,
+): { position: number; value: T }[] {
+  const picked: { position: number; value: T }[] = [];
+
+  for (const [name, raw] of formData.entries()) {
+    if (!name.startsWith(prefix) || typeof raw !== 'string' || raw.trim() === '') {
+      continue;
+    }
+
+    const position = Number(raw);
+    if (!Number.isFinite(position)) {
+      continue;
+    }
+
+    picked.push({ position, value: build(name.slice(prefix.length)) });
+  }
+
+  return picked.sort((left, right) => left.position - right.position);
+}
+
+export async function saveRowAction(
+  _previous: RotationSetupActionState,
+  formData: FormData,
+): Promise<RotationSetupActionState> {
+  const user = await actor();
+  if (user === null) {
+    return { error: 'rotationSetup.errors.unknown' };
+  }
+
+  const rowId = text(formData, 'rowId');
+  const type = text(formData, 'type');
+
+  // Дата приходит из поля ввода: незаполненная или битая должна назваться
+  // сама, а не превратиться в «не получилось сохранить».
+  const startDate = tryParseBusinessDate(text(formData, 'startDate'));
+  if (startDate === null) {
+    return { error: 'rotationRows.errors.startDateInvalid' };
+  }
+
+  const slots = ordered(formData, 'slot-', (bedId) => ({ bedId })).map((item) => item.value);
+  const zones = ordered(formData, 'zone-', (key) => {
+    const [areaId = '', checklistId = ''] = key.split('|');
+
+    return { areaId, checklistId };
+  }).map((item) => item.value);
+
+  try {
+    await saveRow(user, {
+      ...(rowId === '' ? {} : { rowId }),
+      houseId: text(formData, 'houseId'),
+      name: text(formData, 'name'),
+      type: type === 'room' ? 'room' : 'common',
+      weekday: Number(text(formData, 'weekday')),
+      startDate,
+      slots,
+      zones,
+    });
+  } catch (error) {
+    return failure(error);
+  }
+
+  refresh();
+
+  return { done: 'rotationSetup.saved' };
+}
+
+export async function archiveRowAction(
+  _previous: RotationSetupActionState,
+  formData: FormData,
+): Promise<RotationSetupActionState> {
+  const user = await actor();
+  if (user === null) {
+    return { error: 'rotationSetup.errors.unknown' };
+  }
+
+  try {
+    await archiveRow(user, text(formData, 'rowId'));
+  } catch (error) {
+    return failure(error);
+  }
+
+  refresh();
+
+  return { done: 'rotationSetup.rowArchived' };
 }

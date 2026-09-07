@@ -67,6 +67,8 @@ export const AUDIT_ACTIONS = {
   checklistArchived: 'checklist.archived',
   eligibilityGroupSaved: 'eligibility_group.saved',
   areaEligibilitySet: 'area_eligibility.set',
+  rotationRowSaved: 'rotation_row.saved',
+  rotationRowArchived: 'rotation_row.archived',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
