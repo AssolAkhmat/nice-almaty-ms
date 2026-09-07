@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { generateTemporaryPassword, hashPassword } from '@/lib/password';
 
 import { getDb, type Executor } from './client';
+import { seedContent } from './seed-content';
 import {
   ACCOUNT_CODES,
   accounts as accountsTable,
@@ -29,9 +30,16 @@ export const HOUSE_COUNT = 11;
 
 export const SUPERADMIN_PHONE = '+77010000000';
 
-/** Телефоны админов: по одному на дом, номер совпадает с номером дома. */
+/**
+ * Телефоны админов: по одному на дом, номер совпадает с номером дома.
+ *
+ * Номер дополняется до одиннадцати цифр, а не приклеивается в конец:
+ * с десятого дома простая склейка давала `+770100000010` — на две цифры
+ * длиннее настоящего казахстанского номера. У домов с первого по девятый
+ * номера от этого не изменились.
+ */
 export function adminPhone(houseNumber: number): string {
-  return `+7701000000${houseNumber}`;
+  return `+7701${String(houseNumber).padStart(7, '0')}`;
 }
 
 export function houseSlug(houseNumber: number): string {
@@ -99,6 +107,8 @@ export interface SeedResult {
   orgId: string;
   houseIds: string[];
   accounts: SeedAccount[];
+  /** Сколько жильцов завёл этот запуск: повторный не заводит никого. */
+  residents: number;
 }
 
 export interface SeedOptions {
@@ -108,6 +118,12 @@ export interface SeedOptions {
    * Тесты передают предсказуемый, чтобы не выуживать его из вывода.
    */
   passwordFor?: (phone: string) => string;
+  /**
+   * Наполнять ли дома жильцами, зонами и рядами ротаций.
+   * Прогон приёмок обходится каркасом: свои данные он заводит сам,
+   * а чужие жильцы мешали бы его проверкам (P7-13).
+   */
+  withContent?: boolean;
 }
 
 async function ensureOrganization(executor: Executor): Promise<string> {
@@ -348,5 +364,14 @@ export async function seedNetwork(options: SeedOptions = {}): Promise<SeedResult
   await ensureContractTemplate(executor, orgId);
   await ensureAccounts(executor, orgId, houseIds);
 
-  return { orgId, houseIds, accounts };
+  /*
+   * Наполнение — отдельный шаг: прогон приёмок обходится каркасом,
+   * а живой установке нужна сеть, в которой уже есть кого расселять.
+   */
+  const content =
+    options.withContent === false
+      ? { residents: 0 }
+      : await seedContent(executor, orgId, houseIds, passwordFor);
+
+  return { orgId, houseIds, accounts, residents: content.residents };
 }

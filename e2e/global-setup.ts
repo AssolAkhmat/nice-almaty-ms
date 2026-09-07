@@ -530,9 +530,14 @@ export default async function globalSetup(): Promise<void> {
   const db = drizzle(client, { schema });
 
   try {
+    /*
+     * Каркас без наполнения: приёмки заводят своих жильцов и свои ряды,
+     * а сидовые мешали бы им — счётчики и списки перестали бы сходиться.
+     */
     await seedNetwork({
       executor: db as unknown as Executor,
       passwordFor: () => E2E_PASSWORD,
+      withContent: false,
     });
 
     /*

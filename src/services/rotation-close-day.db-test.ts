@@ -159,14 +159,26 @@ async function debtsOf(tx: Transaction, userId: string) {
   return tx.select().from(schema.rotationDebts).where(eq(schema.rotationDebts.userId, userId));
 }
 
+/**
+ * Состояние конкретного назначения. Счётчик прогона считает всю сеть,
+ * а в общей базе живут ещё и сидовые ротации: проверять надо своё
+ * назначение, а не итог задания (инцидент I7).
+ */
+async function stateOf(tx: Transaction, assignmentId: string): Promise<string> {
+  const [assignment] = await tx
+    .select({ state: schema.rotationAssignments.state })
+    .from(schema.rotationAssignments)
+    .where(eq(schema.rotationAssignments.id, assignmentId));
+
+  return assignment?.state ?? '';
+}
+
 describe('автозакрытие дня', () => {
   it('неподтверждённая вчерашняя ротация становится «не выполнена» с оценкой 1', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '9901');
 
-      const result = await closeRotationDay({ executor: tx, instant: TUESDAY_NIGHT });
-
-      expect(result.closed).toBe(1);
+      await closeRotationDay({ executor: tx, instant: TUESDAY_NIGHT });
 
       const day = await readCalendar(
         fixture.admin,
@@ -207,9 +219,9 @@ describe('автозакрытие дня', () => {
         { executor: tx, instant: parseInstant('2026-09-07T18:00:00+05:00') },
       );
 
-      const result = await closeRotationDay({ executor: tx, instant: TUESDAY_NIGHT });
+      await closeRotationDay({ executor: tx, instant: TUESDAY_NIGHT });
 
-      expect(result.closed).toBe(0);
+      expect(await stateOf(tx, fixture.assignmentId)).toBe('confirmed');
       expect(await debtsOf(tx, fixture.workerId)).toHaveLength(0);
     });
   });
@@ -220,9 +232,10 @@ describe('автозакрытие дня', () => {
 
       await setOccurrenceStatus(fixture.admin, fixture.occurrenceId, 'cancelled', { executor: tx });
 
-      const result = await closeRotationDay({ executor: tx, instant: TUESDAY_NIGHT });
+      await closeRotationDay({ executor: tx, instant: TUESDAY_NIGHT });
 
-      expect(result.closed).toBe(0);
+      // Отменённое закрытие не трогает: назначение остаётся как было (§7).
+      expect(await stateOf(tx, fixture.assignmentId)).toBe('assigned');
       expect(await debtsOf(tx, fixture.workerId)).toHaveLength(0);
     });
   });
@@ -232,9 +245,9 @@ describe('автозакрытие дня', () => {
       const fixture = await seed(tx, '9905');
 
       // 23:55 самого понедельника — ротация ещё сегодняшняя (§7).
-      const result = await closeRotationDay({ executor: tx, instant: MONDAY_NIGHT });
+      await closeRotationDay({ executor: tx, instant: MONDAY_NIGHT });
 
-      expect(result.closed).toBe(0);
+      expect(await stateOf(tx, fixture.assignmentId)).toBe('assigned');
       expect(await debtsOf(tx, fixture.workerId)).toHaveLength(0);
     });
   });
@@ -248,9 +261,9 @@ describe('автозакрытие дня', () => {
         .set({ userId: null, state: 'needs_reassignment' })
         .where(eq(schema.rotationAssignments.id, fixture.assignmentId));
 
-      const result = await closeRotationDay({ executor: tx, instant: TUESDAY_NIGHT });
+      await closeRotationDay({ executor: tx, instant: TUESDAY_NIGHT });
 
-      expect(result.closed).toBe(1);
+      expect(await stateOf(tx, fixture.assignmentId)).toBe('missed');
       expect(await debtsOf(tx, fixture.workerId)).toHaveLength(0);
     });
   });
