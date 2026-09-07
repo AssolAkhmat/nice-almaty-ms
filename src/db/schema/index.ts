@@ -1,3 +1,4 @@
+export * from './absences';
 export * from './accounts';
 export * from './areas';
 export * from './audit-log';
@@ -12,6 +13,7 @@ export * from './invoices';
 export * from './job-runs';
 export * from './organizations';
 export * from './rate-limits';
+export * from './rating';
 export * from './residencies';
 export * from './resident-profiles';
 export * from './rotations';

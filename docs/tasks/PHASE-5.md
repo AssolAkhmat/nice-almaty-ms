@@ -38,10 +38,10 @@
 - Коммит: `feat(domain): рейтинг, пороги и перезарядка по §5`
 
 ### T5.2 — Схема присутствия и рейтинга
-- [ ] `absences` с `type`, `status`, `start_at` для краткосрочных и `doc_file_id`
-- [ ] `rating_rules`, `rating_events`, `rating_threshold_states`
-- [ ] `fines`, `discounts`
-- [ ] Миграция на чистой базе; репозитории фильтруют по `org_id` и дому
+- [x] `absences` с `type`, `status`, `start_at` для краткосрочных и `doc_file_id`
+- [x] `rating_rules`, `rating_events`, `rating_threshold_states`
+- [x] `fines`, `discounts`
+- [x] Миграция на чистой базе; репозитории фильтруют по `org_id` и дому
 - Коммит: `feat(db): отсутствия, рейтинг, штрафы и скидки`
 
 ### T5.3 — Отсутствия: подача и одобрение
