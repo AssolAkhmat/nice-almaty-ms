@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm';
 
 import { NotFoundError } from '@/lib/errors';
 import { now } from '@/lib/time';
@@ -48,11 +48,32 @@ function livesInVisibleHouse(context: AccessContext) {
   )`;
 }
 
+export interface ListUsersOptions {
+  /**
+   * Порядок списка.
+   *
+   * `phone` — по номеру: так список ищут глазами в фильтрах журнала.
+   * `newest` — новые сверху: список аккаунтов пагинируется по 25 записей
+   * (инцидент I3), и заведённая только что учётная запись обязана быть
+   * видна без листания. Номер для этого не годится — он случаен.
+   *
+   * Второй ключ у `newest` — телефон: аккаунты, заведённые в одну
+   * транзакцию, получают от `now()` одно и то же время, и без него
+   * их порядок остался бы на усмотрение планировщика.
+   */
+  order?: 'phone' | 'newest';
+}
+
 export async function listUsers(
   context: AccessContext,
   executor: Executor = getDb(),
+  options: ListUsersOptions = {},
 ): Promise<User[]> {
-  return executor.select().from(users).where(scope(context)).orderBy(asc(users.phone));
+  const query = executor.select().from(users).where(scope(context));
+
+  return options.order === 'newest'
+    ? query.orderBy(desc(users.createdAt), asc(users.phone))
+    : query.orderBy(asc(users.phone));
 }
 
 export async function findUser(

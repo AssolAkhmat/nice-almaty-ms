@@ -79,7 +79,13 @@ export async function allowPasswordReset(
   });
 }
 
-/** Список учётных записей в области видимости контекста. */
+/**
+ * Список учётных записей в области видимости контекста, новые сверху.
+ *
+ * Порядок здесь не украшение: список пагинируется по 25 записей (инцидент I3),
+ * и при сортировке по телефону только что заведённый аккаунт оказывался
+ * на случайной странице — вместе с кнопками «разрешить сброс» и «архивировать».
+ */
 export async function listAccounts(
   actor: UserActor,
   executor: Executor = getDb(),
@@ -89,7 +95,7 @@ export async function listAccounts(
     userId: actor.context.userId,
   });
 
-  return listUsers(actor.context, executor);
+  return listUsers(actor.context, executor, { order: 'newest' });
 }
 
 export interface CreateAccountInput {

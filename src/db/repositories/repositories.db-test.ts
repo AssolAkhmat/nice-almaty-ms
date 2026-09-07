@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -279,6 +280,114 @@ describe('видимость домов', () => {
       const house = await createHouse(fixture.superadmin, { name: 'Новый', slug: 'novy-2006' }, tx);
 
       expect(house.orgId).toBe(fixture.orgId);
+    });
+  });
+});
+
+/**
+ * Состаривает уже заведённые фикстурой аккаунты сети.
+ *
+ * `defaultNow()` в PostgreSQL — это время начала транзакции по часам базы,
+ * а `now()` здесь — по часам процесса; в контейнере они расходятся, и без
+ * явного времени тест проверял бы не порядок списка, а разницу часов.
+ */
+async function ageOutFixtureAccounts(tx: Transaction, orgId: string, moment: Date): Promise<void> {
+  await tx
+    .update(schema.users)
+    .set({ createdAt: minusMilliseconds(moment, 60 * 60 * 1000) })
+    .where(eq(schema.users.orgId, orgId));
+}
+
+describe('порядок списка пользователей', () => {
+  /*
+   * Список аккаунтов пагинируется по 25 записей (инцидент I3), поэтому
+   * порядок решает, увидит ли суперадмин только что заведённый аккаунт.
+   * Сортировка по телефону прятала его: номер нового жильца попадал
+   * куда придётся, а в приёмке фазы 1 — за пределы первой страницы.
+   */
+  it('новый аккаунт открывает список, даже если его номер сортируется последним', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '3010');
+      const moment = now();
+      await ageOutFixtureAccounts(tx, fixture.orgId, moment);
+
+      const [newest] = await tx
+        .insert(schema.users)
+        .values({
+          orgId: fixture.orgId,
+          phone: '+77099999999',
+          passwordHash: 'x',
+          role: 'resident',
+          createdAt: moment,
+        })
+        .returning();
+
+      const [earlier] = await tx
+        .insert(schema.users)
+        .values({
+          orgId: fixture.orgId,
+          phone: '+77000000000',
+          passwordHash: 'x',
+          role: 'resident',
+          createdAt: minusMilliseconds(moment, 60_000),
+        })
+        .returning();
+
+      const visible = await listUsers(fixture.superadmin, tx, { order: 'newest' });
+      const order = visible.map((user) => user.id);
+
+      expect(order[0]).toBe(newest?.id);
+      expect(order.indexOf(newest?.id ?? '')).toBeLessThan(order.indexOf(earlier?.id ?? ''));
+    });
+  });
+
+  it('одновременно заведённые аккаунты идут по телефону: порядок не случаен', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '3011');
+      const moment = now();
+      await ageOutFixtureAccounts(tx, fixture.orgId, moment);
+
+      await tx.insert(schema.users).values([
+        {
+          orgId: fixture.orgId,
+          phone: '+77099999992',
+          passwordHash: 'x',
+          role: 'resident',
+          createdAt: moment,
+        },
+        {
+          orgId: fixture.orgId,
+          phone: '+77099999991',
+          passwordHash: 'x',
+          role: 'resident',
+          createdAt: moment,
+        },
+      ]);
+
+      const visible = await listUsers(fixture.superadmin, tx, { order: 'newest' });
+
+      expect(visible.slice(0, 2).map((user) => user.phone)).toEqual([
+        '+77099999991',
+        '+77099999992',
+      ]);
+    });
+  });
+
+  it('по умолчанию порядок прежний — по телефону: список актёров в журнале ищут глазами', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '3012');
+
+      await tx.insert(schema.users).values({
+        orgId: fixture.orgId,
+        phone: '+77000000000',
+        passwordHash: 'x',
+        role: 'resident',
+        createdAt: now(),
+      });
+
+      const visible = await listUsers(fixture.superadmin, tx);
+
+      expect(visible[0]?.phone).toBe('+77000000000');
     });
   });
 });
