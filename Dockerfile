@@ -7,6 +7,10 @@ WORKDIR /app
 # Зависимости ставятся отдельным слоем: меняются реже исходников.
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+# Скрипты копируются вместе с манифестами: `prepare` запускает
+# `scripts/install-hooks.mjs`, и без него установка падает на первом же слое.
+# Меняются они редко, кеш слоя от этого почти не страдает.
+COPY scripts ./scripts
 RUN pnpm install --frozen-lockfile
 
 # Полное дерево с исходниками: из него работают миграции и воркер.
