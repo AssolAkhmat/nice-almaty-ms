@@ -39,7 +39,8 @@
       "area_checklist": "Area checklist",
       "eligibility_group": "Eligibility group",
       "rotation_row": "Rotation row",
-      "rotation_occurrence": "Rotation"
+      "rotation_occurrence": "Rotation",
+      "rotation_template": "Rotation template"
     }
   },
   "auth": {
@@ -1206,5 +1207,22 @@
       "cancelled": "A cancelled rotation cannot be confirmed",
       "scoreRange": "The score is a whole number from 1 to 10"
     }
+  },
+  "rotationTemplates": {
+    "title": "Day template for the group",
+    "hint": "The text is written in the interface language and goes to the message as is",
+    "header": "Header",
+    "footer": "Footer",
+    "save": "Save",
+    "saved": "Template saved",
+    "types": {
+      "regular": "Regular cleaning",
+      "general": "Deep cleaning"
+    },
+    "copy": "Copy",
+    "copied": "Text copied",
+    "templateTitle": "Text for the group",
+    "empty": "No rotations today",
+    "unassigned": "unassigned"
   }
 }

@@ -6,6 +6,7 @@ import { AppError } from '@/lib/errors';
 import { getCurrentSession } from '@/lib/session';
 import { generateGeneralCleaning, setCancelRegularOnGeneral } from '@/services/general-cleaning';
 import { archiveRow, saveRow } from '@/services/rotation-rows';
+import { saveTemplateText } from '@/services/rotation-templates';
 import { generateSchedule } from '@/services/rotation-schedule';
 import {
   archiveChecklist,
@@ -14,6 +15,8 @@ import {
   setAreaEligibility,
   updateGroup,
 } from '@/services/rotation-setup';
+
+import { getLocale } from 'next-intl/server';
 
 import { tryParseBusinessDate } from '@/lib/time';
 
@@ -376,4 +379,30 @@ export async function setCancelRegularAction(
   refresh();
 
   return { done: 'generalCleaning.settingSaved' };
+}
+
+export async function saveTemplateAction(
+  _previous: RotationSetupActionState,
+  formData: FormData,
+): Promise<RotationSetupActionState> {
+  const user = await actor();
+  if (user === null) {
+    return { error: 'rotationSetup.errors.unknown' };
+  }
+
+  const type = text(formData, 'type') === 'general' ? 'general' : 'regular';
+  const locale = await getLocale();
+
+  try {
+    await saveTemplateText(user, text(formData, 'houseId'), type, locale, {
+      header: text(formData, 'header'),
+      footer: text(formData, 'footer'),
+    });
+  } catch (error) {
+    return failure(error);
+  }
+
+  refresh();
+
+  return { done: 'rotationTemplates.saved' };
 }

@@ -30,6 +30,27 @@ test.describe('календарь ротаций', () => {
     await expect(page).toHaveURL(/mode=day/);
   });
 
+  test('в дневном режиме есть текст для группы с кнопкой «Копировать»', async ({ page }) => {
+    await login(page, E2E_ACCOUNTS.adminHouse1);
+    await page.goto('/rotations?mode=day');
+
+    await expect(page.getByTestId('day-template-text')).toBeVisible();
+    await expect(page.getByTestId('day-template-copy')).toBeVisible();
+
+    // Текст plain text и всегда содержит дату дня: её же показывает заголовок.
+    const text = await page.getByTestId('day-template-text').inputValue();
+    expect(text).toMatch(/\d{2}\.\d{2}\.\d{4}/);
+  });
+
+  test('в недельном режиме текста для группы нет: непонятно, какой день копировать', async ({
+    page,
+  }) => {
+    await login(page, E2E_ACCOUNTS.adminHouse1);
+    await page.goto('/rotations?mode=week');
+
+    await expect(page.getByTestId('day-template-text')).toHaveCount(0);
+  });
+
   test('админ видит действия над периодом, если у дома есть зоны с чек-листами', async ({
     page,
   }) => {

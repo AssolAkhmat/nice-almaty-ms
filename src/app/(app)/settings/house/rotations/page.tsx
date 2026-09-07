@@ -1,4 +1,4 @@
-import { getTranslations } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
@@ -11,6 +11,7 @@ import { getCurrentSession } from '@/lib/session';
 import { addDays, todayInAlmaty } from '@/lib/time';
 import { generalCleaningDate, readGeneralCleaningSettings } from '@/services/general-cleaning';
 import { readRows } from '@/services/rotation-rows';
+import { readTemplateText } from '@/services/rotation-templates';
 import { readSchedule } from '@/services/rotation-schedule';
 import { readRotationSetup } from '@/services/rotation-setup';
 
@@ -22,6 +23,7 @@ import {
 } from './rotation-rows-manager';
 import { RotationSetupManager, type AreaBlock, type GroupRow } from './rotation-setup-manager';
 import { GeneralCleaningPanel } from './general-cleaning-panel';
+import { TemplateSettings, type TemplateBlock } from './template-settings';
 import { ScheduleGenerator } from './schedule-generator';
 
 import type { UserActor } from '@/services/users';
@@ -73,12 +75,22 @@ export default async function RotationSetupPage({
   // Горизонт по умолчанию — месяц вперёд: §6.6 требует расписание на месяц.
   const defaultUntil = addDays(today, 30);
 
-  const [setup, rows, scheduled, generalSettings] = await Promise.all([
-    readRotationSetup(actor, houseId),
-    readRows(actor, houseId),
-    readSchedule(actor, houseId, { from: today, to: defaultUntil }),
-    readGeneralCleaningSettings(actor, houseId),
-  ]);
+  const locale = await getLocale();
+
+  const [setup, rows, scheduled, generalSettings, regularTemplate, generalTemplate] =
+    await Promise.all([
+      readRotationSetup(actor, houseId),
+      readRows(actor, houseId),
+      readSchedule(actor, houseId, { from: today, to: defaultUntil }),
+      readGeneralCleaningSettings(actor, houseId),
+      readTemplateText(actor, houseId, 'regular', locale),
+      readTemplateText(actor, houseId, 'general', locale),
+    ]);
+
+  const templates: TemplateBlock[] = [
+    { type: 'regular', ...regularTemplate },
+    { type: 'general', ...generalTemplate },
+  ];
 
   const areas: AreaBlock[] = setup.areas.map((area) => ({
     areaId: area.area.id,
@@ -191,6 +203,8 @@ export default async function RotationSetupPage({
         defaultDate={generalCleaningDate(today)}
         houseId={houseId}
       />
+
+      <TemplateSettings blocks={templates} houseId={houseId} />
     </section>
   );
 }

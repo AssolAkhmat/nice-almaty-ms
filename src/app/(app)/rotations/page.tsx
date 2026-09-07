@@ -1,4 +1,4 @@
-import { getTranslations } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
@@ -20,7 +20,9 @@ import {
   type BusinessDate,
 } from '@/lib/time';
 import { readCalendar } from '@/services/rotation-calendar';
+import { readTemplateText } from '@/services/rotation-templates';
 
+import { DayTemplate } from './day-template';
 import {
   RotationCalendarView,
   type CalendarMode,
@@ -150,6 +152,23 @@ export default async function RotationsPage({
     label: `${areaNames.get(checklist.areaId) ?? '—'} · ${checklist.title}`,
   }));
 
+  /*
+   * Текст для группы собирается только в дневном режиме: §6.7 привязывает
+   * кнопку «Шаблон» именно к дню, и на неделе непонятно, какой день копировать.
+   * Генеральная уборка берёт свою шапку — у неё она настраивается отдельно.
+   */
+  const dayCards = mode === 'day' ? cards : [];
+  const isGeneralDay = dayCards.some((card) => card.type === 'general');
+  const template =
+    mode === 'day' && calendar.houseId !== null
+      ? await readTemplateText(
+          actor,
+          calendar.houseId,
+          isGeneralDay ? 'general' : 'regular',
+          await getLocale(),
+        )
+      : null;
+
   return (
     <section className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
@@ -205,6 +224,23 @@ export default async function RotationsPage({
           </Link>
         </div>
       </Card>
+
+      {template !== null && (
+        <DayTemplate
+          date={range.from}
+          entries={dayCards
+            .filter((card) => card.status !== 'cancelled')
+            .map((card) => ({
+              areaName: card.areaName,
+              checklistTitle: card.checklistTitle,
+              people: card.assignments
+                .map((assignment) => assignment.userName)
+                .filter((name): name is string => name !== null),
+            }))}
+          footer={template.footer}
+          header={template.header}
+        />
+      )}
 
       <RotationCalendarView
         canManage={canManage}
