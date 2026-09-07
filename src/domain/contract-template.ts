@@ -19,6 +19,10 @@ export const CONTRACT_TOKENS = [
   'house.name',
   'house.address',
   'today',
+  /* Реквизиты нанимателя и номер договора (T8.1). */
+  'resident.id_doc_issuer',
+  'resident.registration_address',
+  'residency.contract_number',
 ] as const;
 
 export type ContractToken = (typeof CONTRACT_TOKENS)[number];

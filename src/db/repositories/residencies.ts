@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, like, sql } from 'drizzle-orm';
 
 import { NotFoundError } from '@/lib/errors';
 import { now, type BusinessDate } from '@/lib/time';
@@ -163,6 +163,31 @@ export async function createResidency(
   }
 
   return residency;
+}
+
+/**
+ * Последний выданный номер договора года. Сортировка сперва по длине:
+ * «2026-10000» лексикографически меньше «2026-9999», и без длины пятизначный
+ * номер потерялся бы, а нумерация пошла бы по второму кругу (T8.1).
+ */
+export async function lastContractNumber(
+  orgId: string,
+  year: number,
+  executor: Executor = getDb(),
+): Promise<string | null> {
+  const [row] = await executor
+    .select({ number: residencies.contractNumber })
+    .from(residencies)
+    .where(and(eq(residencies.orgId, orgId), like(residencies.contractNumber, `${String(year)}-%`)))
+    .orderBy(
+      sql`length(${residencies.contractNumber}) desc`,
+      desc(residencies.contractNumber),
+      // Идентификатор в хвосте — правило устойчивого порядка списков (ordering.test.ts).
+      desc(residencies.id),
+    )
+    .limit(1);
+
+  return row?.number ?? null;
 }
 
 export async function updateResidency(

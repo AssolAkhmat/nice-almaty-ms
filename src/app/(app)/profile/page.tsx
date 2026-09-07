@@ -46,6 +46,8 @@ export default async function ProfilePage() {
     sex: profile.sex ?? '',
     birthDate: profile.birthDate ?? '',
     phone: profile.phone ?? session.user.phone,
+    idDocIssuer: profile.idDocIssuer ?? '',
+    registrationAddress: profile.registrationAddress ?? '',
     university: profile.university ?? '',
     course: profile.course === null ? '' : String(profile.course),
     major: profile.major ?? '',

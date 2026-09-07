@@ -31,15 +31,19 @@ afterAll(async () => {
 
 describe('сравнение версий', () => {
   it('отставшая база названа по числам', () => {
-    expect(schemaProblem(17, 19)).toBe('применено 17 из 19');
+    const applied = EXPECTED_MIGRATIONS - 2;
+
+    expect(schemaProblem(applied)).toBe(
+      `применено ${String(applied)} из ${String(EXPECTED_MIGRATIONS)}`,
+    );
   });
 
   it('совпадение молчит', () => {
-    expect(schemaProblem(19, 19)).toBeNull();
+    expect(schemaProblem(EXPECTED_MIGRATIONS)).toBeNull();
   });
 
   it('база впереди кода — не ошибка: так выглядит выкатка', () => {
-    expect(schemaProblem(20, 19)).toBeNull();
+    expect(schemaProblem(EXPECTED_MIGRATIONS + 1)).toBeNull();
   });
 });
 

@@ -201,6 +201,8 @@
       "iinHint": "Twelve digits. Entered once, then shown masked.",
       "idDocNumber": "ID document number",
       "idDocHint": "Entered once, then shown masked.",
+      "idDocIssuer": "Document issued by",
+      "registrationAddress": "Registration address",
       "university": "University",
       "course": "Year",
       "major": "Major",

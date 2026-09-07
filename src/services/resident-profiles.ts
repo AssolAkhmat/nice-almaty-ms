@@ -37,6 +37,10 @@ export interface ProfileInput {
   emergencyName?: string | null;
   emergencyPhone?: string | null;
   emergencyRelation?: string | null;
+  /** Орган выдачи удостоверения. По умолчанию «МВД РК» (T8.1). */
+  idDocIssuer?: string | null;
+  /** Адрес прописки — реквизит нанимателя в договоре. */
+  registrationAddress?: string | null;
   preferredPayment?: 'kaspi' | 'cash' | null;
   noEpilepsy?: boolean | null;
   noAsthma?: boolean | null;

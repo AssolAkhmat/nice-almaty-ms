@@ -20,6 +20,9 @@ const VALUES = {
   'house.name': 'Дом 1',
   'house.address': 'Алматы, ул. Абая, 1',
   today: '15.03.2027',
+  'resident.id_doc_issuer': 'МВД РК',
+  'resident.registration_address': 'Алматы, ул. Сатпаева, 22, кв. 5',
+  'residency.contract_number': '2026-0007',
 };
 
 describe('палитра токенов', () => {
@@ -35,6 +38,10 @@ describe('палитра токенов', () => {
       'house.name',
       'house.address',
       'today',
+      // T8.1: реквизиты нанимателя и номер договора.
+      'resident.id_doc_issuer',
+      'resident.registration_address',
+      'residency.contract_number',
     ]);
   });
 });

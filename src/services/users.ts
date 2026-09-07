@@ -9,6 +9,8 @@ import {
   updateUserAuthState,
 } from '@/db/repositories/users';
 import { createResidency } from '@/db/repositories/residencies';
+
+import { nextNumberForOrg } from './contract-numbers';
 import { revokeAllUserSessions } from '@/db/repositories/sessions';
 import { normalizePhone } from '@/domain/phone';
 import { assertCan } from '@/lib/authz';
@@ -183,9 +185,12 @@ export async function createAccount(
      * ничем, кроме прямой записи в базу (P2-42).
      */
     if (residencyHouseId !== null) {
+      // Номер присваивается сразу: договор собирают позже, но ссылаться
+      // на проживание по номеру начинают с первого дня (T8.1).
+      const contractNumber = await nextNumberForOrg(actor.context.orgId, tx);
       const residency = await createResidency(
         actor.context,
-        { userId: user.id, houseId: residencyHouseId, status: 'created' },
+        { userId: user.id, houseId: residencyHouseId, status: 'created', contractNumber },
         tx,
       );
 
@@ -195,7 +200,7 @@ export async function createAccount(
           action: AUDIT_ACTIONS.residencyCreated,
           entityType: 'residency',
           entityId: residency.id,
-          after: { userId: user.id, houseId: residencyHouseId, status: 'created' },
+          after: { userId: user.id, houseId: residencyHouseId, status: 'created', contractNumber },
         },
         tx,
       );

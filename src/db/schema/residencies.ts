@@ -7,7 +7,9 @@ import {
   index,
   pgEnum,
   pgTable,
+  text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 
@@ -47,6 +49,13 @@ export const residencies = pgTable(
       .notNull()
       .references(() => houses.id),
     status: residencyStatusEnum('status').notNull().default('created'),
+    /**
+     * Номер договора, «ГГГГ-НННН». Присваивает система при заведении
+     * проживания: вводимый руками номер рано или поздно повторится (T8.1).
+     * Пусто у проживаний, заведённых до появления нумерации, — им номер
+     * достаётся при первой сборке договора.
+     */
+    contractNumber: text('contract_number'),
     contractStart: date('contract_start'),
     contractEnd: date('contract_end'),
     /** Дата оплаты депозита: до неё проживание не активно (§1.2). */
@@ -71,6 +80,8 @@ export const residencies = pgTable(
   (table) => [
     index('residencies_house_status_idx').on(table.houseId, table.status),
     index('residencies_user_idx').on(table.userId),
+    // Номер уникален в пределах сети: двух договоров с одним номером не бывает.
+    uniqueIndex('residencies_org_contract_number_unique').on(table.orgId, table.contractNumber),
   ],
 );
 

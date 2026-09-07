@@ -146,6 +146,8 @@ export async function saveProfileAction(
       emergencyName: optionalText(formData, 'emergencyName'),
       emergencyPhone: optionalText(formData, 'emergencyPhone'),
       emergencyRelation: optionalText(formData, 'emergencyRelation'),
+      idDocIssuer: optionalText(formData, 'idDocIssuer'),
+      registrationAddress: optionalText(formData, 'registrationAddress'),
       preferredPayment: payment === 'kaspi' || payment === 'cash' ? payment : null,
       noEpilepsy: formData.get('noEpilepsy') !== null,
       noAsthma: formData.get('noAsthma') !== null,

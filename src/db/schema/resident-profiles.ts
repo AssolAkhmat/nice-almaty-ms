@@ -47,6 +47,13 @@ export const residentProfiles = pgTable('resident_profiles', {
   phone: text('phone'),
   idDocNumberEnc: encrypted('id_doc_number_enc'),
   idDocLast4: text('id_doc_last4'),
+  /**
+   * Орган выдачи удостоверения. Не шифруется: он не опознаёт человека,
+   * в отличие от номера, и в договоре печатается как есть (T8.1).
+   */
+  idDocIssuer: text('id_doc_issuer').default('МВД РК'),
+  /** Адрес прописки. В договоре — реквизит нанимателя, к месту в доме отношения не имеет. */
+  registrationAddress: text('registration_address'),
   iinEnc: encrypted('iin_enc'),
   iinLast4: text('iin_last4'),
   university: text('university'),

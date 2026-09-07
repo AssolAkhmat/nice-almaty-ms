@@ -93,9 +93,11 @@ export const DOCUMENT_TYPE_SEED = [
  */
 export const CONTRACT_TEMPLATE_HTML = [
   '<h1>Договор найма койко-места</h1>',
-  '<p>Дата: {{today}}</p>',
+  '<p>Договор № {{residency.contract_number}} от {{today}}</p>',
   '<p>Наймодатель: {{house.name}}, адрес: {{house.address}}.</p>',
   '<p>Наниматель: {{resident.full_name}}, ИИН {{resident.iin}}.</p>',
+  '<p>Удостоверение выдано: {{resident.id_doc_issuer}}.</p>',
+  '<p>Адрес прописки: {{resident.registration_address}}.</p>',
   '<p>Предмет договора: {{bed.room}}, {{bed.label}}.</p>',
   '<p>Плата за проживание: {{bed.price}} в месяц.</p>',
   '<p>Срок: с {{residency.contract_start}} по {{residency.contract_end}}.</p>',

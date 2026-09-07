@@ -24,6 +24,8 @@ export interface ProfileFormValues {
   sex: string;
   birthDate: string;
   phone: string;
+  idDocIssuer: string;
+  registrationAddress: string;
   university: string;
   course: string;
   major: string;
@@ -148,6 +150,16 @@ export function ProfileForm({
           </CardHeader>
 
           <div className="grid gap-3 md:grid-cols-3">
+            <Field htmlFor="idDocIssuer" label={t('profile.fields.idDocIssuer')}>
+              <Input defaultValue={values.idDocIssuer} id="idDocIssuer" name="idDocIssuer" />
+            </Field>
+            <Field htmlFor="registrationAddress" label={t('profile.fields.registrationAddress')}>
+              <Input
+                defaultValue={values.registrationAddress}
+                id="registrationAddress"
+                name="registrationAddress"
+              />
+            </Field>
             <Field htmlFor="university" label={t('profile.fields.university')}>
               <Input defaultValue={values.university} id="university" name="university" />
             </Field>

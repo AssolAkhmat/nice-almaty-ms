@@ -16,6 +16,7 @@ import { ConflictError, NotFoundError, ValidationError } from '@/lib/errors';
 import { now, todayInAlmaty, type BusinessDate } from '@/lib/time';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
+import { ensureContractNumber } from './contract-numbers';
 import { revealSensitiveField } from './resident-profiles';
 
 import type { PdfRenderer } from '@/adapters/pdf';
@@ -95,6 +96,7 @@ async function contractValues(
   actor: UserActor,
   residency: Residency,
   deps: Resolved,
+  contractNumber: string,
 ): Promise<Record<string, string>> {
   const { executor, today } = deps;
 
@@ -124,6 +126,9 @@ async function contractValues(
     'house.name': house.name,
     'house.address': house.address ?? '',
     today: humanDate(today),
+    'resident.id_doc_issuer': profile.idDocIssuer ?? '',
+    'resident.registration_address': profile.registrationAddress ?? '',
+    'residency.contract_number': contractNumber,
   };
 }
 
@@ -221,7 +226,8 @@ export async function buildContract(
     throw new ValidationError('contracts.unknownTokens', { tokens: unknown });
   }
 
-  const values = await contractValues(actor, residency, resolved);
+  const contractNumber = await ensureContractNumber(actor.context, residency, executor);
+  const values = await contractValues(actor, residency, resolved, contractNumber);
   const html = renderContractTemplate(template.bodyHtml, values);
   const pdf = await resolved.pdf.render(html);
 
@@ -255,7 +261,7 @@ export async function buildContract(
         action: AUDIT_ACTIONS.contractGenerated,
         entityType: 'residency',
         entityId: residency.id,
-        after: { contractFileId: file.id, templateVersion: template.version },
+        after: { contractFileId: file.id, templateVersion: template.version, contractNumber },
       },
       tx,
     );
@@ -307,7 +313,8 @@ export async function signContract(
   }
 
   const dataUrl = `data:image/png;base64,${Buffer.from(bytes).toString('base64')}`;
-  const values = await contractValues(actor, residency, resolved);
+  const contractNumber = await ensureContractNumber(actor.context, residency, executor);
+  const values = await contractValues(actor, residency, resolved, contractNumber);
   const html = withSignature(renderContractTemplate(template.bodyHtml, values), dataUrl);
   const pdf = await resolved.pdf.render(html);
 
