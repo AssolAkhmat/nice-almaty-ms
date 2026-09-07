@@ -12,6 +12,7 @@ import { ValidationError } from '@/lib/errors';
 import { todayInAlmaty, type BusinessDate } from '@/lib/time';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
+import { syncFutureAssignments } from './rotation-schedule';
 
 import type { Area, BedAssignment } from '@/db/schema';
 import type { UserActor } from './users';
@@ -102,6 +103,13 @@ export async function assignBedToResidency(
       tx,
     );
 
+    /*
+     * Будущие ротации пересчитываются сразу (§6.6): слот ряда держится места,
+     * и сменившийся жилец обязан появиться в расписании вместе с заселением.
+     * Иначе за место убирал бы съехавший — до следующей ручной генерации.
+     */
+    await syncFutureAssignments(actor, residency.houseId, today, { executor: tx, today });
+
     return assignment;
   });
 }
@@ -128,6 +136,10 @@ export async function releaseBedOfResidency(
 
   await executor.transaction(async (tx) => {
     await releaseBed(residency.id, on, tx);
+
+    // Освободившееся место возвращает свои будущие назначения в «требует
+    // решения»: убирать за него теперь некому, и это видно админу (§6.3).
+    await syncFutureAssignments(actor, residency.houseId, on, { executor: tx, today: on });
 
     await recordAudit(
       { context: actor.context, ip: actor.ip, requestId: actor.requestId },

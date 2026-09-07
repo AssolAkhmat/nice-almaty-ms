@@ -14,6 +14,7 @@ import {
   eligibilityGroups,
   residencies,
   residentProfiles,
+  rotationAssignments,
   rotationOccurrences,
   rotationRowSlots,
   rotationRowZones,
@@ -22,6 +23,7 @@ import {
   users,
   type AreaChecklist,
   type AreaEligibility,
+  type RotationAssignment,
   type EligibilityGroup,
   type RotationOccurrence,
   type RotationRow,
@@ -43,6 +45,7 @@ function houseScope(
   context: AccessContext,
   column:
     | typeof areas.houseId
+    | typeof beds.houseId
     | typeof rotationRows.houseId
     | typeof rotationOccurrences.houseId
     | typeof eligibilityGroups.houseId
@@ -666,6 +669,133 @@ export async function listOccurrences(
       ),
     )
     .orderBy(asc(rotationOccurrences.date), asc(rotationOccurrences.createdAt));
+}
+
+/**
+ * Кто занимает места дома на указанную дату.
+ *
+ * Период занятости полуоткрытый: день выезда место уже свободно (P2-1),
+ * поэтому дата сравнивается включением в сам диапазон, а не с его границами.
+ */
+export async function listBedOccupantsOn(
+  context: AccessContext,
+  houseId: string,
+  date: BusinessDate,
+  executor: Executor = getDb(),
+): Promise<{ bedId: string; userId: string }[]> {
+  assertHouseVisible(context, houseId);
+
+  const rows = await executor
+    .select({ bedId: bedAssignments.bedId, userId: residencies.userId })
+    .from(bedAssignments)
+    .innerJoin(residencies, eq(residencies.id, bedAssignments.residencyId))
+    .innerJoin(beds, eq(beds.id, bedAssignments.bedId))
+    .where(
+      and(
+        eq(beds.houseId, houseId),
+        houseScope(context, beds.houseId),
+        sql`${bedAssignments.period} @> ${date}::date`,
+      ),
+    );
+
+  return rows;
+}
+
+export async function requireOccurrence(
+  context: AccessContext,
+  occurrenceId: string,
+  executor: Executor = getDb(),
+): Promise<RotationOccurrence> {
+  const [occurrence] = await executor
+    .select()
+    .from(rotationOccurrences)
+    .where(
+      and(
+        eq(rotationOccurrences.id, occurrenceId),
+        eq(rotationOccurrences.orgId, context.orgId),
+        houseScope(context, rotationOccurrences.houseId),
+      ),
+    )
+    .limit(1);
+
+  if (occurrence === undefined) {
+    throw new NotFoundError('Занятие не найдено');
+  }
+
+  return occurrence;
+}
+
+export interface CreateAssignmentInput {
+  occurrenceId: string;
+  userId?: string | null;
+  slotPosition?: number | null;
+  source?: 'auto' | 'manual' | 'debt';
+  state?: 'assigned' | 'needs_reassignment' | 'confirmed' | 'missed' | 'cancelled';
+}
+
+export async function createAssignment(
+  context: AccessContext,
+  input: CreateAssignmentInput,
+  executor: Executor = getDb(),
+): Promise<RotationAssignment> {
+  await requireOccurrence(context, input.occurrenceId, executor);
+
+  const [assignment] = await executor
+    .insert(rotationAssignments)
+    .values({
+      occurrenceId: input.occurrenceId,
+      userId: input.userId ?? null,
+      slotPosition: input.slotPosition ?? null,
+      source: input.source ?? 'auto',
+      state: input.state ?? 'assigned',
+    })
+    .returning();
+
+  if (assignment === undefined) {
+    throw new Error('Назначение не создано');
+  }
+
+  return assignment;
+}
+
+export interface UpdateAssignmentInput {
+  userId?: string | null;
+  state?: 'assigned' | 'needs_reassignment' | 'confirmed' | 'missed' | 'cancelled';
+  source?: 'auto' | 'manual' | 'debt';
+}
+
+export async function updateAssignment(
+  assignmentId: string,
+  patch: UpdateAssignmentInput,
+  executor: Executor = getDb(),
+): Promise<RotationAssignment> {
+  const [assignment] = await executor
+    .update(rotationAssignments)
+    .set({ ...patch, updatedAt: now() })
+    .where(eq(rotationAssignments.id, assignmentId))
+    .returning();
+
+  if (assignment === undefined) {
+    throw new NotFoundError('Назначение не найдено');
+  }
+
+  return assignment;
+}
+
+/** Назначения перечисленных занятий: календарь читает их одним запросом. */
+export async function listAssignmentsFor(
+  occurrenceIds: readonly string[],
+  executor: Executor = getDb(),
+): Promise<RotationAssignment[]> {
+  if (occurrenceIds.length === 0) {
+    return [];
+  }
+
+  return executor
+    .select()
+    .from(rotationAssignments)
+    .where(inArray(rotationAssignments.occurrenceId, [...occurrenceIds]))
+    .orderBy(asc(rotationAssignments.slotPosition), asc(rotationAssignments.createdAt));
 }
 
 export interface TemplateSettingsInput {

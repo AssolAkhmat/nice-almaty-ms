@@ -5,6 +5,7 @@ import { headers } from 'next/headers';
 import { AppError } from '@/lib/errors';
 import { getCurrentSession } from '@/lib/session';
 import { archiveRow, saveRow } from '@/services/rotation-rows';
+import { generateSchedule } from '@/services/rotation-schedule';
 import {
   archiveChecklist,
   createGroup,
@@ -296,4 +297,31 @@ export async function archiveRowAction(
   refresh();
 
   return { done: 'rotationSetup.rowArchived' };
+}
+
+export async function generateScheduleAction(
+  _previous: RotationSetupActionState,
+  formData: FormData,
+): Promise<RotationSetupActionState> {
+  const user = await actor();
+  if (user === null) {
+    return { error: 'rotationSetup.errors.unknown' };
+  }
+
+  const until = tryParseBusinessDate(text(formData, 'until'));
+  if (until === null) {
+    return { error: 'rotationSchedule.errors.untilInvalid' };
+  }
+
+  let created = 0;
+
+  try {
+    ({ created } = await generateSchedule(user, text(formData, 'houseId'), until));
+  } catch (error) {
+    return failure(error);
+  }
+
+  refresh();
+
+  return { done: created === 0 ? 'rotationSchedule.nothingNew' : 'rotationSchedule.generated' };
 }

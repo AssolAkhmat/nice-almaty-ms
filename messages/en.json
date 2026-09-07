@@ -1100,5 +1100,17 @@
       "roomRowSlots": "A room row uses beds of that same room",
       "tooManyDuties": "Zones need more people than the row has beds"
     }
+  },
+  "rotationSchedule": {
+    "title": "Schedule",
+    "until": "Generate until",
+    "untilHint": "Occurrences will appear in the calendar",
+    "generate": "Generate",
+    "generated": "Schedule extended",
+    "nothingNew": "Nothing new to add",
+    "scheduled": "Upcoming occurrences: {count}",
+    "errors": {
+      "untilInvalid": "Set the date to generate until"
+    }
   }
 }

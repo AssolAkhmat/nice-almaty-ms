@@ -122,6 +122,20 @@ test.describe('настройка ротаций', () => {
     await expect(page.locator('main')).toContainText('Ряды ротаций');
   });
 
+  test('расписание генерируется до указанной даты', async ({ page }) => {
+    await login(page, E2E_ACCOUNTS.adminHouse1);
+    await page.goto('/settings/house/rotations');
+
+    const generate = page.getByTestId('schedule-generate');
+    await expect(generate).toBeVisible();
+    await expect(page.getByTestId('schedule-until')).toBeVisible();
+
+    await generate.click();
+
+    // Рядов у дома может не быть вовсе — тогда честный ответ «новых занятий нет».
+    await expect(page.getByTestId('schedule-done')).toBeVisible();
+  });
+
   test('суперадмин открывает настройку и выбирает дом', async ({ page }) => {
     await login(page, E2E_ACCOUNTS.superadmin);
     await page.goto('/settings/house/rotations');
