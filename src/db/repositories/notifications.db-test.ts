@@ -179,7 +179,14 @@ describe('очередь доставки', () => {
 
       await queueOutbox(notification.id, ['inapp', 'webpush'], tx);
 
-      const queued = await listOutbox({ status: 'queued', limit: 10 }, tx);
+      /*
+       * Очередь общая на всю базу, и прогон приёмки оставляет в ней свои
+       * строки: смотреть надо на строки своего уведомления, а не на всю
+       * таблицу — иначе тест зависит от того, что делали до него.
+       */
+      const queued = (await listOutbox({ status: 'queued', limit: 100 }, tx)).filter(
+        (row) => row.notificationId === notification.id,
+      );
 
       expect(queued.map((row) => row.channel).sort()).toEqual(['inapp', 'webpush']);
     });
@@ -196,11 +203,14 @@ describe('очередь доставки', () => {
       );
       await queueOutbox(notification.id, ['inapp'], tx);
 
-      const [row] = await listOutbox({ status: 'queued', limit: 10 }, tx);
+      const mine = <Row extends { notificationId: string }>(rows: Row[]): Row[] =>
+        rows.filter((row) => row.notificationId === notification.id);
+
+      const [row] = mine(await listOutbox({ status: 'queued', limit: 100 }, tx));
       await markOutboxSent(row?.id ?? '', tx);
 
-      expect(await listOutbox({ status: 'queued', limit: 10 }, tx)).toEqual([]);
-      const sent = await listOutbox({ status: 'sent', limit: 10 }, tx);
+      expect(mine(await listOutbox({ status: 'queued', limit: 100 }, tx))).toEqual([]);
+      const sent = mine(await listOutbox({ status: 'sent', limit: 100 }, tx));
       expect(sent[0]?.sentAt).not.toBeNull();
       expect(sent[0]?.attempts).toBe(1);
     });
@@ -219,7 +229,11 @@ describe('очередь доставки', () => {
       await queueOutbox(notification.id, ['inapp'], tx);
       await queueOutbox(notification.id, ['inapp'], tx);
 
-      expect(await listOutbox({ status: 'queued', limit: 10 }, tx)).toHaveLength(1);
+      const queued = (await listOutbox({ status: 'queued', limit: 100 }, tx)).filter(
+        (row) => row.notificationId === notification.id,
+      );
+
+      expect(queued).toHaveLength(1);
     });
   });
 });

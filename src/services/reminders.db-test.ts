@@ -55,10 +55,14 @@ async function inRollback(body: (tx: Transaction) => Promise<void>): Promise<voi
   }
 }
 
-/** Понедельник: в этот день недели стоит ряд ротаций в фикстуре. */
-const MONDAY = parseBusinessDate('2026-09-07');
-const MORNING = parseInstant('2026-09-07T09:00:00+05:00');
-const EVENING = parseInstant('2026-09-07T19:00:00+05:00');
+/*
+ * Понедельник далёкого марта, а не «сегодня»: задания идемпотентны по дню,
+ * и день настоящего прогона приёмка уже могла занять — тогда тест увидел бы
+ * «уже разослано» вместо рассылки. Дата в будущем принадлежит только тесту.
+ */
+const MONDAY = parseBusinessDate('2027-03-08');
+const MORNING = parseInstant('2027-03-08T09:00:00+05:00');
+const EVENING = parseInstant('2027-03-08T19:00:00+05:00');
 
 async function seed(tx: Transaction, suffix: string, options: { withAdmin?: boolean } = {}) {
   const [org] = await tx
@@ -123,7 +127,7 @@ async function seed(tx: Transaction, suffix: string, options: { withAdmin?: bool
       userId: dwellerUser?.id ?? '',
       houseId,
       status: 'active',
-      moveInDate: '2026-09-01',
+      moveInDate: '2027-03-01',
     })
     .returning();
 
@@ -131,7 +135,7 @@ async function seed(tx: Transaction, suffix: string, options: { withAdmin?: bool
     residencyId: residency?.id ?? '',
     bedId: bed?.id ?? '',
     price: 100_000,
-    period: '[2026-09-01,)',
+    period: '[2027-03-01,)',
   });
 
   const context: AccessContext = {
@@ -197,7 +201,7 @@ describe('напоминания о ротациях', () => {
 
       const result = await remindRotations({ executor: tx, instant: MORNING });
 
-      expect(result.periodKey).toBe('2026-09-07:morning');
+      expect(result.periodKey).toBe('2027-03-08:morning');
 
       const [notification] = await notificationsOf(tx, fixture.dwellerId);
       expect(notification?.type).toBe('rotation.reminder');
@@ -212,7 +216,7 @@ describe('напоминания о ротациях', () => {
 
       const result = await remindRotations({ executor: tx, instant: EVENING });
 
-      expect(result.periodKey).toBe('2026-09-07:evening');
+      expect(result.periodKey).toBe('2027-03-08:evening');
 
       const [notification] = await notificationsOf(tx, fixture.dwellerId);
       expect(notification?.titleI18n).toMatchObject({ ru: 'Завтра ваша уборка' });
@@ -271,7 +275,7 @@ describe('отбой', () => {
         houseId: fixture.houseId,
         type: 'short',
         status: 'approved',
-        startDate: '2026-09-07',
+        startDate: '2027-03-08',
         reason: 'Задерживаюсь на работе',
       });
 
@@ -306,7 +310,7 @@ describe('отбой', () => {
 });
 
 describe('напоминания 25 числа', () => {
-  const ON_25TH = parseInstant('2026-09-25T10:00:00+05:00');
+  const ON_25TH = parseInstant('2027-03-25T10:00:00+05:00');
 
   it('коммуналка за месяц напоминается тому, кто ведёт дом', async () => {
     await inRollback(async (tx) => {
@@ -314,7 +318,7 @@ describe('напоминания 25 числа', () => {
 
       const result = await remindUtilities({ executor: tx, instant: ON_25TH });
 
-      expect(result.month).toBe('2026-09-01');
+      expect(result.month).toBe('2027-03-01');
 
       const [notification] = await notificationsOf(tx, fixture.adminId ?? '');
       expect(notification?.type).toBe('utilities.remind');
@@ -328,7 +332,7 @@ describe('напоминания 25 числа', () => {
       await tx.insert(schema.utilityPeriods).values({
         orgId: fixture.orgId,
         houseId: fixture.houseId,
-        month: '2026-09-01',
+        month: '2027-03-01',
         status: 'closed',
       });
 
@@ -355,7 +359,7 @@ describe('напоминания 25 числа', () => {
 
       const result = await remindSchedule({ executor: tx, instant: ON_25TH });
 
-      expect(result.month).toBe('2026-10-01');
+      expect(result.month).toBe('2027-04-01');
 
       const [notification] = await notificationsOf(tx, fixture.adminId ?? '');
       expect(notification?.type).toBe('schedule.remind');
@@ -365,7 +369,7 @@ describe('напоминания 25 числа', () => {
   it('составленное расписание напоминания не требует', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '6613');
-      await withRotation(tx, fixture, parseBusinessDate('2026-10-05'));
+      await withRotation(tx, fixture, parseBusinessDate('2027-04-05'));
 
       await remindSchedule({ executor: tx, instant: ON_25TH });
 
@@ -464,8 +468,8 @@ describe('возврат депозита', () => {
         .update(schema.residencies)
         .set({
           status: 'terminating',
-          terminationRequestedAt: parseInstant('2026-08-15T12:00:00+05:00'),
-          moveOutDate: '2026-08-15',
+          terminationRequestedAt: parseInstant('2027-02-13T12:00:00+05:00'),
+          moveOutDate: '2027-02-13',
         })
         .where(eq(schema.residencies.id, fixture.residencyId));
 
@@ -485,8 +489,8 @@ describe('возврат депозита', () => {
         .update(schema.residencies)
         .set({
           status: 'terminating',
-          terminationRequestedAt: parseInstant('2026-08-07T12:00:00+05:00'),
-          moveOutDate: '2026-08-07',
+          terminationRequestedAt: parseInstant('2027-02-05T12:00:00+05:00'),
+          moveOutDate: '2027-02-05',
         })
         .where(eq(schema.residencies.id, fixture.residencyId));
 
@@ -505,8 +509,8 @@ describe('возврат депозита', () => {
         .update(schema.residencies)
         .set({
           status: 'terminating',
-          terminationRequestedAt: parseInstant('2026-08-25T12:00:00+05:00'),
-          moveOutDate: '2026-08-25',
+          terminationRequestedAt: parseInstant('2027-02-24T12:00:00+05:00'),
+          moveOutDate: '2027-02-24',
         })
         .where(eq(schema.residencies.id, fixture.residencyId));
 

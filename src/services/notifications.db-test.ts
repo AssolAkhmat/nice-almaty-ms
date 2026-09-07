@@ -298,12 +298,15 @@ describe('разбор очереди', () => {
         tx,
       );
 
-      const first = await dispatchNotifications({ executor: tx, senders: channel.registry });
-      expect(first.sent).toBe(1);
+      /*
+       * Очередь общая на всю базу: прогон приёмки оставляет в ней свои
+       * строки, и считать надо не сколько задание разобрало всего,
+       * а что стало с этой строкой и сколько раз позвали канал по ней.
+       */
+      await dispatchNotifications({ executor: tx, senders: channel.registry });
+      await dispatchNotifications({ executor: tx, senders: channel.registry });
 
-      const second = await dispatchNotifications({ executor: tx, senders: channel.registry });
-      expect(second.taken).toBe(0);
-      expect(channel.calls).toEqual([notification.id]);
+      expect(channel.calls.filter((id) => id === notification.id)).toEqual([notification.id]);
 
       const queue = await outboxOf(tx, notification.id);
       expect(queue[0]?.status).toBe('sent');
@@ -324,16 +327,14 @@ describe('разбор очереди', () => {
       );
 
       for (let attempt = 1; attempt < MAX_DELIVERY_ATTEMPTS; attempt += 1) {
-        const result = await dispatchNotifications({ executor: tx, senders: channel.registry });
-        expect(result.retried).toBe(1);
+        await dispatchNotifications({ executor: tx, senders: channel.registry });
 
         const pending = await outboxOf(tx, notification.id);
         expect(pending[0]?.status).toBe('queued');
         expect(pending[0]?.attempts).toBe(attempt);
       }
 
-      const last = await dispatchNotifications({ executor: tx, senders: channel.registry });
-      expect(last.failed).toBe(1);
+      await dispatchNotifications({ executor: tx, senders: channel.registry });
 
       const queue = await outboxOf(tx, notification.id);
       expect(queue[0]?.status).toBe('failed');
@@ -353,8 +354,7 @@ describe('разбор очереди', () => {
         tx,
       );
 
-      const result = await dispatchNotifications({ executor: tx, senders: channel.registry });
-      expect(result.failed).toBe(1);
+      await dispatchNotifications({ executor: tx, senders: channel.registry });
 
       const queue = await outboxOf(tx, notification.id);
       expect(queue[0]?.status).toBe('failed');
@@ -381,8 +381,7 @@ describe('разбор очереди', () => {
         tx,
       );
 
-      const result = await dispatchNotifications({ executor: tx, senders: registry });
-      expect(result.retried).toBe(1);
+      await dispatchNotifications({ executor: tx, senders: registry });
 
       const queue = await outboxOf(tx, notification.id);
       expect(queue[0]?.status).toBe('queued');
@@ -400,8 +399,7 @@ describe('разбор очереди', () => {
         tx,
       );
 
-      const result = await dispatchNotifications({ executor: tx, senders: {} });
-      expect(result.skipped).toBe(1);
+      await dispatchNotifications({ executor: tx, senders: {} });
 
       const queue = await outboxOf(tx, notification.id);
       expect(queue[0]?.status).toBe('skipped');
@@ -425,15 +423,19 @@ describe('разбор очереди', () => {
         },
       };
 
-      await notify(
+      const notification = await notify(
         fixture.network,
         { userId: fixture.first, type: 'rotation.reminder', ...TEXTS, payload: { id: 7 } },
         tx,
       );
       await dispatchNotifications({ executor: tx, senders: registry });
 
-      expect(seen).toHaveLength(1);
-      expect(seen[0]).toMatchObject({
+      const mine = seen.filter(
+        (message) => (message as { notificationId: string }).notificationId === notification.id,
+      );
+
+      expect(mine).toHaveLength(1);
+      expect(mine[0]).toMatchObject({
         userId: fixture.first,
         type: 'rotation.reminder',
         title: TEXTS.title,
@@ -455,7 +457,9 @@ describe('разбор очереди', () => {
         inapp: {
           channel: 'inapp',
           deliver: (message) => {
-            locales.push(message.locale);
+            if (message.userId === fixture.first) {
+              locales.push(message.locale);
+            }
 
             return Promise.resolve({ kind: 'sent' });
           },
