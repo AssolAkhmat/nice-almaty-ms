@@ -31,6 +31,11 @@ import type { AuditActor } from './audit';
 export const PASSWORD_RESET_TTL_MS = 24 * 60 * 60 * 1000;
 
 export interface UserActor {
+  /**
+   * Скоупы токена, если запрос пришёл от бота. У входа по сессии их нет:
+   * человек ограничен ролью, а не выданным набором (docs/06-API.md).
+   */
+  scopes?: readonly string[] | undefined;
   context: AccessContext;
   ip?: string | undefined;
   requestId?: string | undefined;

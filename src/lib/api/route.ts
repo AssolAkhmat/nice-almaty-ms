@@ -1,6 +1,7 @@
 import { getSession } from '@/services/auth';
 
 import { AppError, UnauthorizedError, type AppErrorCode } from '../errors';
+import { identifyByToken } from './token-auth';
 import { newRequestId, requestLogger } from '../logger';
 import { SESSION_COOKIE_NAME } from '../session-token';
 
@@ -120,18 +121,24 @@ function clientIp(request: Request): string | undefined {
 /**
  * Действующий пользователь запроса.
  *
- * В docs/06-API.md входов два — сессионная cookie и Bearer-токен, но токенов
- * пока никто не выпускает: таблицы токенов нет, скоупы не заведены. Поэтому
- * Bearer отвергается вслух: молчаливое «не пустил, но и не сказал почему»
- * выглядит как поломка, а не как незаконченная функция.
+ * Входов два (docs/06-API.md): Bearer-токен для ботов и сессионная cookie
+ * для интерфейса. Токен старше: если заголовок пришёл, разбирается именно
+ * он — молчаливый откат на чужую сессию был бы худшим из возможных ответов.
  */
 export async function requireApiActor(
   request: Request,
   requestId: string,
   executor?: Executor,
 ): Promise<UserActor> {
-  if (request.headers.get('authorization') !== null) {
-    throw new UnauthorizedError('Токены API ещё не выпускаются: вход по сессии');
+  const identity = await identifyByToken(request, executor);
+
+  if (identity !== null) {
+    return {
+      context: identity.context,
+      ip: clientIp(request),
+      requestId,
+      scopes: identity.scopes,
+    };
   }
 
   const token = readCookie(request, SESSION_COOKIE_NAME);
