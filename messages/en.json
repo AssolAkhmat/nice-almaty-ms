@@ -44,7 +44,8 @@
       "absence": "Absence",
       "rating_event": "Rating event",
       "fine": "Fine",
-      "discount": "Discount"
+      "discount": "Discount",
+      "rating_rule": "Rating rule"
     }
   },
   "auth": {
@@ -1309,7 +1310,38 @@
       "reasonRequired": "State the reason",
       "unknownAction": "No such action in the rules",
       "fineCancelled": "The fine is already cancelled",
-      "fineAmount": "Fine amount must be whole tenge above zero"
+      "fineAmount": "Fine amount must be whole tenge above zero",
+      "codeRequired": "State the rule code",
+      "sameHouse": "That is the same house",
+      "notInteger": "The value must be a whole number",
+      "houseRequired": "Choose a house"
+    },
+    "rules": {
+      "title": "Rating rules",
+      "subtitle": "Deltas, actions and thresholds. Network level with per-house overrides",
+      "network": "Network",
+      "scores": "Cleaning scores",
+      "actions": "Admin actions",
+      "down": "Downward thresholds: fine amount, ₸",
+      "up": "Upward thresholds: discount amount, ₸",
+      "score": "Score {score}",
+      "downThreshold": "Below {threshold}",
+      "upThreshold": "Above {threshold}",
+      "overridden": "overridden by the house",
+      "save": "Save",
+      "saved": "Saved",
+      "error": "Could not save",
+      "copyTitle": "Copy rules from a house",
+      "copyFrom": "Source house",
+      "copy": "Copy",
+      "copied": "Copied",
+      "action": {
+        "help": "Act of help",
+        "violation": "Violation",
+        "warning": "Warning",
+        "reprimand": "Reprimand",
+        "severe_reprimand": "Severe reprimand"
+      }
     }
   }
 }

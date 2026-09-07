@@ -105,68 +105,83 @@ export async function resolveRatingRules(
     DEFAULT_RATING_RULES.upThresholds.map((rule) => [rule.threshold, rule]),
   );
 
-  for (const rule of [...network, ...house]) {
-    if (rule.kind === 'score_delta') {
-      const score = numberFrom(rule.config, 'score');
-      const delta = numberFrom(rule.config, 'delta');
-
-      if (score !== null && delta !== null) {
-        if (rule.isActive) {
-          scoreDeltas[score] = delta;
-        } else {
-          delete scoreDeltas[score];
-        }
-      }
-
-      continue;
-    }
-
-    if (rule.kind === 'admin_action') {
-      const delta = numberFrom(rule.config, 'delta');
-
-      if (delta !== null) {
-        if (rule.isActive) {
-          actionDeltas[rule.code] = delta;
-        } else {
-          delete actionDeltas[rule.code];
-        }
-      }
-
-      continue;
-    }
-
-    const threshold = numberFrom(rule.config, 'threshold');
-
-    if (threshold === null) {
-      continue;
-    }
-
-    if (rule.kind === 'threshold_down') {
-      if (!rule.isActive) {
-        downThresholds.delete(threshold);
+  /*
+   * Выключенное правило сети убирает правило вовсе — так удаляют порог,
+   * не удаляя историю. Выключенное переопределение дома лишь перестаёт
+   * действовать, и дом возвращается к сетевому: иначе «выключить» значило
+   * бы для дома «жить вообще без этого правила», а такого §5.5 не даёт.
+   */
+  for (const [level, rules] of [
+    ['network', network],
+    ['house', house],
+  ] as const) {
+    for (const rule of rules) {
+      if (!rule.isActive && level === 'house') {
         continue;
       }
 
-      const actions = (rule.config as { actions?: unknown }).actions;
+      if (rule.kind === 'score_delta') {
+        const score = numberFrom(rule.config, 'score');
+        const delta = numberFrom(rule.config, 'delta');
 
-      downThresholds.set(threshold, {
+        if (score !== null && (delta !== null || !rule.isActive)) {
+          if (rule.isActive && delta !== null) {
+            scoreDeltas[score] = delta;
+          } else {
+            delete scoreDeltas[score];
+          }
+        }
+
+        continue;
+      }
+
+      if (rule.kind === 'admin_action') {
+        const delta = numberFrom(rule.config, 'delta');
+
+        if (rule.isActive) {
+          if (delta !== null) {
+            actionDeltas[rule.code] = delta;
+          }
+        } else {
+          delete actionDeltas[rule.code];
+        }
+
+        continue;
+      }
+
+      const threshold = numberFrom(rule.config, 'threshold');
+
+      if (threshold === null) {
+        continue;
+      }
+
+      if (rule.kind === 'threshold_down') {
+        if (!rule.isActive) {
+          downThresholds.delete(threshold);
+          continue;
+        }
+
+        const actions = (rule.config as { actions?: unknown }).actions;
+
+        downThresholds.set(threshold, {
+          threshold,
+          actions: Array.isArray(actions) ? actions.map(String) : [],
+          fineAmount: numberFrom(rule.config, 'fine_amount') ?? 0,
+        });
+
+        continue;
+      }
+
+      if (!rule.isActive) {
+        upThresholds.delete(threshold);
+        continue;
+      }
+
+      upThresholds.set(threshold, {
         threshold,
-        actions: Array.isArray(actions) ? actions.map(String) : [],
-        fineAmount: numberFrom(rule.config, 'fine_amount') ?? 0,
+        discountAmount: numberFrom(rule.config, 'discount_amount') ?? 0,
       });
-
-      continue;
     }
-
-    if (!rule.isActive) {
-      upThresholds.delete(threshold);
-      continue;
-    }
-
-    upThresholds.set(threshold, {
-      threshold,
-      discountAmount: numberFrom(rule.config, 'discount_amount') ?? 0,
-    });
   }
 
   const byThreshold = (a: { threshold: number }, b: { threshold: number }): number =>
@@ -175,7 +190,8 @@ export async function resolveRatingRules(
   return {
     scoreDeltas,
     actionDeltas,
-    downThresholds: [...downThresholds.values()].sort(byThreshold),
+    // Порядок как в §5.3–5.4: вниз от большего порога, вверх от меньшего.
+    downThresholds: [...downThresholds.values()].sort((a, b) => byThreshold(b, a)),
     upThresholds: [...upThresholds.values()].sort(byThreshold),
   };
 }

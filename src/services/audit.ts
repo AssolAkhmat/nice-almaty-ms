@@ -86,6 +86,7 @@ export const AUDIT_ACTIONS = {
   fineAdded: 'fine.added',
   fineCancelled: 'fine.cancelled',
   discountApproved: 'discount.approved',
+  ratingRuleSaved: 'rating_rule.saved',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

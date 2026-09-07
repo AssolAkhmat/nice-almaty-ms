@@ -64,6 +64,7 @@ export const ACTIONS = [
   'fine.create',
   'fine.cancel',
   'discount.approve',
+  'rating.rules',
   'utility.reopen',
   'accounting.read',
   'accounting.write',
@@ -134,6 +135,7 @@ export const PERMISSIONS: PermissionMatrix = {
     'fine.create': 'org',
     'fine.cancel': 'org',
     'discount.approve': 'org',
+    'rating.rules': 'org',
     'utility.reopen': 'org',
     'accounting.read': 'org',
     'accounting.write': 'org',
@@ -202,6 +204,8 @@ export const PERMISSIONS: PermissionMatrix = {
      */
     'fine.cancel': 'none',
     'discount.approve': 'none',
+    /* Дельты и суммы штрафов — деньги всей сети: их назначает суперадмин (§5.5). */
+    'rating.rules': 'none',
     /*
      * Переоткрытие закрытого периода меняет уже выставленные счета
      * (§4, модуль 6), поэтому остаётся за суперадмином и пишется в журнал.
@@ -319,6 +323,7 @@ export const PERMISSIONS: PermissionMatrix = {
     'fine.create': 'none',
     'fine.cancel': 'none',
     'discount.approve': 'none',
+    'rating.rules': 'none',
     'utility.reopen': 'none',
     'accounting.read': 'none',
     'accounting.write': 'none',

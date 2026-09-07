@@ -412,6 +412,12 @@ async function removeAcceptanceHouseData(db: ReturnType<typeof drizzle>): Promis
     .delete(schema.eligibilityGroups)
     .where(inArray(schema.eligibilityGroups.houseId, houseIds));
 
+  /*
+   * Переопределения правил рейтинга приёмки: оставленные прошлым прогоном,
+   * они сместили бы дельты следующего — тот правит те же коды.
+   */
+  await db.delete(schema.ratingRules).where(inArray(schema.ratingRules.houseId, houseIds));
+
   const damageIds = (
     await db
       .select({ id: schema.damages.id })
