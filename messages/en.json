@@ -1569,5 +1569,60 @@
         "body": "The deadline was {date}, house {house}"
       }
     }
+  },
+  "inventory": {
+    "title": "Inventory",
+    "subtitle": "House property: receipts, usage, transfers",
+    "empty": "No items yet",
+    "name": "Name",
+    "qty": "Quantity",
+    "unit": "Unit",
+    "unitCost": "Unit cost",
+    "status": "Status",
+    "note": "Note",
+    "add": "Add to inventory",
+    "added": "Item added",
+    "consume": "Write down",
+    "consumed": "Movement recorded",
+    "writeOff": "Write off fully",
+    "transfer": "Transfer",
+    "transferred": "Item transferred",
+    "toHouse": "To house",
+    "history": "History",
+    "export": "Export",
+    "exportCsv": "CSV",
+    "exportXlsx": "XLSX",
+    "auditTitle": "Stocktake",
+    "auditStart": "Start a stocktake",
+    "auditClose": "Close the sheet",
+    "auditClosed": "Sheet closed: lines adjusted — {count}",
+    "auditNone": "No open sheet",
+    "expected": "On record",
+    "actual": "Counted",
+    "difference": "Difference",
+    "comment": "Comment",
+    "save": "Save",
+    "saved": "Line saved",
+    "statuses": {
+      "in_use": "In use",
+      "written_off": "Written off"
+    },
+    "movements": {
+      "in": "Receipt",
+      "out": "Usage",
+      "write_off": "Write-off",
+      "transfer": "Transfer",
+      "audit_adjust": "Adjustment"
+    },
+    "errors": {
+      "unknown": "It did not work. Try again",
+      "qtyPositive": "Quantity must be greater than zero",
+      "nameRequired": "Name and unit are required",
+      "notEnough": "There is not that much on record",
+      "sameHouse": "The item is already in this house",
+      "auditClosed": "The sheet is already closed",
+      "houseRequired": "House is not specified",
+      "format": "Unknown export format"
+    }
   }
 }

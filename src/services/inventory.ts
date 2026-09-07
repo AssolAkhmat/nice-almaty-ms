@@ -31,7 +31,10 @@ export interface InventoryDeps {
   today?: BusinessDate;
 }
 
-function resolve(deps: InventoryDeps): { executor: Executor; today: BusinessDate } {
+export function resolveInventoryDeps(deps: InventoryDeps): {
+  executor: Executor;
+  today: BusinessDate;
+} {
   return {
     executor: deps.executor ?? getDb(),
     today: deps.today ?? todayInAlmaty(now()),
@@ -39,7 +42,7 @@ function resolve(deps: InventoryDeps): { executor: Executor; today: BusinessDate
 }
 
 /** Права на инвентарь идут по дому: админ ведёт только свой (§«Инвентарь»). */
-function assertHouse(actor: UserActor, houseId: string, write: boolean): void {
+export function assertInventoryHouse(actor: UserActor, houseId: string, write: boolean): void {
   assertCan(actor.context, write ? 'inventory.manage' : 'inventory.read', { houseId });
 }
 
@@ -58,10 +61,10 @@ export async function listInventory(
   filter: ItemFilter = {},
   deps: InventoryDeps = {},
 ): Promise<InventoryItem[]> {
-  const { executor } = resolve(deps);
+  const { executor } = resolveInventoryDeps(deps);
 
   if (filter.houseId !== undefined) {
-    assertHouse(actor, filter.houseId, false);
+    assertInventoryHouse(actor, filter.houseId, false);
   }
 
   return listItems(actor.context, filter, executor);
@@ -72,10 +75,10 @@ export async function readItemHistory(
   itemId: string,
   deps: InventoryDeps = {},
 ): Promise<{ item: InventoryItem; movements: InventoryMovement[] }> {
-  const { executor } = resolve(deps);
+  const { executor } = resolveInventoryDeps(deps);
 
   const item = await requireItem(actor.context, itemId, executor);
-  assertHouse(actor, item.houseId, false);
+  assertInventoryHouse(actor, item.houseId, false);
 
   return { item, movements: await listMovements(actor.context, itemId, executor) };
 }
@@ -96,9 +99,9 @@ export async function receiveItem(
   input: AddItemInput,
   deps: InventoryDeps = {},
 ): Promise<InventoryItem> {
-  const { executor, today } = resolve(deps);
+  const { executor, today } = resolveInventoryDeps(deps);
 
-  assertHouse(actor, input.houseId, true);
+  assertInventoryHouse(actor, input.houseId, true);
   const amount = assertPositive(input.qty);
 
   if (input.name.trim() === '' || input.unit.trim() === '') {
@@ -148,10 +151,10 @@ export async function consumeItem(
   input: { qty: string; type: 'out' | 'write_off'; docRef?: string | null },
   deps: InventoryDeps = {},
 ): Promise<InventoryItem> {
-  const { executor, today } = resolve(deps);
+  const { executor, today } = resolveInventoryDeps(deps);
 
   const item = await requireItem(actor.context, itemId, executor);
-  assertHouse(actor, item.houseId, true);
+  assertInventoryHouse(actor, item.houseId, true);
 
   const amount = assertPositive(input.qty);
   const rest = applyMovement(parseQty(item.qty), input.type, amount);
@@ -217,7 +220,7 @@ export async function transferItem(
   toHouseId: string,
   deps: InventoryDeps = {},
 ): Promise<InventoryItem> {
-  const { executor, today } = resolve(deps);
+  const { executor, today } = resolveInventoryDeps(deps);
 
   const item = await requireItem(actor.context, itemId, executor);
 
@@ -226,8 +229,8 @@ export async function transferItem(
    * убытие из одного дома и приход в другой, и админ, ведущий только
    * свой дом, не вправе распорядиться чужим.
    */
-  assertHouse(actor, item.houseId, true);
-  assertHouse(actor, toHouseId, true);
+  assertInventoryHouse(actor, item.houseId, true);
+  assertInventoryHouse(actor, toHouseId, true);
 
   if (item.houseId === toHouseId) {
     throw new ConflictError('inventory.errors.sameHouse');
