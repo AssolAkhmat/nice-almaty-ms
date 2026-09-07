@@ -3,6 +3,7 @@ import { assertCronSecret } from '@/lib/api/cron';
 import { apiJson, apiRoute } from '@/lib/api/route';
 import { loadEnv } from '@/lib/env/load';
 import { generateMonthlyInvoices, MONTHLY_INVOICES_JOB } from '@/services/monthly-invoices';
+import { dispatchNotifications, NOTIFICATIONS_DISPATCH_JOB } from '@/services/notifications';
 import { RATING_YEAR_RESET_JOB, resetRatingYear } from '@/services/rating-year';
 import { closeRotationDay, ROTATIONS_CLOSE_DAY_JOB } from '@/services/rotation-close-day';
 
@@ -20,6 +21,7 @@ const HANDLERS: Readonly<Record<string, JobHandler>> = {
   [MONTHLY_INVOICES_JOB]: () => generateMonthlyInvoices(),
   [ROTATIONS_CLOSE_DAY_JOB]: () => closeRotationDay(),
   [RATING_YEAR_RESET_JOB]: () => resetRatingYear(),
+  [NOTIFICATIONS_DISPATCH_JOB]: () => dispatchNotifications(),
 };
 
 export const POST = apiRoute<{ job: string }>(async (request, { params, requestId }) => {

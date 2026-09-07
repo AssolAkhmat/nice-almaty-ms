@@ -116,6 +116,28 @@ export async function findUserByPhone(
   return user ?? null;
 }
 
+/**
+ * Пользователь сети по идентификатору, мимо ролевой видимости.
+ *
+ * Нужен адресации уведомлений: админ дома пишет суперадмину сети, а
+ * суперадмина в его списке нет и быть не должно. Из карточки при этом
+ * ничего не раскрывается — проверяется только то, что адресат
+ * существует и живёт в той же сети, что и отправитель.
+ */
+export async function findUserInOrg(
+  orgId: string,
+  userId: string,
+  executor: Executor = getDb(),
+): Promise<User | null> {
+  const [user] = await executor
+    .select()
+    .from(users)
+    .where(and(eq(users.orgId, orgId), eq(users.id, userId)))
+    .limit(1);
+
+  return user ?? null;
+}
+
 export async function createUser(
   context: AccessContext,
   input: Omit<NewUser, 'orgId'>,

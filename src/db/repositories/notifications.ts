@@ -172,6 +172,15 @@ export interface OutboxFilter {
   status: 'queued' | 'sent' | 'failed' | 'skipped';
   limit: number;
   channels?: readonly ('inapp' | 'webpush' | 'whatsapp')[];
+  /**
+   * Взять строки под блокировку, пропуская занятые.
+   *
+   * Так разбор очереди берёт пачку: два прогона, наложившиеся друг на
+   * друга — ручной вызов поверх расписания, — разберут разные строки,
+   * а не отправят одно и то же дважды. Занятые строки не ждут своей
+   * очереди, а достаются следующему прогону через пять минут.
+   */
+  lock?: boolean;
 }
 
 export async function listOutbox(
@@ -184,12 +193,14 @@ export async function listOutbox(
     conditions.push(inArray(notificationOutbox.channel, [...filter.channels]));
   }
 
-  return executor
+  const query = executor
     .select()
     .from(notificationOutbox)
     .where(and(...conditions))
     .orderBy(asc(notificationOutbox.createdAt), asc(notificationOutbox.id))
     .limit(filter.limit);
+
+  return filter.lock === true ? query.for('update', { skipLocked: true }) : query;
 }
 
 export async function markOutboxSent(
