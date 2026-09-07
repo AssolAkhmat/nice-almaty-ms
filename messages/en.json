@@ -843,7 +843,27 @@
       "refundNotPayable": "A refund invoice is closed by a payout, not by a resident payment",
       "notMonthly": "Only a monthly invoice can be recalculated",
       "noPeriod": "The invoice has no month",
-      "method": "Choose a payment method"
+      "method": "Choose a payment method",
+      "alreadySent": "The invoice is already marked as sent"
+    },
+    "remote": {
+      "title": "Remote payments",
+      "subtitle": "Who to send a Kaspi invoice to and whose transfer to expect",
+      "sent": "Invoice sent",
+      "notSent": "Invoice not sent",
+      "markSent": "Invoice sent",
+      "markReceived": "Payment received",
+      "due": "due {date}",
+      "empty": "No tasks",
+      "emptyHint": "Residents paying via Kaspi with an open invoice will appear here",
+      "residentTitle": "Admin section",
+      "residentHint": "Your invoices are in the Invoices section",
+      "noHouse": "No house selected",
+      "noHouseHint": "Add a house in the network settings",
+      "done": {
+        "sent": "Marked as sent",
+        "received": "Payment recorded"
+      }
     }
   },
   "utilities": {

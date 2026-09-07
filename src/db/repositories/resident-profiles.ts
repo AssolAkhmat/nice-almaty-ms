@@ -65,6 +65,31 @@ export async function findProfile(
   return profile ?? null;
 }
 
+/**
+ * Предпочтительный способ оплаты по нескольким жильцам сразу — для списка
+ * «удалёнки» (§3.1). Отдельной выборкой, а не по профилю на строку: список
+ * дома за месяц иначе бил бы базу по разу на жильца.
+ */
+export async function listPreferredPayments(
+  context: AccessContext,
+  userIds: readonly string[],
+  executor: Executor = getDb(),
+): Promise<Map<string, ResidentProfile['preferredPayment']>> {
+  if (userIds.length === 0) {
+    return new Map();
+  }
+
+  const rows = await executor
+    .select({
+      userId: residentProfiles.userId,
+      preferredPayment: residentProfiles.preferredPayment,
+    })
+    .from(residentProfiles)
+    .where(and(visibleUserIds(context, executor), inArray(residentProfiles.userId, [...userIds])));
+
+  return new Map(rows.map((row) => [row.userId, row.preferredPayment]));
+}
+
 export async function requireProfile(
   context: AccessContext,
   userId: string,

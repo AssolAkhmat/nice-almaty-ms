@@ -179,6 +179,12 @@ export default async function InvoicesPage({
         </nav>
       )}
 
+      <nav className="flex flex-wrap gap-2 text-[13px]">
+        <Link className="text-text-muted hover:text-text" href="/invoices/remote">
+          {t('remote.title')}
+        </Link>
+      </nav>
+
       <SummaryCard summary={summary} />
       <HouseInvoicesTable rows={tableRows} />
 
