@@ -115,7 +115,8 @@
     "settings": "Баптаулар",
     "documents": "Құжаттар",
     "contract": "Шарт",
-    "deposit": "Депозит"
+    "deposit": "Депозит",
+    "notifications": "Хабарламалар"
   },
   "houses": {
     "title": "Үйлер",
@@ -1390,6 +1391,48 @@
       "warning": "Ескерту",
       "reprimand": "Сөгіс",
       "severe_reprimand": "Қатаң сөгіс"
+    }
+  },
+  "notifications": {
+    "title": "Хабарламалар",
+    "subtitle": "Жүйе сізге жеке хабарлағаны",
+    "unreadOnly": "Тек оқылмағандар",
+    "all": "Барлығы",
+    "allTypes": "Кез келген түр",
+    "filterType": "Түрі",
+    "markRead": "Оқылды",
+    "markAllRead": "Барлығын оқу",
+    "empty": "Хабарлама жоқ",
+    "emptyUnread": "Оқылмағандар жоқ",
+    "unreadCount": "Оқылмағандар: {count}",
+    "push": {
+      "title": "Осы құрылғыдағы push",
+      "hint": "Қосымша жабық кезде де хабарлама келеді",
+      "enable": "Қосу",
+      "disable": "Өшіру",
+      "enabled": "Push қосылды",
+      "disabled": "Push өшірілді",
+      "unavailable": "Браузер push қолдамайды",
+      "notConfigured": "Бұл орнатылымда push бапталмаған",
+      "denied": "Браузер баптауында хабарламаға тыйым салынған",
+      "active": "Осы құрылғыда push қосулы",
+      "inactive": "Push өшірулі"
+    },
+    "types": {
+      "rotationReminder": "Жинау туралы еске салу",
+      "rotationMissed": "Жинау расталмаған",
+      "invoiceIssued": "Шот қойылды",
+      "absenceReviewed": "Болмау бойынша шешім",
+      "documentExpiring": "Құжат мерзімі бітуде",
+      "depositRefund": "Депозитті қайтару",
+      "utilitiesRemind": "Айлық коммуналдық",
+      "scheduleRemind": "Айға арналған кесте",
+      "curfewCheck": "Тыныштық уақыты",
+      "unknown": "Хабарлама"
+    },
+    "errors": {
+      "unknown": "Болмады. Қайта көріңіз",
+      "subscription": "Жазылым сақталмады"
     }
   }
 }

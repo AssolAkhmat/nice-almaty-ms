@@ -72,6 +72,42 @@ export function nextDeliveryState(attempts: number, outcome: DeliveryOutcome): D
   }
 }
 
+/**
+ * Коды событий, о которых система уведомляет (docs/01-ARCHITECTURE.md,
+ * «Планировщик»). Список закрытый: по нему строится фильтр в центре
+ * уведомлений, и тип, которого в нём нет, показывается общим заголовком,
+ * а не пустотой.
+ */
+export const NOTIFICATION_TYPES = [
+  'rotation.reminder',
+  'rotation.missed',
+  'invoice.issued',
+  'absence.reviewed',
+  'document.expiring',
+  'deposit.refund',
+  'utilities.remind',
+  'schedule.remind',
+  'curfew.check',
+] as const;
+
+export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
+
+/**
+ * Ключ локализации для кода события.
+ *
+ * Точка в коде — разделитель вложенности у next-intl, поэтому
+ * `rotation.reminder` в словаре живёт как `rotationReminder`.
+ * Неизвестный код даёт `unknown`: заголовок общий, но уведомление
+ * читается, а не превращается в сырой код на экране.
+ */
+export function notificationTypeKey(type: string): string {
+  if (!(NOTIFICATION_TYPES as readonly string[]).includes(type)) {
+    return 'unknown';
+  }
+
+  return type.replace(/\.(\w)/g, (_, letter: string) => letter.toUpperCase());
+}
+
 export interface ChannelOptions {
   /** У адресата есть живая подписка браузера на push. */
   hasPushSubscription: boolean;

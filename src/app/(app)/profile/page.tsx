@@ -4,9 +4,11 @@ import { redirect } from 'next/navigation';
 import { requireArea, requireBed } from '@/db/repositories/areas';
 import { findOpenAssignment, listResidencies } from '@/db/repositories/residencies';
 import { getCurrentSession } from '@/lib/session';
+import { listOwnPushSubscriptions, pushKeyForBrowser } from '@/services/notifications';
 import { readProfile } from '@/services/resident-profiles';
 
 import { ProfileForm, type PlacementView, type ProfileFormValues } from './profile-form';
+import { PushSubscription } from './push-subscription';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +26,8 @@ export default async function ProfilePage() {
   const { context } = session;
 
   const profile = await readProfile({ context }, session.user.id);
+
+  const subscriptions = await listOwnPushSubscriptions(context);
 
   const [residency] = await listResidencies(context, {});
   const assignment = residency === undefined ? null : await findOpenAssignment(residency.id);
@@ -63,6 +67,8 @@ export default async function ProfilePage() {
       </div>
 
       <ProfileForm placement={placement} values={values} />
+
+      <PushSubscription active={subscriptions.length > 0} publicKey={pushKeyForBrowser()} />
     </section>
   );
 }

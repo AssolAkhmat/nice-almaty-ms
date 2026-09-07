@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
+import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/modal';
 import { cn } from '@/lib/cn';
 import { isActiveHref, NAV_ITEMS, PRIMARY_NAV_ITEMS } from '@/lib/navigation';
@@ -13,8 +14,12 @@ import { isActiveHref, NAV_ITEMS, PRIMARY_NAV_ITEMS } from '@/lib/navigation';
 const ITEM_CLASSES =
   'flex h-14 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-[11px] transition-colors duration-150';
 
+export interface BottomNavProps {
+  unread: number;
+}
+
 /** Мобильная навигация: четыре пункта и «Ещё» с полным списком. */
-export function BottomNav() {
+export function BottomNav({ unread }: BottomNavProps) {
   const t = useTranslations('nav');
   const tCommon = useTranslations('common');
   const pathname = usePathname();
@@ -78,6 +83,11 @@ export function BottomNav() {
                 >
                   <Icon aria-hidden="true" size={20} strokeWidth={1.5} />
                   {t(item.key)}
+                  {item.key === 'notifications' && unread > 0 && (
+                    <Badge className="ml-auto" data-testid="unread-badge-mobile" tone="accent">
+                      {unread}
+                    </Badge>
+                  )}
                 </AppLink>
               </li>
             );

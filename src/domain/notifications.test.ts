@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   MAX_DELIVERY_ATTEMPTS,
+  NOTIFICATION_TYPES,
   channelsFor,
   missingLocales,
   nextDeliveryState,
+  notificationTypeKey,
 } from './notifications';
 
 /**
@@ -66,6 +68,24 @@ describe('каналы уведомления', () => {
 
   it('с подпиской добавляется push', () => {
     expect(channelsFor({ hasPushSubscription: true })).toEqual(['inapp', 'webpush']);
+  });
+});
+
+describe('код события', () => {
+  it('точка в коде превращается в ключ словаря', () => {
+    expect(notificationTypeKey('rotation.reminder')).toBe('rotationReminder');
+    expect(notificationTypeKey('utilities.remind')).toBe('utilitiesRemind');
+  });
+
+  it('неизвестный код читается общим заголовком, а не сырым кодом', () => {
+    expect(notificationTypeKey('inventory.audit')).toBe('unknown');
+    expect(notificationTypeKey('')).toBe('unknown');
+  });
+
+  it('все известные коды дают разные ключи', () => {
+    const keys = NOTIFICATION_TYPES.map(notificationTypeKey);
+
+    expect(new Set(keys).size).toBe(NOTIFICATION_TYPES.length);
   });
 });
 

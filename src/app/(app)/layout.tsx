@@ -5,6 +5,7 @@ import { AppShell } from '@/components/layout/app-shell';
 import { isPathAllowed } from '@/lib/residency-access';
 import { getCurrentSession } from '@/lib/session';
 import { PATHNAME_HEADER } from '@/middleware';
+import { unreadCount } from '@/services/notifications';
 import { readAccessScope } from '@/services/onboarding';
 
 export const dynamic = 'force-dynamic';
@@ -45,5 +46,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     }
   }
 
-  return <AppShell>{children}</AppShell>;
+  /*
+   * Непрочитанное считается по записям в приложении, а не по каналам
+   * доставки: push система уже показала, и второй раз он не новость (P6-18).
+   */
+  const unread = await unreadCount(session.context);
+
+  return <AppShell unread={unread}>{children}</AppShell>;
 }

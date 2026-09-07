@@ -115,7 +115,8 @@
     "settings": "Настройки",
     "documents": "Документы",
     "contract": "Договор",
-    "deposit": "Депозит"
+    "deposit": "Депозит",
+    "notifications": "Уведомления"
   },
   "houses": {
     "title": "Дома",
@@ -1390,6 +1391,48 @@
       "warning": "Предупреждение",
       "reprimand": "Выговор",
       "severe_reprimand": "Строгий выговор"
+    }
+  },
+  "notifications": {
+    "title": "Уведомления",
+    "subtitle": "Что система сообщила лично вам",
+    "unreadOnly": "Только непрочитанные",
+    "all": "Все",
+    "allTypes": "Любой тип",
+    "filterType": "Тип",
+    "markRead": "Прочитано",
+    "markAllRead": "Прочитать все",
+    "empty": "Уведомлений нет",
+    "emptyUnread": "Непрочитанных нет",
+    "unreadCount": "Непрочитанных: {count}",
+    "push": {
+      "title": "Push на этом устройстве",
+      "hint": "Уведомления приходят, даже когда приложение закрыто",
+      "enable": "Включить",
+      "disable": "Отключить",
+      "enabled": "Push включён",
+      "disabled": "Push отключён",
+      "unavailable": "Браузер не поддерживает push",
+      "notConfigured": "Push в этой установке не настроен",
+      "denied": "Уведомления запрещены в настройках браузера",
+      "active": "Push включён на этом устройстве",
+      "inactive": "Push выключен"
+    },
+    "types": {
+      "rotationReminder": "Напоминание об уборке",
+      "rotationMissed": "Уборка не подтверждена",
+      "invoiceIssued": "Счёт выставлен",
+      "absenceReviewed": "Решение по отсутствию",
+      "documentExpiring": "Срок документа истекает",
+      "depositRefund": "Возврат депозита",
+      "utilitiesRemind": "Коммуналка за месяц",
+      "scheduleRemind": "Расписание на месяц",
+      "curfewCheck": "Отбой",
+      "unknown": "Уведомление"
+    },
+    "errors": {
+      "unknown": "Не получилось. Попробуйте ещё раз",
+      "subscription": "Подписка не сохранена"
     }
   }
 }

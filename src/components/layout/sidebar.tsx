@@ -4,6 +4,7 @@ import { AppLink } from '@/components/ui/app-link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/cn';
 import { isActiveHref, NAV_ITEMS } from '@/lib/navigation';
 
@@ -12,7 +13,12 @@ import { isActiveHref, NAV_ITEMS } from '@/lib/navigation';
  * Планшет (768-1023): те же пункты, свёрнутые в иконки.
  * Мобильный (< 768): меню скрыто, работает нижняя навигация.
  */
-export function Sidebar() {
+export interface SidebarProps {
+  /** Непрочитанные уведомления: число рядом с пунктом, а не сам список. */
+  unread: number;
+}
+
+export function Sidebar({ unread }: SidebarProps) {
   const t = useTranslations('nav');
   const pathname = usePathname();
 
@@ -43,6 +49,11 @@ export function Sidebar() {
               >
                 <Icon aria-hidden="true" className="shrink-0" size={20} strokeWidth={1.5} />
                 <span className="hidden lg:inline">{t(item.key)}</span>
+                {item.key === 'notifications' && unread > 0 && (
+                  <Badge className="ml-auto" data-testid="unread-badge" tone="accent">
+                    {unread}
+                  </Badge>
+                )}
               </AppLink>
             </li>
           );

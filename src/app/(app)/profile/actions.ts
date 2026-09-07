@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 
 import { AppError } from '@/lib/errors';
 import { getCurrentSession } from '@/lib/session';
+import { subscribeToPush, unsubscribeFromPush } from '@/services/notifications';
 import {
   revealSensitiveField,
   saveProfile,
@@ -14,6 +15,73 @@ import {
 export interface ProfileActionState {
   error?: string;
   done?: string;
+}
+
+export interface PushActionState {
+  error?: string;
+  done?: string;
+}
+
+/**
+ * Подписка браузера на push. Адресат берётся из сессии, а не из запроса:
+ * иначе один браузер подписался бы на уведомления другого человека (P6-3).
+ */
+export async function subscribePushAction(formData: FormData): Promise<PushActionState> {
+  const session = await getCurrentSession();
+
+  if (session === null) {
+    return { error: 'notifications.errors.subscription' };
+  }
+
+  const endpoint = text(formData, 'endpoint');
+  const p256dh = text(formData, 'p256dh');
+  const auth = text(formData, 'auth');
+  const userAgent = optionalText(formData, 'userAgent');
+
+  if (endpoint === '' || p256dh === '' || auth === '') {
+    return { error: 'notifications.errors.subscription' };
+  }
+
+  try {
+    await subscribeToPush(session.context, {
+      endpoint,
+      p256dh,
+      auth,
+      ...(userAgent === null ? {} : { userAgent }),
+    });
+    revalidatePath('/profile');
+
+    return { done: 'notifications.push.enabled' };
+  } catch (error) {
+    return {
+      error: error instanceof AppError ? error.message : 'notifications.errors.subscription',
+    };
+  }
+}
+
+export async function unsubscribePushAction(formData: FormData): Promise<PushActionState> {
+  const session = await getCurrentSession();
+
+  if (session === null) {
+    return { error: 'notifications.errors.subscription' };
+  }
+
+  const endpoint = text(formData, 'endpoint');
+
+  if (endpoint === '') {
+    return { error: 'notifications.errors.subscription' };
+  }
+
+  try {
+    await unsubscribeFromPush(session.context, endpoint);
+    revalidatePath('/profile');
+
+    return { done: 'notifications.push.disabled' };
+  } catch (error) {
+    return {
+      error: error instanceof AppError ? error.message : 'notifications.errors.subscription',
+    };
+  }
 }
 
 export interface RevealState {

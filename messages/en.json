@@ -115,7 +115,8 @@
     "settings": "Settings",
     "documents": "Documents",
     "contract": "Contract",
-    "deposit": "Deposit"
+    "deposit": "Deposit",
+    "notifications": "Notifications"
   },
   "houses": {
     "title": "Houses",
@@ -1390,6 +1391,48 @@
       "warning": "Warning",
       "reprimand": "Reprimand",
       "severe_reprimand": "Severe reprimand"
+    }
+  },
+  "notifications": {
+    "title": "Notifications",
+    "subtitle": "What the system told you personally",
+    "unreadOnly": "Unread only",
+    "all": "All",
+    "allTypes": "Any type",
+    "filterType": "Type",
+    "markRead": "Mark read",
+    "markAllRead": "Mark all read",
+    "empty": "No notifications",
+    "emptyUnread": "Nothing unread",
+    "unreadCount": "Unread: {count}",
+    "push": {
+      "title": "Push on this device",
+      "hint": "Notifications arrive even when the app is closed",
+      "enable": "Enable",
+      "disable": "Disable",
+      "enabled": "Push enabled",
+      "disabled": "Push disabled",
+      "unavailable": "This browser does not support push",
+      "notConfigured": "Push is not configured in this installation",
+      "denied": "Notifications are blocked in browser settings",
+      "active": "Push is on for this device",
+      "inactive": "Push is off"
+    },
+    "types": {
+      "rotationReminder": "Cleaning reminder",
+      "rotationMissed": "Cleaning not confirmed",
+      "invoiceIssued": "Invoice issued",
+      "absenceReviewed": "Absence decision",
+      "documentExpiring": "Document expires soon",
+      "depositRefund": "Deposit refund",
+      "utilitiesRemind": "Monthly utilities",
+      "scheduleRemind": "Monthly schedule",
+      "curfewCheck": "Curfew",
+      "unknown": "Notification"
+    },
+    "errors": {
+      "unknown": "It did not work. Try again",
+      "subscription": "Subscription was not saved"
     }
   }
 }

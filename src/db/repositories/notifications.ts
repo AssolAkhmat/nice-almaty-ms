@@ -58,6 +58,12 @@ export interface NotificationFilter {
   type?: string;
   /** Только непрочитанные: центр уведомлений открывается с них. */
   unreadOnly?: boolean;
+  /**
+   * Сколько записей вернуть. Уведомления копятся быстрее всего остального
+   * — напоминание о каждой уборке, — и список без предела однажды стал бы
+   * страницей на тысячу строк.
+   */
+  limit?: number;
 }
 
 /** Адресат, чьи уведомления контекст вправе читать: только он сам. */
@@ -96,11 +102,13 @@ export async function listNotifications(
     conditions.push(isNull(notifications.readAt));
   }
 
-  return executor
+  const query = executor
     .select()
     .from(notifications)
     .where(and(...conditions))
     .orderBy(sql`${notifications.createdAt} desc`, asc(notifications.id));
+
+  return filter.limit === undefined ? query : query.limit(filter.limit);
 }
 
 export async function countUnread(

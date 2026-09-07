@@ -1,5 +1,6 @@
 import {
   BedDouble,
+  Bell,
   CalendarDays,
   CalendarX,
   FileCheck,
@@ -38,6 +39,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'rotations', href: '/rotations', icon: CalendarDays, primary: true },
   { key: 'invoices', href: '/invoices', icon: Receipt, primary: true },
   { key: 'absences', href: '/absences', icon: CalendarX, primary: true },
+  { key: 'notifications', href: '/notifications', icon: Bell },
   { key: 'contract', href: '/contract', icon: FileSignature },
   { key: 'deposit', href: '/deposit', icon: PiggyBank },
   { key: 'documents', href: '/documents', icon: FileCheck },

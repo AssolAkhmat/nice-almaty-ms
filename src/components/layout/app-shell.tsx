@@ -24,15 +24,22 @@ function Header() {
  * Каркас защищённой зоны (docs/05-DESIGN-SYSTEM.md, «Сетка и адаптивность»).
  * Проверка прав появится в фазе 1: сейчас это только раскладка.
  */
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  unread = 0,
+}: {
+  children: React.ReactNode;
+  /** Непрочитанные уведомления адресата: считает защищённая зона. */
+  unread?: number;
+}) {
   return (
     <div className="flex min-h-dvh flex-col">
       <Header />
       <div className="flex flex-1">
-        <Sidebar />
+        <Sidebar unread={unread} />
         <main className="min-w-0 flex-1 px-3 py-4 md:px-6 md:py-6">{children}</main>
       </div>
-      <BottomNav />
+      <BottomNav unread={unread} />
     </div>
   );
 }
