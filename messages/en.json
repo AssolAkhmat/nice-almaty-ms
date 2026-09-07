@@ -47,7 +47,8 @@
       "discount": "Discount",
       "rating_rule": "Rating rule",
       "inventory_item": "Inventory item",
-      "inventory_audit": "Inventory audit"
+      "inventory_audit": "Inventory audit",
+      "api_token": "API token"
     }
   },
   "auth": {

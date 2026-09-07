@@ -1,5 +1,6 @@
 export * from './absences';
 export * from './accounts';
+export * from './api-tokens';
 export * from './areas';
 export * from './audit-log';
 export * from './beds';

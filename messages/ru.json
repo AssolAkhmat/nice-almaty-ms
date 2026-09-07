@@ -47,7 +47,8 @@
       "discount": "Скидка",
       "rating_rule": "Правило рейтинга",
       "inventory_item": "Позиция инвентаря",
-      "inventory_audit": "Инвентаризация"
+      "inventory_audit": "Инвентаризация",
+      "api_token": "Токен API"
     }
   },
   "auth": {

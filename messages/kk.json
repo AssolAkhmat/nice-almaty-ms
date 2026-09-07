@@ -47,7 +47,8 @@
       "discount": "Жеңілдік",
       "rating_rule": "Рейтинг ережесі",
       "inventory_item": "Түгендеу позициясы",
-      "inventory_audit": "Түгендеу"
+      "inventory_audit": "Түгендеу",
+      "api_token": "API токені"
     }
   },
   "auth": {

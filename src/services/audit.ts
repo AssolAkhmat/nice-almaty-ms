@@ -92,6 +92,8 @@ export const AUDIT_ACTIONS = {
   inventoryMoved: 'inventory_item.moved',
   inventoryWrittenOff: 'inventory_item.written_off',
   inventoryAuditClosed: 'inventory_audit.closed',
+  apiTokenIssued: 'api_token.issued',
+  apiTokenRevoked: 'api_token.revoked',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
