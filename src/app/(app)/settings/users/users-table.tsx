@@ -7,6 +7,7 @@ import { Badge, StatusPill } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Modal } from '@/components/ui/modal';
+import { Pagination } from '@/components/ui/pagination';
 import { Table, type TableColumn } from '@/components/ui/table';
 import { parseInstant } from '@/lib/time';
 
@@ -26,10 +27,24 @@ export interface AccountRow {
 
 const INITIAL: AccountActionState = {};
 
+/**
+ * Сколько записей на странице. Сеть за пару лет набирает сотни аккаунтов,
+ * и список целиком перестаёт открываться за разумное время: на шестистах
+ * жильцах перерисовка после создания аккаунта переставала укладываться
+ * даже в ожидание приёмки (инцидент I3).
+ */
+const PAGE_SIZE = 25;
+
 export function UsersTable({ rows }: { rows: readonly AccountRow[] }) {
   const t = useTranslations();
   const format = useFormatter();
   const [pendingArchive, setPendingArchive] = useState<AccountRow | null>(null);
+  const [page, setPage] = useState(1);
+
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  // Список мог укоротиться архивацией: страница за его концом пустой не бывает.
+  const current = Math.min(page, pageCount);
+  const visible = rows.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
 
   const [resetState, resetAction, isResetPending] = useActionState(
     allowPasswordResetAction,
@@ -145,8 +160,10 @@ export function UsersTable({ rows }: { rows: readonly AccountRow[] }) {
         columns={columns}
         emptyState={<EmptyState title={t('users.empty')} />}
         rowKey={(row) => row.id}
-        rows={rows}
+        rows={visible}
       />
+
+      <Pagination onPageChange={setPage} page={current} pageCount={pageCount} />
 
       {/* Архивация необратима в интерфейсе, поэтому подтверждение с описанием последствий. */}
       <Modal
