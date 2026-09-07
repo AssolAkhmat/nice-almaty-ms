@@ -411,6 +411,27 @@
       "onboardingEmpty": "No open move-ins",
       "expiringDocuments": "Documents expiring within a month: {count}",
       "openCalendar": "Rotation calendar"
+    },
+    "network": {
+      "title": "Network",
+      "beds": "Beds",
+      "money": "Money for {month}",
+      "issued": "Issued",
+      "paid": "Paid",
+      "debt": "Debt",
+      "rating": "Rating",
+      "cleaning": "Cleaning score",
+      "noHouses": "No houses yet",
+      "refunds": "Deposit refunds",
+      "noRefunds": "No refunds pending",
+      "deadline": "Deadline",
+      "daysLeft": "Days left: {days}",
+      "overdue": "Days overdue: {days}",
+      "decisions": "Needs a decision",
+      "discounts": "Proposed discounts: {count}",
+      "fines": "Fines awaiting a decision: {count}",
+      "periods": "Utility periods not closed: {count}",
+      "noDecisions": "Nothing pending"
     }
   },
   "documents": {

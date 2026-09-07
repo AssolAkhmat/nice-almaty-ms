@@ -1,12 +1,13 @@
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import * as schema from '@/db/schema';
 import { testDatabaseUrl } from '@/db/testing/database-url';
-import { addDays, parseBusinessDate, type BusinessDate } from '@/lib/time';
+import { addDays, parseBusinessDate, parseInstant, type BusinessDate } from '@/lib/time';
 
-import { readHouseDashboard, readResidentDashboard } from './dashboard';
+import { readHouseDashboard, readNetworkDashboard, readResidentDashboard } from './dashboard';
 import { createInvoice } from './invoices';
 import { saveRow } from './rotation-rows';
 import { generateSchedule } from './rotation-schedule';
@@ -352,6 +353,52 @@ describe('дэшборд жильца', () => {
 
       expect(view.utilities.status).toBe('missing');
       expect(view.utilities.month).toBe('2026-09-01');
+    });
+  });
+
+  it('дэшборд сети сводит дома, занятость и деньги', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6711');
+
+      await createInvoice(
+        fixture.network,
+        {
+          residencyId: fixture.residencyId,
+          type: 'monthly',
+          periodMonth: parseBusinessDate('2026-09-01'),
+          dueDate: parseBusinessDate('2026-09-10'),
+          lines: [{ kind: 'rent', title: 'Проживание', amount: 100_000 }],
+        },
+        { executor: tx, today: MONDAY },
+      );
+
+      const view = await readNetworkDashboard(fixture.network, { executor: tx, today: MONDAY });
+      const house = view.houses.find((row) => row.houseId === fixture.houseId);
+
+      expect(house?.beds).toEqual({ taken: 1, total: 1 });
+      expect(house?.issued).toBe(100_000);
+      expect(house?.debt).toBe(100_000);
+    });
+  });
+
+  it('расторжение попадает в обратный отсчёт возврата', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6712');
+
+      await tx
+        .update(schema.residencies)
+        .set({
+          status: 'terminating',
+          terminationRequestedAt: parseInstant('2026-08-15T12:00:00+05:00'),
+          moveOutDate: '2026-08-15',
+        })
+        .where(eq(schema.residencies.id, fixture.residencyId));
+
+      const view = await readNetworkDashboard(fixture.network, { executor: tx, today: MONDAY });
+      const refund = view.refunds.find((row) => row.residencyId === fixture.residencyId);
+
+      expect(refund?.deadline).toBe('2026-09-14');
+      expect(refund?.daysLeft).toBe(7);
     });
   });
 

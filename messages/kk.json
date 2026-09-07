@@ -411,6 +411,27 @@
       "onboardingEmpty": "Аяқталмаған қоныстану жоқ",
       "expiringDocuments": "Жақын айда мерзімі бітетін анықтама: {count}",
       "openCalendar": "Ротация күнтізбесі"
+    },
+    "network": {
+      "title": "Желі",
+      "beds": "Орындар",
+      "money": "{month} ақшасы",
+      "issued": "Қойылды",
+      "paid": "Төленді",
+      "debt": "Қарыз",
+      "rating": "Рейтинг",
+      "cleaning": "Жинау бағасы",
+      "noHouses": "Әзірге үй жоқ",
+      "refunds": "Депозиттерді қайтару",
+      "noRefunds": "Қайтару күтілмейді",
+      "deadline": "Соңғы мерзім",
+      "daysLeft": "Қалған күн: {days}",
+      "overdue": "Мерзімі өткен күн: {days}",
+      "decisions": "Шешім қажет",
+      "discounts": "Ұсынылған жеңілдік: {count}",
+      "fines": "Шешім күткен айыппұл: {count}",
+      "periods": "Жабылмаған коммуналдық кезең: {count}",
+      "noDecisions": "Шешілмегені жоқ"
     }
   },
   "documents": {

@@ -6,11 +6,16 @@ import { AppLink } from '@/components/ui/app-link';
 import { listHouses } from '@/db/repositories/houses';
 import { DEFAULT_LOCALE, isLocale, type Locale } from '@/lib/i18n/config';
 import { getCurrentSession } from '@/lib/session';
-import { readHouseDashboard, readResidentDashboard } from '@/services/dashboard';
+import {
+  readHouseDashboard,
+  readNetworkDashboard,
+  readResidentDashboard,
+} from '@/services/dashboard';
 import { readOnboarding } from '@/services/onboarding';
 import { readTerminationView } from '@/services/terminations';
 
 import { HouseDashboardView } from './house-dashboard';
+import { NetworkDashboardView } from './network-dashboard';
 import { OnboardingWizard } from './onboarding-wizard';
 import { ResidentDashboard } from './resident-dashboard';
 import { TerminationNotice } from './termination-notice';
@@ -61,7 +66,10 @@ export default async function DashboardPage({
       return <ModuleStub navKey="dashboard" />;
     }
 
-    const view = await readHouseDashboard({ context }, houseId);
+    const [houseView, networkView] = await Promise.all([
+      readHouseDashboard({ context }, houseId),
+      context.role === 'superadmin' ? readNetworkDashboard({ context }) : null,
+    ]);
 
     return (
       <section className="flex flex-col gap-6">
@@ -69,6 +77,8 @@ export default async function DashboardPage({
           <h1>{t('title')}</h1>
           <p className="text-text-muted text-[13px]">{t('subtitle')}</p>
         </div>
+
+        {networkView !== null && <NetworkDashboardView view={networkView} />}
 
         {houses.length > 1 && (
           <nav className="flex flex-wrap gap-2 text-[13px]">
@@ -87,7 +97,7 @@ export default async function DashboardPage({
           </nav>
         )}
 
-        <HouseDashboardView view={view} />
+        <HouseDashboardView view={houseView} />
       </section>
     );
   }

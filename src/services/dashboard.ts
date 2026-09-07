@@ -1,13 +1,27 @@
 import { getDb, type Executor } from '@/db/client';
 import { listResidencies } from '@/db/repositories/residencies';
-import { addDays, now, startOfMonth, todayInAlmaty, type BusinessDate } from '@/lib/time';
+import {
+  addDays,
+  differenceInDays,
+  now,
+  startOfMonth,
+  todayInAlmaty,
+  type BusinessDate,
+} from '@/lib/time';
 
 import { readDepositView } from './deposits';
 import { listDocumentCards } from './documents';
+import { listBedOccupantsOn } from '@/db/repositories/rotations';
+import { listBeds } from '@/db/repositories/areas';
 import { listDocuments } from '@/db/repositories/documents';
+import { listHouses } from '@/db/repositories/houses';
+import { listDiscounts, listFines } from '@/db/repositories/rating';
+import { listUtilityPeriods } from '@/db/repositories/utilities';
 import { listInvoicesFor } from './invoices';
 import { readHouseRating, readMyRatingCard, type HouseRatingRow } from './rating-views';
+import { REFUND_DEADLINE_DAYS } from './expiry-reminders';
 import { listRemoteTasks } from './remote';
+import { readRotationStats } from './rotation-stats';
 import { readCalendar } from './rotation-calendar';
 import { listPeriodsOfHouse } from './utilities';
 import { readOnboarding } from './onboarding';
@@ -447,6 +461,139 @@ export async function readHouseDashboard(
           status: item.status,
         })),
       documents: expiringSoon(documents, residencies, today),
+    },
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * Дэшборд суперадмина (docs/04-MODULES/09-dashboards.md, «Суперадмин»)
+ * ------------------------------------------------------------------ */
+
+export interface NetworkHouseRow {
+  houseId: string;
+  name: string;
+  /** Занято мест из всего: занятость показывается числами, а не процентом. */
+  beds: { taken: number; total: number };
+  issued: number;
+  paid: number;
+  debt: number;
+  rating: number | null;
+  /** Средняя оценка уборок за текущий месяц; `null` — оценок не было. */
+  cleaningScore: number | null;
+}
+
+export interface RefundWatchRow {
+  residencyId: string;
+  houseName: string;
+  deadline: BusinessDate;
+  /** Отрицательное — просрочка. */
+  daysLeft: number;
+  balance: number;
+}
+
+export interface NetworkDecisions {
+  /** Скидки ждут подтверждения суперадмина: система их только предлагает (§5.4). */
+  discounts: number;
+  /** Штрафы, ещё не попавшие в счёт: их можно отменить. */
+  fines: number;
+  /** Незакрытые периоды коммуналки за прошедшие месяцы. */
+  utilityPeriods: { periodId: string; houseName: string; month: BusinessDate }[];
+}
+
+export interface NetworkDashboard {
+  today: BusinessDate;
+  month: BusinessDate;
+  houses: NetworkHouseRow[];
+  refunds: RefundWatchRow[];
+  decisions: NetworkDecisions;
+}
+
+export async function readNetworkDashboard(
+  actor: UserActor,
+  deps: DashboardDeps = {},
+): Promise<NetworkDashboard> {
+  const { executor, today } = resolve(deps);
+  const month = startOfMonth(today);
+
+  const houses = await listHouses(actor.context, {}, executor);
+  const rows: NetworkHouseRow[] = [];
+
+  for (const house of houses) {
+    const [beds, occupants, invoices, rating, stats] = await Promise.all([
+      listBeds(actor.context, house.id, {}, executor),
+      listBedOccupantsOn(actor.context, house.id, today, executor),
+      listInvoicesFor(actor, { houseId: house.id, periodMonth: month }, { executor, today }),
+      readHouseRating(actor, house.id, { executor, today }),
+      readRotationStats(actor, house.id, { from: month, to: today }, { executor }),
+    ]);
+
+    const issued = invoices.reduce((sum, row) => sum + row.invoice.total, 0);
+    const paid = invoices.reduce((sum, row) => sum + row.paid, 0);
+    const scored = stats.months.find((item) => item.month === month);
+
+    rows.push({
+      houseId: house.id,
+      name: house.name,
+      beds: { taken: occupants.length, total: beds.length },
+      issued,
+      paid,
+      debt: issued - paid,
+      rating:
+        rating.length === 0
+          ? null
+          : Math.round(rating.reduce((sum, row) => sum + row.rating, 0) / rating.length),
+      cleaningScore: scored?.averageScore ?? null,
+    });
+  }
+
+  const names = new Map(houses.map((house) => [house.id, house.name]));
+  const terminating = await listResidencies(actor.context, { status: 'terminating' }, executor);
+  const refunds: RefundWatchRow[] = [];
+
+  for (const residency of terminating) {
+    if (residency.terminationRequestedAt === null) {
+      continue;
+    }
+
+    const deadline = addDays(todayInAlmaty(residency.terminationRequestedAt), REFUND_DEADLINE_DAYS);
+    const view = await readDepositView(actor, residency.id, {}, { executor, today });
+
+    refunds.push({
+      residencyId: residency.id,
+      houseName: names.get(residency.houseId) ?? '',
+      deadline,
+      daysLeft: differenceInDays(today, deadline),
+      balance: view.balance,
+    });
+  }
+
+  const [discounts, fines, periods] = await Promise.all([
+    listDiscounts(actor.context, { status: 'proposed' }, executor),
+    listFines(actor.context, { status: 'pending' }, executor),
+    listUtilityPeriods(actor.context, { status: 'draft' }, executor),
+  ]);
+
+  return {
+    today,
+    month,
+    houses: rows,
+    refunds: refunds.sort((left, right) => left.daysLeft - right.daysLeft),
+    decisions: {
+      discounts: discounts.length,
+      fines: fines.length,
+      /*
+       * Переоткрытый период по данным неотличим от просто незакрытого:
+       * статус у обоих `draft`, а сам факт переоткрытия живёт в журнале.
+       * Поэтому здесь — все незакрытые периоды прошедших месяцев: и те,
+       * которые открыли заново, и те, которые не закрыли вовремя (P6-33).
+       */
+      utilityPeriods: periods
+        .filter((period) => period.month < month)
+        .map((period) => ({
+          periodId: period.id,
+          houseName: names.get(period.houseId) ?? '',
+          month: period.month as BusinessDate,
+        })),
     },
   };
 }

@@ -411,6 +411,27 @@
       "onboardingEmpty": "Незакрытых заселений нет",
       "expiringDocuments": "Справок истекает в ближайший месяц: {count}",
       "openCalendar": "Календарь ротаций"
+    },
+    "network": {
+      "title": "Сеть",
+      "beds": "Места",
+      "money": "Деньги за {month}",
+      "issued": "Выставлено",
+      "paid": "Оплачено",
+      "debt": "Долг",
+      "rating": "Рейтинг",
+      "cleaning": "Оценка уборок",
+      "noHouses": "Домов пока нет",
+      "refunds": "Возвраты депозитов",
+      "noRefunds": "Возвратов не ждём",
+      "deadline": "Крайний срок",
+      "daysLeft": "Осталось дней: {days}",
+      "overdue": "Просрочено дней: {days}",
+      "decisions": "Требует решения",
+      "discounts": "Предложенных скидок: {count}",
+      "fines": "Штрафов ждут решения: {count}",
+      "periods": "Незакрытых периодов коммуналки: {count}",
+      "noDecisions": "Нерешённого нет"
     }
   },
   "documents": {
