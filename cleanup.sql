@@ -15,11 +15,7 @@ begin;
 -- 1. Данные: все таблицы схемы public, кроме скелета сети.
 do $$
 declare
-  -- По одному имени в строке намеренно. Список — единственное, что стоит между
-  -- скелетом сети и truncate: 8 сентября 2026 он потерял хвост при переносе,
-  -- остался «organizations, houses, users» — и счета, типы документов и шаблон
-  -- договора на боевой базе были стёрты. Урезанный массив остаётся правильным
-  -- SQL, поэтому ниже он проверяется явно, а не принимается на веру.
+  -- По одному имени в строке намеренно: потерянная строка видна глазом.
   keep constant text[] := array[
     'organizations',
     'houses',
@@ -31,12 +27,18 @@ declare
   expected constant integer := 6;
   absent text[];
   list text;
+  tbl text;
+  rows_now bigint;
+  before_counts jsonb := '{}'::jsonb;
+  lost text;
 begin
+  -- Проверка первая: список не урезан.
   if coalesce(array_length(keep, 1), 0) <> expected then
     raise exception 'Список сохраняемых таблиц урезан: % имён вместо %. Очистка отменена.',
       coalesce(array_length(keep, 1), 0), expected;
   end if;
 
+  -- Проверка вторая: все имена действительно существуют в схеме.
   select array_agg(name order by name)
     into absent
     from unnest(keep) as name
@@ -49,6 +51,14 @@ begin
       absent;
   end if;
 
+  -- Снимок до очистки. Проверки выше отвечают за список; этот снимок отвечает
+  -- за результат и не зависит от причины: что бы ни увело строки из сохраняемой
+  -- таблицы — список, каскад, триггер, — расхождение будет видно ниже.
+  foreach tbl in array keep loop
+    execute format('select count(*) from public.%I', tbl) into rows_now;
+    before_counts := before_counts || jsonb_build_object(tbl, rows_now);
+  end loop;
+
   select string_agg(format('public.%I', tablename), ', ' order by tablename)
     into list
     from pg_tables
@@ -58,6 +68,21 @@ begin
   raise notice 'Очищаются таблицы: %', list;
 
   execute format('truncate table %s restart identity', list);
+
+  -- Проверка третья: сохраняемые таблицы после очистки не похудели.
+  foreach tbl in array keep loop
+    execute format('select count(*) from public.%I', tbl) into rows_now;
+
+    if rows_now < (before_counts ->> tbl)::bigint then
+      lost := concat_ws('; ', lost,
+        format('%s: было %s, стало %s', tbl, before_counts ->> tbl, rows_now));
+    end if;
+  end loop;
+
+  if lost is not null then
+    raise exception 'Очистка задела скелет сети (%). Транзакция откачена, база не изменена.',
+      lost;
+  end if;
 end
 $$;
 
@@ -71,9 +96,33 @@ delete from users where phone <> '+77010000000';
 delete from accounts where house_id is not null;
 delete from houses;
 
+-- 3. Итоговая проверка перед commit: сеть должна остаться пригодной к работе.
+--    Экранов у типов документов, шаблона договора и счетов сети нет (модули 10
+--    и 11), поэтому пустыми они остаться не могут — их неоткуда завести, кроме
+--    `pnpm db:seed --skeleton`.
+do $$
+declare
+  types integer;
+  templates integer;
+  network integer;
+  people integer;
+begin
+  select count(*) into types from document_types;
+  select count(*) into templates from contract_templates;
+  select count(*) into network from accounts where house_id is null;
+  select count(*) into people from users;
+
+  if types = 0 or templates = 0 or network = 0 or people = 0 then
+    raise exception
+      'После очистки скелет сети пуст: типов документов %, шаблонов %, счетов сети %, учётных записей %. Транзакция откачена. Если их не было и до очистки, сперва восстановите скелет: pnpm db:seed --skeleton',
+      types, templates, network, people;
+  end if;
+end
+$$;
+
 commit;
 
--- 3. Отчёт: ожидаемые числа в комментариях.
+-- 4. Отчёт: ожидаемые числа в комментариях.
 select
   (select count(*) from houses)             as houses,          -- 0
   (select count(*) from users)              as users,           -- 1

@@ -257,3 +257,66 @@ describe('все команды db:* закрыты стражем', () => {
     expect(Object.keys(scripts).filter((name) => name.startsWith('db:')).length).toBeGreaterThan(0);
   });
 });
+
+/**
+ * Окружение для обёрнутой команды.
+ *
+ * `tsx` и `drizzle-kit` сами `.env` не читают: `pnpm db:seed` падал на разборе
+ * окружения, требуя DEPLOY_TARGET, APP_URL и остальные секреты, хотя рядом
+ * лежал заполненный файл. Страж этот файл уже читает — ради выбора цели, —
+ * поэтому он же и передаёт его вниз. Порядок тот же, что и у цели:
+ * значение из оболочки сильнее файла.
+ */
+function runGuardPrinting(
+  variable: string,
+  options: { dotenv: string; shellEnv?: Readonly<Record<string, string | undefined>> },
+) {
+  const directory = emptyDirectory();
+  writeFileSync(join(directory, '.env'), options.dotenv, 'utf8');
+
+  const environment: NodeJS.ProcessEnv = { ...process.env };
+  delete environment.DATABASE_URL;
+  delete environment.DIRECT_DATABASE_URL;
+
+  for (const [key, value] of Object.entries(options.shellEnv ?? {})) {
+    if (value === undefined) {
+      delete environment[key];
+    } else {
+      environment[key] = value;
+    }
+  }
+
+  return spawnSync(
+    process.execPath,
+    [GUARD, process.execPath, '-p', `process.env.${variable} ?? 'НЕТ'`],
+    { cwd: directory, encoding: 'utf8', env: environment },
+  );
+}
+
+describe('окружение команды', () => {
+  const LOCAL = 'DATABASE_URL=postgres://nice:nice@localhost:5432/nice\n';
+
+  it('переменная из .env доходит до запущенной команды', () => {
+    const result = runGuardPrinting('SESSION_SECRET', {
+      dotenv: `${LOCAL}SESSION_SECRET=из-файла\n`,
+    });
+
+    expect(result.stdout).toContain('из-файла');
+  });
+
+  it('значение из оболочки сильнее файла', () => {
+    const result = runGuardPrinting('SESSION_SECRET', {
+      dotenv: `${LOCAL}SESSION_SECRET=из-файла\n`,
+      shellEnv: { SESSION_SECRET: 'из-оболочки' },
+    });
+
+    expect(result.stdout).toContain('из-оболочки');
+    expect(result.stdout).not.toContain('из-файла');
+  });
+
+  it('пустое значение в файле значением не считается', () => {
+    const result = runGuardPrinting('SESSION_SECRET', { dotenv: `${LOCAL}SESSION_SECRET=\n` });
+
+    expect(result.stdout).toContain('НЕТ');
+  });
+});

@@ -119,8 +119,24 @@ console.log(`Выполняю: ${command.join(' ')}`);
 
 const [executable, ...rest] = command;
 
+/**
+ * Окружение для обёрнутой команды: значения из `.env`, поверх — окружение
+ * оболочки. Ни `tsx`, ни `drizzle-kit` файл сами не читают, и `pnpm db:seed`
+ * падал на разборе окружения рядом с заполненным `.env`. Страж этот файл уже
+ * прочитал, выбирая цель, — он же и передаёт его вниз, тем же порядком:
+ * заданное в оболочке сильнее файла, пустое значение значением не считается.
+ */
+function childEnvironment() {
+  const fromFile = Object.fromEntries(
+    Object.entries(dotenvValues()).filter(([, value]) => value !== ''),
+  );
+
+  return { ...fromFile, ...process.env };
+}
+
 const result = spawnSync(executable, rest, {
   stdio: 'inherit',
+  env: childEnvironment(),
   // На Windows исполняемые файлы из node_modules/.bin — это .cmd,
   // а их Node без оболочки не запускает.
   shell: process.platform === 'win32',
