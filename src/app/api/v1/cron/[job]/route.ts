@@ -3,6 +3,7 @@ import { assertCronSecret } from '@/lib/api/cron';
 import { apiJson, apiRoute } from '@/lib/api/route';
 import { loadEnv } from '@/lib/env/load';
 import { generateMonthlyInvoices, MONTHLY_INVOICES_JOB } from '@/services/monthly-invoices';
+import { closeRotationDay, ROTATIONS_CLOSE_DAY_JOB } from '@/services/rotation-close-day';
 
 /**
  * Задания планировщика (docs/01-ARCHITECTURE.md, «Планировщик»).
@@ -16,6 +17,7 @@ type JobHandler = () => Promise<unknown>;
 
 const HANDLERS: Readonly<Record<string, JobHandler>> = {
   [MONTHLY_INVOICES_JOB]: () => generateMonthlyInvoices(),
+  [ROTATIONS_CLOSE_DAY_JOB]: () => closeRotationDay(),
 };
 
 export const POST = apiRoute<{ job: string }>(async (request, { params, requestId }) => {

@@ -7,6 +7,10 @@
     {
       "path": "/api/v1/cron/invoices-monthly",
       "schedule": "5 19 * * *"
+    },
+    {
+      "path": "/api/v1/cron/rotations-close-day",
+      "schedule": "55 18 * * *"
     }
   ]
 }

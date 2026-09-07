@@ -26,6 +26,8 @@ export interface ScheduledJob {
 export const JOBS: readonly ScheduledJob[] = [
   // 1 числа в 00:05 по Алматы (docs/01-ARCHITECTURE.md, §3).
   { job: 'invoices-monthly', schedule: '5 0 1 * *' },
+  // Каждый день в 23:55 по Алматы (§7): закрывается вчерашний день ротаций.
+  { job: 'rotations-close-day', schedule: '55 23 * * *' },
 ];
 
 export function start(): void {

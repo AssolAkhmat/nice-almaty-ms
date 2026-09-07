@@ -919,6 +919,30 @@ export async function listGeneralCleaningParticipants(
   return Array.from(new Set([...residents, ...admins].map((row) => row.userId)));
 }
 
+/**
+ * Занятия одной даты по всей сети: так их читает автозакрытие дня.
+ *
+ * Дома здесь не перебираются: заданию всё равно, в каком доме уборка,
+ * а лишний обход по домам означал бы запрос на каждый дом сети.
+ */
+export async function listOccurrencesOfDate(
+  context: AccessContext,
+  date: BusinessDate,
+  executor: Executor = getDb(),
+): Promise<RotationOccurrence[]> {
+  return executor
+    .select()
+    .from(rotationOccurrences)
+    .where(
+      and(
+        eq(rotationOccurrences.orgId, context.orgId),
+        eq(rotationOccurrences.date, date),
+        houseScope(context, rotationOccurrences.houseId),
+      ),
+    )
+    .orderBy(asc(rotationOccurrences.createdAt));
+}
+
 export interface CalendarDictionaries {
   areas: { id: string; name: string }[];
   checklists: { id: string; areaId: string; title: string; peopleNeeded: number }[];
