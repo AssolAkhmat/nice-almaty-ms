@@ -1,8 +1,9 @@
-import { and, asc, desc, eq, gte, inArray, lt } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
 
 import { NotFoundError } from '@/lib/errors';
-import { now } from '@/lib/time';
+import { now, type BusinessDate } from '@/lib/time';
 
+import { assertHouseVisible } from '../access';
 import { getDb, type Executor } from '../client';
 import {
   depositTransactions,
@@ -81,9 +82,18 @@ export async function addInvoiceLines(
     .returning();
 }
 
+export interface InvoiceFilter {
+  residencyId?: string;
+  type?: Invoice['type'];
+  houseId?: string;
+  /** Первое число месяца, к которому относится счёт. */
+  periodMonth?: BusinessDate;
+  status?: Invoice['status'];
+}
+
 export async function listInvoices(
   context: AccessContext,
-  filter: { residencyId?: string; type?: Invoice['type'] } = {},
+  filter: InvoiceFilter = {},
   executor: Executor = getDb(),
 ): Promise<Invoice[]> {
   const conditions = [invoiceScope(context, executor)];
@@ -94,12 +104,22 @@ export async function listInvoices(
   if (filter.type !== undefined) {
     conditions.push(eq(invoices.type, filter.type));
   }
+  if (filter.houseId !== undefined) {
+    assertHouseVisible(context, filter.houseId);
+    conditions.push(eq(invoices.houseId, filter.houseId));
+  }
+  if (filter.periodMonth !== undefined) {
+    conditions.push(eq(invoices.periodMonth, filter.periodMonth));
+  }
+  if (filter.status !== undefined) {
+    conditions.push(eq(invoices.status, filter.status));
+  }
 
   return executor
     .select()
     .from(invoices)
     .where(and(...conditions))
-    .orderBy(desc(invoices.createdAt));
+    .orderBy(desc(invoices.periodMonth), desc(invoices.createdAt));
 }
 
 export async function findInvoice(
@@ -153,6 +173,45 @@ export async function listInvoiceLines(
     .from(invoiceLines)
     .where(eq(invoiceLines.invoiceId, invoiceId))
     .orderBy(asc(invoiceLines.createdAt));
+}
+
+/**
+ * Строки счёта переписываются целиком: правка идёт списком, а не по одной,
+ * и сумма счёта пересобирается из того же списка (инвариант 5). Дописывать
+ * поверх старых значило бы держать два источника итога.
+ */
+export async function replaceInvoiceLines(
+  invoiceId: string,
+  lines: readonly Omit<NewInvoiceLine, 'invoiceId'>[],
+  executor: Executor = getDb(),
+): Promise<InvoiceLine[]> {
+  await executor.delete(invoiceLines).where(eq(invoiceLines.invoiceId, invoiceId));
+
+  return addInvoiceLines(
+    lines.map((line) => ({ ...line, invoiceId })),
+    executor,
+  );
+}
+
+/** Внесено по каждому счёту — одной выборкой: таблица дома считает сводку. */
+export async function paidTotals(
+  invoiceIds: readonly string[],
+  executor: Executor = getDb(),
+): Promise<Map<string, number>> {
+  if (invoiceIds.length === 0) {
+    return new Map();
+  }
+
+  const rows = await executor
+    .select({
+      invoiceId: payments.invoiceId,
+      paid: sql<number>`coalesce(sum(${payments.amount}), 0)::int`,
+    })
+    .from(payments)
+    .where(inArray(payments.invoiceId, [...invoiceIds]))
+    .groupBy(payments.invoiceId);
+
+  return new Map(rows.map((row) => [row.invoiceId, row.paid]));
 }
 
 export async function listPayments(

@@ -36,6 +36,8 @@ export const AUDIT_ACTIONS = {
   contractSigned: 'contract.signed',
   keysIssued: 'residency.keys_issued',
   invoiceIssued: 'invoice.issued',
+  invoiceEdited: 'invoice.edited',
+  invoiceCancelled: 'invoice.cancelled',
   paymentRecorded: 'payment.recorded',
   depositCharged: 'deposit.charged',
   residencyCreated: 'residency.created',

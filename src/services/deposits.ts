@@ -3,19 +3,16 @@ import {
   addInvoiceLines,
   createDepositTransaction,
   createInvoice,
-  createPayment,
   listDepositTransactions,
   listInvoiceLines,
   listInvoices,
   listPayments,
-  requireInvoice,
-  updateInvoice,
 } from '@/db/repositories/invoices';
 import { countDamageShares } from '@/db/repositories/damages';
 import { requireResidency, updateResidency } from '@/db/repositories/residencies';
-import { depositBalance, invoiceStatus, remainingToPay } from '@/domain/invoice';
+import { depositBalance, remainingToPay } from '@/domain/invoice';
 import { assertCan } from '@/lib/authz';
-import { ConflictError, NotFoundError, ValidationError } from '@/lib/errors';
+import { ConflictError, ValidationError } from '@/lib/errors';
 import { now, startOfDayUtc, todayInAlmaty, type BusinessDate } from '@/lib/time';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
@@ -194,156 +191,108 @@ function depositPart(lines: readonly InvoiceLine[]): number {
 }
 
 /**
- * Платёж по счёту. Когда депозитный счёт закрыт полностью, срабатывает
- * шаг 8 заселения: депозит зачисляется, проживание становится `active`,
+ * Что оплата депозита делает сверх обычного платежа: шаг 8 заселения
+ * (§1.2 п.8). Депозит зачисляется, проживание становится `active`,
  * `move_in_date` — дата оплаты, а не дата подписания договора.
+ *
+ * Вызывается из единственного пути платежа (`services/invoices.ts`) внутри
+ * его транзакции: правило «переплата запрещена» и статус счёта не должны
+ * существовать в двух экземплярах, а заселение — не дело счетов.
  */
-export async function recordPayment(
+export async function settleDepositInvoice(
   actor: UserActor,
-  invoiceId: string,
-  input: PaymentInput,
+  invoice: Invoice,
+  residency: Residency,
+  status: Invoice['status'],
   deps: DepositDeps = {},
-): Promise<Invoice> {
+): Promise<void> {
   const { executor, today } = resolve(deps);
 
-  const invoice = await requireInvoice(actor.context, invoiceId, executor);
-  const residency = await requireResidency(actor.context, invoice.residencyId, executor);
-
-  assertCan(actor.context, 'payment.record', {
-    houseId: residency.houseId,
-    userId: residency.userId,
-  });
-
-  assertMoney(input.amount);
-  if (input.amount === 0) {
-    throw new ValidationError('deposits.amountInvalid');
+  // До полной оплаты депозит депозитом не стал: жилец ещё не заселён.
+  if (status !== 'paid') {
+    return;
   }
 
-  if (invoice.status === 'cancelled') {
-    throw new ConflictError('Счёт отменён');
-  }
+  const lines = await listInvoiceLines(invoice.id, executor);
+  const charge = depositPart(lines);
 
-  const previous = await listPayments(invoice.id, executor);
-  const paidBefore = previous.reduce((sum, payment) => sum + payment.amount, 0);
+  /*
+   * Деньги входят в книгу тем же движением, что и на депозитный счёт
+   * жильца (§10.1, инвариант 4). Проводка идёт по полной оплате, а не
+   * по каждому платежу: остаток фонда иначе разошёлся бы с суммой
+   * депозитов ровно на недоплату.
+   */
+  await postDepositPayment(
+    actor,
+    {
+      houseId: residency.houseId,
+      invoiceId: invoice.id,
+      method: lastMethod(await listPayments(invoice.id, executor)),
+      deposit: charge,
+      other: invoice.total - charge,
+      date: today,
+    },
+    { executor, today },
+  );
 
-  // Переплата запрещена без явного решения (инвариант 6 из 02-DATA-MODEL.md).
-  if (paidBefore + input.amount > invoice.total) {
-    throw new ValidationError('deposits.overpayment', {
-      remaining: remainingToPay(invoice.total, paidBefore),
-    });
-  }
+  await createDepositTransaction(
+    actor.context,
+    {
+      residencyId: residency.id,
+      type: 'charge',
+      amount: charge,
+      refType: 'invoice',
+      refId: invoice.id,
+      note: 'Оплата депозита',
+      createdBy: actor.context.userId,
+    },
+    executor,
+  );
 
-  return executor.transaction(async (tx) => {
-    await createPayment(
-      {
-        invoiceId: invoice.id,
-        amount: input.amount,
-        method: input.method,
-        recordedBy: actor.context.userId,
-        note: input.note ?? null,
-      },
-      tx,
-    );
+  await recordAudit(
+    { context: actor.context, ip: actor.ip, requestId: actor.requestId },
+    {
+      action: AUDIT_ACTIONS.depositCharged,
+      entityType: 'residency',
+      entityId: residency.id,
+      after: { amount: charge, invoiceId: invoice.id },
+    },
+    executor,
+  );
 
-    const paid = paidBefore + input.amount;
-    const status = invoiceStatus(invoice.total, paid);
-
-    const updated = await updateInvoice(actor.context, invoice.id, { status }, tx);
-    if (updated === null) {
-      throw new NotFoundError('Счёт не найден');
-    }
-
-    await recordAudit(
-      { context: actor.context, ip: actor.ip, requestId: actor.requestId },
-      {
-        action: AUDIT_ACTIONS.paymentRecorded,
-        entityType: 'invoice',
-        entityId: invoice.id,
-        before: { status: invoice.status, paid: paidBefore },
-        after: { status, paid, method: input.method },
-      },
-      tx,
-    );
-
-    if (invoice.type !== 'deposit' || status !== 'paid') {
-      return updated;
-    }
-
-    const lines = await listInvoiceLines(invoice.id, tx);
-    const charge = depositPart(lines);
-
-    /*
-     * Деньги входят в книгу тем же движением, что и на депозитный счёт
-     * жильца (§10.1, инвариант 4). Проводка идёт по полной оплате, а не
-     * по каждому платежу: до неё депозит депозитом не стал — §1.2 п.8
-     * не считает жильца заселённым, и остаток фонда разошёлся бы
-     * с суммой депозитов ровно на недоплату.
-     */
-    await postDepositPayment(
-      actor,
-      {
-        houseId: residency.houseId,
-        invoiceId: invoice.id,
-        method: input.method,
-        deposit: charge,
-        other: invoice.total - charge,
-        date: today,
-      },
-      { executor: tx, today },
-    );
-
-    await createDepositTransaction(
+  /*
+   * Шаг 8 §1.2: до оплаты депозита жилец не заселён. Дата заезда — день
+   * оплаты, а не день подписания договора и не день назначения места.
+   */
+  if (residency.status !== 'active') {
+    await updateResidency(
       actor.context,
-      {
-        residencyId: residency.id,
-        type: 'charge',
-        amount: charge,
-        refType: 'invoice',
-        refId: invoice.id,
-        note: 'Оплата депозита',
-        createdBy: actor.context.userId,
-      },
-      tx,
+      residency.id,
+      { status: 'active', moveInDate: today },
+      executor,
     );
 
     await recordAudit(
       { context: actor.context, ip: actor.ip, requestId: actor.requestId },
       {
-        action: AUDIT_ACTIONS.depositCharged,
+        action: AUDIT_ACTIONS.residencyActivated,
         entityType: 'residency',
         entityId: residency.id,
-        after: { amount: charge, invoiceId: invoice.id },
+        before: { status: residency.status },
+        after: { status: 'active', moveInDate: today },
       },
-      tx,
+      executor,
     );
+  }
+}
 
-    /*
-     * Шаг 8 §1.2: до оплаты депозита жилец не заселён. Дата заезда — день
-     * оплаты, а не день подписания договора и не день назначения места.
-     */
-    if (residency.status !== 'active') {
-      await updateResidency(
-        actor.context,
-        residency.id,
-        { status: 'active', moveInDate: today },
-        tx,
-      );
-
-      await recordAudit(
-        { context: actor.context, ip: actor.ip, requestId: actor.requestId },
-        {
-          action: AUDIT_ACTIONS.residencyActivated,
-          entityType: 'residency',
-          entityId: residency.id,
-          before: { status: residency.status },
-          after: { status: 'active', moveInDate: today },
-        },
-        tx,
-      );
-    }
-
-    return updated;
-  });
+/**
+ * Каким способом закрыт счёт. Платежей может быть несколько, и в кассу
+ * с Kaspi они попадали бы порознь; проводка идёт одна, по последнему
+ * способу — на нём счёт и закрылся ([ОТКРЫТО] P3-12).
+ */
+function lastMethod(payments: readonly Payment[]): Payment['method'] {
+  return payments.at(-1)?.method ?? 'cash';
 }
 
 /** Экран «Мой депозит»: остаток, движение за год и счёт на депозит. */

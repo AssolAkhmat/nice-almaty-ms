@@ -14,7 +14,7 @@ import {
 import { listDepositTransactions } from '@/db/repositories/invoices';
 import { listResidencies } from '@/db/repositories/residencies';
 import { ACCOUNT_CODES, houseFundCode } from '@/db/schema';
-import { depositBalance } from '@/domain/invoice';
+import { depositBalance, type PaymentAllocation } from '@/domain/invoice';
 import { assertCan } from '@/lib/authz';
 import { ConflictError, NotFoundError, ValidationError } from '@/lib/errors';
 import { todayInAlmaty, type BusinessDate } from '@/lib/time';
@@ -373,6 +373,68 @@ async function postDepositFundToHouse(
         { accountId: depositFund.id, direction: 'debit', amount: input.amount },
         { accountId: houseFund.id, direction: 'credit', amount: input.amount },
       ],
+    },
+    deps,
+  );
+}
+
+export interface InvoicePaymentEntry {
+  houseId: string;
+  invoiceId: string;
+  method: Payment['method'];
+  /** Разнесение платежа по фондам (§10.1); сумма долей — сам платёж. */
+  allocation: PaymentAllocation;
+  date?: BusinessDate | undefined;
+}
+
+/**
+ * Платёж по счёту (§10.1). Дебет — касса или Kaspi на всю сумму, кредит
+ * расходится по фондам: коммуналка поставщику, погашение перерасхода
+ * обратно в депозитный фонд, остальное — фонд дома. Одной проводкой,
+ * а не тремя: деньги пришли одним платежом.
+ */
+export async function postInvoicePayment(
+  actor: UserActor,
+  input: InvoicePaymentEntry,
+  deps: LedgerDeps = {},
+): Promise<LedgerEntry> {
+  const { executor } = resolve(deps);
+
+  const total = input.allocation.utilities + input.allocation.deposit + input.allocation.house;
+  const money = await requireAccountByCode(actor, moneyCode(input.method), executor);
+  const lines: PostLine[] = [{ accountId: money.id, direction: 'debit', amount: total }];
+
+  if (input.allocation.utilities > 0) {
+    const utilityFund = await requireAccountByCode(actor, ACCOUNT_CODES.utilityFund, executor);
+    lines.push({
+      accountId: utilityFund.id,
+      direction: 'credit',
+      amount: input.allocation.utilities,
+    });
+  }
+
+  if (input.allocation.deposit > 0) {
+    const depositFund = await requireAccountByCode(actor, ACCOUNT_CODES.depositFund, executor);
+    lines.push({
+      accountId: depositFund.id,
+      direction: 'credit',
+      amount: input.allocation.deposit,
+    });
+  }
+
+  if (input.allocation.house > 0) {
+    const houseFund = await requireHouseFund(actor, input.houseId, executor);
+    lines.push({ accountId: houseFund.id, direction: 'credit', amount: input.allocation.house });
+  }
+
+  return postSystemEntry(
+    actor,
+    {
+      description: 'Оплата счёта',
+      sourceType: 'invoice',
+      sourceId: input.invoiceId,
+      ...(input.date === undefined ? {} : { date: input.date }),
+      lines,
     },
     deps,
   );

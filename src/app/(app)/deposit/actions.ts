@@ -5,7 +5,8 @@ import { revalidatePath } from 'next/cache';
 
 import { AppError } from '@/lib/errors';
 import { getCurrentSession } from '@/lib/session';
-import { issueDepositInvoice, recordPayment } from '@/services/deposits';
+import { issueDepositInvoice } from '@/services/deposits';
+import { recordPayment } from '@/services/invoices';
 
 import type { UserActor } from '@/services/users';
 

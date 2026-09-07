@@ -9,7 +9,8 @@ import { testDatabaseUrl } from '@/db/testing/database-url';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { parseBusinessDate } from '@/lib/time';
 
-import { issueDepositInvoice, readDepositView, recordPayment } from './deposits';
+import { issueDepositInvoice, readDepositView } from './deposits';
+import { recordPayment } from './invoices';
 
 import type { AccessContext } from '@/db/access';
 import type { Database, Transaction } from '@/db/client';

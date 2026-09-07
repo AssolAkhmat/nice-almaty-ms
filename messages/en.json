@@ -85,7 +85,8 @@
     "more": "More",
     "menu": "Menu",
     "moduleNotReady": "This section is not built yet",
-    "moduleNotReadyHint": "It arrives in its own phase of the roadmap."
+    "moduleNotReadyHint": "It arrives in its own phase of the roadmap.",
+    "remove": "Remove"
   },
   "nav": {
     "label": "Main navigation",
@@ -741,6 +742,107 @@
     "done": {
       "created": "Damage recorded",
       "reversed": "Damage reversed"
+    }
+  },
+  "invoices": {
+    "title": "Invoices",
+    "subtitle": "Your invoices, lines and payments",
+    "adminSubtitle": "House invoices for the month: issued, paid, debt",
+    "create": "Issue an invoice",
+    "residency": "Resident",
+    "typeField": "Invoice type",
+    "period": "Invoice month",
+    "periodHint": "First day of the month",
+    "dueDate": "Due date",
+    "note": "Comment",
+    "lines": "Invoice lines",
+    "noLinesYet": "No lines yet",
+    "lineKind": "Kind",
+    "lineTitle": "Title",
+    "lineAmount": "Amount",
+    "addLine": "Add line",
+    "saveLines": "Save lines",
+    "submit": "Issue",
+    "total": "Total",
+    "paid": "Paid",
+    "remaining": "Remaining",
+    "overdue": "Overdue",
+    "paymentHistory": "Payment history",
+    "paymentAmount": "Payment amount",
+    "record": "Record payment",
+    "recordPayment": "Record payment",
+    "recalculate": "Recalculate",
+    "cancel": "Cancel invoice",
+    "recalcHint": "Recalculation rebuilds automatic lines; manual ones stay as they are",
+    "closedHint": "The invoice is closed: lines cannot be edited, only reversed and reissued",
+    "resident": "Resident",
+    "statusColumn": "Status",
+    "tableCaption": "House invoices for the month",
+    "backToList": "Back to invoices",
+    "empty": "No invoices",
+    "emptyHint": "Invoices will appear here once issued",
+    "noHouse": "No house selected",
+    "noHouseHint": "Add a house in the network settings",
+    "summary": {
+      "issued": "Issued",
+      "paid": "Paid",
+      "debt": "Debt"
+    },
+    "type": {
+      "monthly": "Monthly",
+      "extra": "Extra",
+      "deposit": "Deposit",
+      "deposit_refund": "Deposit refund"
+    },
+    "kind": {
+      "rent": "Rent",
+      "utilities": "Utilities",
+      "fine": "Fine",
+      "damage_carryover": "Deposit overdraft",
+      "extra": "Manual charge",
+      "deposit": "Deposit",
+      "discount": "Discount",
+      "proration": "Pro-rated days"
+    },
+    "method": {
+      "label": "Payment method",
+      "kaspi": "Kaspi",
+      "cash": "Cash"
+    },
+    "status": {
+      "pending": "Pending",
+      "issued": "Issued",
+      "partially_paid": "Partially paid",
+      "paid": "Paid",
+      "cancelled": "Cancelled",
+      "returned": "Returned",
+      "burned": "Burned"
+    },
+    "done": {
+      "created": "Invoice issued",
+      "edited": "Lines saved",
+      "recalculated": "Invoice recalculated",
+      "cancelled": "Invoice cancelled",
+      "paymentRecorded": "Payment recorded"
+    },
+    "errors": {
+      "unauthorized": "Sign in required",
+      "forbidden": "This action is not available to your role",
+      "not_found": "Not found",
+      "unknown": "The action could not be completed",
+      "amountInvalid": "The amount must be a whole non-negative number of tenge",
+      "titleRequired": "Every line needs a title",
+      "noLines": "An invoice without lines cannot be issued",
+      "closed": "The invoice is closed: lines cannot be edited",
+      "belowPaid": "The invoice total cannot drop below what is already paid",
+      "alreadyCancelled": "The invoice is already cancelled",
+      "paidCannotCancel": "The invoice has payments and cannot be cancelled",
+      "cancelled": "The invoice is cancelled",
+      "overpayment": "The payment exceeds the remaining balance",
+      "refundNotPayable": "A refund invoice is closed by a payout, not by a resident payment",
+      "notMonthly": "Only a monthly invoice can be recalculated",
+      "noPeriod": "The invoice has no month",
+      "method": "Choose a payment method"
     }
   }
 }
