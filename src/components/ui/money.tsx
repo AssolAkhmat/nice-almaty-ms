@@ -8,7 +8,14 @@ export interface MoneyProps {
   className?: string;
 }
 
-/** Числа и деньги выравниваются вправо моноширинными цифрами. */
+/**
+ * Числа и деньги выравниваются вправо моноширинными цифрами.
+ *
+ * Знак тенге — `₸`, а не код `KZT`: так пишут суммы документы сети
+ * и договор (`src/services/contracts.ts`), а «0 KZT» в сводке счетов
+ * владелец прочитал как сломанную вёрстку (T9.8). Узкий символ есть
+ * у всех трёх локалей.
+ */
 export function Money({ amount, className }: MoneyProps) {
   const format = useFormatter();
 
@@ -17,6 +24,7 @@ export function Money({ amount, className }: MoneyProps) {
       {format.number(amount, {
         style: 'currency',
         currency: 'KZT',
+        currencyDisplay: 'narrowSymbol',
         maximumFractionDigits: 0,
         minimumFractionDigits: 0,
       })}

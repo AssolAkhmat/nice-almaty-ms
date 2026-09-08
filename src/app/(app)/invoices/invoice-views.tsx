@@ -187,26 +187,34 @@ export interface HouseSummary {
   debt: number;
 }
 
-/** Сводка дома за месяц: выставлено, оплачено, долг (модуль 2). */
+/**
+ * Сводка дома за месяц: выставлено, оплачено, долг (модуль 2).
+ *
+ * Подпись и сумма стоят столбиком у левого края: `Money` по умолчанию
+ * прижимает сумму вправо — это правило для таблиц, — и в карточке подпись
+ * оказывалась у левого края, а сумма у правого, на всех трёх ширинах (T9.8).
+ */
 export function SummaryCard({ summary }: { summary: HouseSummary }) {
   const t = useTranslations();
 
+  const cells: [string, number][] = [
+    ['issued', summary.issued],
+    ['paid', summary.paid],
+    ['debt', summary.debt],
+  ];
+
   return (
     <Card>
-      <div className="grid gap-3 p-4 sm:grid-cols-3">
-        <div className="flex flex-col gap-1">
-          <span className="text-text-muted text-[13px]">{t('invoices.summary.issued')}</span>
-          <Money amount={summary.issued} className="text-[15px]" />
-        </div>
-        <div className="flex flex-col gap-1">
-          <span className="text-text-muted text-[13px]">{t('invoices.summary.paid')}</span>
-          <Money amount={summary.paid} className="text-[15px]" />
-        </div>
-        <div className="flex flex-col gap-1">
-          <span className="text-text-muted text-[13px]">{t('invoices.summary.debt')}</span>
-          <Money amount={summary.debt} className="text-[15px]" />
-        </div>
-      </div>
+      <dl className="grid gap-3 p-4 sm:grid-cols-3" data-testid="invoice-summary">
+        {cells.map(([key, amount]) => (
+          <div className="flex flex-col gap-1" key={key}>
+            <dt className="text-text-muted text-[13px]">{t(`invoices.summary.${key}`)}</dt>
+            <dd>
+              <Money amount={amount} className="text-left text-[15px] font-medium" />
+            </dd>
+          </div>
+        ))}
+      </dl>
     </Card>
   );
 }
