@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { CONTRACT_TOKENS, renderContractTemplate, unknownTokens } from './contract-template';
+import {
+  CONTRACT_TOKENS,
+  renderContractTemplate,
+  SAMPLE_CONTRACT_VALUES,
+  unknownTokens,
+} from './contract-template';
 
 /**
  * Подстановка в шаблон договора (docs/04-MODULES/11-users-settings.md).
@@ -114,5 +119,24 @@ describe('неизвестные токены', () => {
     delete withoutIin['resident.iin'];
 
     expect(() => renderContractTemplate('{{resident.iin}}', withoutIin)).toThrow(/resident\.iin/);
+  });
+});
+
+/**
+ * Предпросмотр шаблона (T8.4). Суперадмин правит договор до того, как по нему
+ * заселят живого человека, и смотреть на него он должен на выдуманных данных —
+ * лезть за чужим ИИН ради предпросмотра нельзя.
+ */
+describe('образец для предпросмотра', () => {
+  it('у каждого токена палитры есть значение', () => {
+    for (const token of CONTRACT_TOKENS) {
+      expect(SAMPLE_CONTRACT_VALUES[token], token).toBeTruthy();
+    }
+  });
+
+  it('в предпросмотре не остаётся ни одного нераскрытого токена', () => {
+    const template = CONTRACT_TOKENS.map((token) => `<p>{{${token}}}</p>`).join('');
+
+    expect(renderContractTemplate(template, SAMPLE_CONTRACT_VALUES)).not.toContain('{{');
   });
 });

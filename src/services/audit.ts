@@ -90,6 +90,7 @@ export const AUDIT_ACTIONS = {
   documentTypeSaved: 'document_type.saved',
   accountSaved: 'account.saved',
   accountArchived: 'account.archived',
+  contractTemplateSaved: 'contract_template.saved',
   documentTypeArchived: 'document_type.archived',
   inventoryItemCreated: 'inventory_item.created',
   inventoryItemUpdated: 'inventory_item.updated',

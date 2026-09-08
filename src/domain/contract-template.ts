@@ -80,3 +80,27 @@ export function renderContractTemplate(template: string, values: ContractValues)
     return escapeHtml(value);
   });
 }
+
+/**
+ * Образец для предпросмотра шаблона (T8.4).
+ *
+ * Данные выдуманные: суперадмин смотрит на вёрстку договора до того, как
+ * по нему заселили живого человека, и подставлять чужой ИИН ради предпросмотра
+ * незачем. Тест держит образец полным — новый токен палитры без значения
+ * оставил бы в предпросмотре сырые скобки.
+ */
+export const SAMPLE_CONTRACT_VALUES: Readonly<Record<ContractToken, string>> = {
+  'resident.full_name': 'Иванов Иван Иванович',
+  'resident.iin': '990101300123',
+  'resident.id_doc_issuer': 'МВД РК',
+  'resident.registration_address': 'Алматы, ул. Сатпаева, 22, кв. 5',
+  'residency.contract_number': '2026-0042',
+  'residency.contract_start': '01.09.2026',
+  'residency.contract_end': '31.05.2027',
+  'bed.room': 'Комната 3',
+  'bed.label': 'Место 2, нижний ярус',
+  'bed.price': '75 000 ₸',
+  'house.name': 'Дом 1',
+  'house.address': 'Алматы, ул. Абая, 1',
+  today: '08.09.2026',
+};

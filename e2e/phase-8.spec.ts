@@ -112,3 +112,62 @@ test.describe('план счетов', () => {
     await expect(page).toHaveURL(/\/settings$/);
   });
 });
+
+test.describe('шаблон договора', () => {
+  test('суперадмин вставляет токен, смотрит предпросмотр и сохраняет', async ({ page }) => {
+    await login(page);
+    await page.goto('/settings/contract-template');
+
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+
+    const body = page.getByTestId('template-body');
+    const before = await body.inputValue();
+
+    // Токен встаёт туда, где курсор: приёмка ставит его в конец текста.
+    await body.click();
+    await page.keyboard.press('Control+End');
+    await page.getByTestId('token-house.address').click();
+    await expect(body).toHaveValue(/house[.]address/);
+
+    await page.getByTestId('template-preview').click();
+    const preview = page.getByTestId('template-preview-result');
+    await expect(preview).toBeVisible();
+    await expect(preview).toContainText('Алматы, ул. Абая, 1');
+    await expect(preview).not.toContainText('{{');
+
+    await page.getByTestId('template-save').click();
+    await expect(page.getByRole('status')).toBeVisible();
+
+    // Возврат к исходному тексту: приёмка не оставляет за собой изменённый договор.
+    await page.reload();
+    await page.getByTestId('template-body').fill(before);
+    await page.getByTestId('template-save').click();
+    await expect(page.getByRole('status')).toBeVisible();
+  });
+
+  test('неизвестный токен не сохраняется и назван по имени', async ({ page }) => {
+    await login(page);
+    await page.goto('/settings/contract-template');
+
+    const body = page.getByTestId('template-body');
+    const before = await body.inputValue();
+
+    await body.fill(`${before}<p>{{resident.middle_name}}</p>`);
+    await page.getByTestId('template-save').click();
+
+    const error = page.getByTestId('template-error');
+    await expect(error).toBeVisible();
+    await expect(error).toContainText('resident.middle_name');
+
+    // В базе шаблон остался прежним: перезагрузка возвращает старый текст.
+    await page.reload();
+    await expect(page.getByTestId('template-body')).toHaveValue(before);
+  });
+
+  test('админ дома к шаблону договора не подходит', async ({ page }) => {
+    await login(page, E2E_ACCOUNTS.adminHouse1);
+    await page.goto('/settings/contract-template');
+
+    await expect(page).toHaveURL(/\/settings$/);
+  });
+});

@@ -36,6 +36,7 @@
       "invoice": "Invoice",
       "ledger_entry": "Ledger entry",
       "account": "Account",
+      "contract_template": "Contract template",
       "damage": "Damage",
       "utility_period": "Utility period",
       "area_checklist": "Area checklist",
@@ -606,6 +607,40 @@
       "systemAccount": "A system account cannot be archived: typical entries rely on it",
       "forbidden": "Only a superadmin edits the chart of accounts",
       "not_found": "Account not found",
+      "unauthorized": "Session expired, sign in again",
+      "validation_error": "Check the fields you filled in"
+    }
+  },
+  "contractTemplate": {
+    "title": "Contract template",
+    "subtitle": "The tenancy contract text and its token palette",
+    "missing": "No active template. Restore the network skeleton: pnpm db:seed --skeleton",
+    "fields": {
+      "name": "Template name",
+      "body": "Contract text (HTML)",
+      "bodyHint": "Tokens are filled in when the contract is built: {{resident.full_name}} and the rest of the palette"
+    },
+    "palette": {
+      "title": "Token palette",
+      "hint": "Click a token and it lands where the cursor is"
+    },
+    "preview": {
+      "title": "Preview",
+      "hint": "Sample data: checking the layout needs no real resident"
+    },
+    "actions": {
+      "save": "Save",
+      "preview": "Preview"
+    },
+    "done": {
+      "saved": "Contract template saved"
+    },
+    "errors": {
+      "unknownTokens": "The template uses tokens that are not in the palette:",
+      "nameRequired": "The template name is required",
+      "bodyRequired": "The contract text cannot be empty",
+      "forbidden": "Only a superadmin edits the contract template",
+      "not_found": "No active contract template",
       "unauthorized": "Session expired, sign in again",
       "validation_error": "Check the fields you filled in"
     }
