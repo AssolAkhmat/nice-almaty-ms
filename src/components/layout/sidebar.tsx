@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/cn';
 import { isActiveHref, NAV_ITEMS } from '@/lib/navigation';
 
+import { LogoutButton } from './logout-button';
+
 /**
  * Десктоп (>= 1024): постоянное меню 240px с подписями.
  * Планшет (768-1023): те же пункты, свёрнутые в иконки.
@@ -25,7 +27,7 @@ export function Sidebar({ unread }: SidebarProps) {
   return (
     <nav
       aria-label={t('label')}
-      className="border-border bg-surface hidden shrink-0 border-r md:block md:w-16 lg:w-60"
+      className="border-border bg-surface hidden shrink-0 border-r md:flex md:w-16 md:flex-col lg:w-60"
       data-testid="sidebar"
     >
       <ul className="flex flex-col gap-0.5 p-2">
@@ -59,6 +61,13 @@ export function Sidebar({ unread }: SidebarProps) {
           );
         })}
       </ul>
+
+      <div className="border-border mt-auto border-t p-2">
+        <LogoutButton
+          className="md:justify-center lg:justify-start"
+          labelClassName="hidden lg:inline"
+        />
+      </div>
     </nav>
   );
 }

@@ -11,6 +11,8 @@ import { Modal } from '@/components/ui/modal';
 import { cn } from '@/lib/cn';
 import { isActiveHref, NAV_ITEMS, PRIMARY_NAV_ITEMS } from '@/lib/navigation';
 
+import { LogoutButton } from './logout-button';
+
 const ITEM_CLASSES =
   'flex h-14 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-[11px] transition-colors duration-150';
 
@@ -93,6 +95,10 @@ export function BottomNav({ unread }: BottomNavProps) {
             );
           })}
         </ul>
+
+        <div className="border-border mt-2 border-t pt-2">
+          <LogoutButton />
+        </div>
       </Modal>
     </>
   );
