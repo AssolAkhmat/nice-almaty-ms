@@ -2,7 +2,7 @@ import { readdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 /**
- * Список миграций, известных коду (указание владельца из `OWNER-NOTES.md`).
+ * Список миграций, известных коду (указание владельца, `docs/DEPLOY-VERCEL.md` §10).
  *
  * Папку с миграциями приложение во время работы не видит: в standalone-сборке
  * её рядом нет, а на Vercel файловая система своя. Поэтому список кладётся

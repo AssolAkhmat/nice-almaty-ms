@@ -4,7 +4,7 @@ import { getDb, type Executor } from './client';
 import { EXPECTED_MIGRATIONS, MIGRATIONS } from './migrations-manifest';
 
 /**
- * Проверка версии схемы при старте (указание владельца из `OWNER-NOTES.md`).
+ * Проверка версии схемы при старте (указание владельца, `docs/DEPLOY-VERCEL.md` §10).
  *
  * Приложение, поднятое на отставшей базе, ломается не сразу и не целиком:
  * половина запросов работает, половина падает на неизвестной колонке,
