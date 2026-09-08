@@ -232,7 +232,9 @@ function StatusBadge({ status }: { status: AbsenceStatus }) {
   const t = useTranslations('absences');
 
   return (
-    <StatusPill kind={status === 'rejected' ? 'muted' : 'done'}>
+    <StatusPill
+      kind={status === 'approved' ? 'done' : status === 'rejected' ? 'muted' : 'attention'}
+    >
       {t(`statuses.${status}`)}
     </StatusPill>
   );
@@ -262,7 +264,7 @@ export function AbsencesView({
           {mine.length === 0 ? (
             <EmptyState title={t('mineEmpty')} />
           ) : (
-            <ul className="flex flex-col gap-3">
+            <ul className="flex flex-col gap-3" data-testid="absences-mine">
               {mine.map((row) => (
                 <li
                   className="border-border flex flex-wrap items-center justify-between gap-2 border-t pt-3 text-[13px] first:border-t-0 first:pt-0"
