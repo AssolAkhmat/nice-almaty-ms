@@ -22,8 +22,24 @@ const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
 
 const CONFIRMATION = '--allow-remote';
 
-/** Порядок выбора повторяет drizzle.config.ts: пустая строка — это «не задано». */
-const URL_VARIABLES = ['DIRECT_DATABASE_URL', 'DATABASE_URL'];
+/**
+ * Какую переменную читает обёрнутая команда.
+ *
+ * `drizzle-kit` повторяет `drizzle.config.ts`: сперва `DIRECT_DATABASE_URL`,
+ * потом `DATABASE_URL`. Приложение (`tsx src/db/seed.cli.ts`) знает только
+ * `DATABASE_URL` — `src/db/client.ts`. Пока правило было общим, страж называл
+ * сиду хост из `DIRECT_DATABASE_URL`, а писал сид в другую базу: подтверждали
+ * одно, менялось другое.
+ */
+const MIGRATION_TOOL = 'drizzle-kit';
+
+function urlVariablesFor(executable) {
+  const tool = executable.split(/[\\/]/).pop() ?? executable;
+
+  return tool.startsWith(MIGRATION_TOOL)
+    ? ['DIRECT_DATABASE_URL', 'DATABASE_URL']
+    : ['DATABASE_URL'];
+}
 
 function fail(message) {
   console.error(message);
@@ -46,10 +62,10 @@ function dotenvValues() {
  * Строка подключения и её происхождение — ровно так, как их увидит drizzle-kit:
  * окружение оболочки перекрывает файл, а не наоборот.
  */
-function resolveTarget() {
+function resolveTarget(variables) {
   const fromFile = dotenvValues();
 
-  for (const variable of URL_VARIABLES) {
+  for (const variable of variables) {
     const shell = process.env[variable];
     const fromShell = shell !== undefined;
     const value = fromShell ? shell : (fromFile[variable] ?? '');
@@ -75,12 +91,13 @@ if (command.length === 0) {
   fail(`Нечего выполнять: node scripts/db-guard.mjs <команда> [${CONFIRMATION}=<хост>]`);
 }
 
-const target = resolveTarget();
+const variables = urlVariablesFor(command[0] ?? '');
+const target = resolveTarget(variables);
 
 if (target === null) {
   fail(
-    'Отказ: не задан DATABASE_URL (или DIRECT_DATABASE_URL) — ни в окружении, ни в .env.\n' +
-      'Команда к базе не запускается вслепую.',
+    `Отказ: не задан ${variables.join(' (или ')}${variables.length > 1 ? ')' : ''} — ` +
+      'ни в окружении, ни в .env.\nКоманда к базе не запускается вслепую.',
   );
 }
 

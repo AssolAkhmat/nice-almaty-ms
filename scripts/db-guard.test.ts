@@ -186,13 +186,15 @@ describe('страж называет источник строки подклю
 });
 
 describe('страж повторяет выбор строки за drizzle.config.ts', () => {
-  it('DIRECT_DATABASE_URL важнее DATABASE_URL', () => {
-    const result = runGuard({
-      shellEnv: { DATABASE_URL: LOCAL, DIRECT_DATABASE_URL: REMOTE },
+  it('DIRECT_DATABASE_URL важнее DATABASE_URL — там, где его читает сама команда', () => {
+    // Порядок остался прежним для drizzle-kit: он и читает эту переменную.
+    const output = runGuardNaming(['drizzle-kit', 'migrate'], {
+      DATABASE_URL: LOCAL,
+      DIRECT_DATABASE_URL: REMOTE,
     });
 
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).toContain('DIRECT_DATABASE_URL');
+    expect(output).toContain('DIRECT_DATABASE_URL');
+    expect(output).toContain('Отказ');
   });
 
   it('пустой DIRECT_DATABASE_URL — не заданный: так его гасит docker-compose', () => {
@@ -318,5 +320,66 @@ describe('окружение команды', () => {
     const result = runGuardPrinting('SESSION_SECRET', { dotenv: `${LOCAL}SESSION_SECRET=\n` });
 
     expect(result.stdout).toContain('НЕТ');
+  });
+});
+
+/**
+ * Цель зависит от того, что именно оборачивают.
+ *
+ * `drizzle-kit` читает `DIRECT_DATABASE_URL` и только потом `DATABASE_URL`,
+ * а приложение (`tsx src/db/seed.cli.ts`) знает единственную переменную —
+ * `DATABASE_URL`. Пока страж выбирал по одному правилу для обеих команд,
+ * он называл сиду чужой хост: подтверждали Supabase, а писало в локальную базу.
+ */
+function runGuardNaming(
+  command: readonly string[],
+  shellEnv: Readonly<Record<string, string | undefined>>,
+) {
+  const directory = emptyDirectory();
+
+  const environment: NodeJS.ProcessEnv = { ...process.env };
+  delete environment.DATABASE_URL;
+  delete environment.DIRECT_DATABASE_URL;
+
+  for (const [key, value] of Object.entries(shellEnv)) {
+    if (value === undefined) {
+      delete environment[key];
+    } else {
+      environment[key] = value;
+    }
+  }
+
+  const result = spawnSync(process.execPath, [GUARD, ...command], {
+    cwd: directory,
+    encoding: 'utf8',
+    env: environment,
+  });
+
+  return `${result.stdout}${result.stderr}`;
+}
+
+describe('выбор переменной по команде', () => {
+  const DIRECT = 'postgres://user:pass@direct.example.com:5432/db';
+  const POOLER = 'postgres://user:pass@pooler.example.com:6543/db';
+
+  it('drizzle-kit идёт по DIRECT_DATABASE_URL', () => {
+    const output = runGuardNaming(['drizzle-kit', 'migrate'], {
+      DIRECT_DATABASE_URL: DIRECT,
+      DATABASE_URL: POOLER,
+    });
+
+    expect(output).toContain('direct.example.com');
+    expect(output).toContain('Источник: DIRECT_DATABASE_URL');
+  });
+
+  it('приложение идёт по DATABASE_URL, даже когда задан DIRECT', () => {
+    const output = runGuardNaming(['tsx', 'src/db/seed.cli.ts'], {
+      DIRECT_DATABASE_URL: DIRECT,
+      DATABASE_URL: POOLER,
+    });
+
+    expect(output).toContain('pooler.example.com');
+    expect(output).toContain('Источник: DATABASE_URL');
+    expect(output).not.toContain('direct.example.com');
   });
 });
