@@ -292,7 +292,8 @@
     },
     "actions": {
       "allowReset": "Allow reset",
-      "archive": "Archive"
+      "archive": "Archive",
+      "openResidency": "Open residency"
     },
     "create": {
       "title": "Create account",
@@ -307,7 +308,8 @@
     },
     "done": {
       "resetAllowed": "Reset allowed for 24 hours. One sign-in will pass with any password.",
-      "archived": "Account archived"
+      "archived": "Account archived",
+      "residencyOpened": "Residency opened: a bed can now be assigned"
     },
     "errors": {
       "unauthorized": "Sign-in required",

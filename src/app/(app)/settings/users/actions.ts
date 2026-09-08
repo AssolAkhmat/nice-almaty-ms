@@ -5,7 +5,12 @@ import { revalidatePath } from 'next/cache';
 
 import { AppError } from '@/lib/errors';
 import { getCurrentSession } from '@/lib/session';
-import { allowPasswordReset, archiveAccount, createAccount } from '@/services/users';
+import {
+  allowPasswordReset,
+  archiveAccount,
+  createAccount,
+  openResidencyForAccount,
+} from '@/services/users';
 
 /**
  * Действия над учётными записями. Права проверяет сервисный слой
@@ -110,6 +115,29 @@ export async function archiveAccountAction(
     revalidatePath('/settings/users');
 
     return { done: 'users.done.archived' };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+/** Проживание для админа, заведённого до P9-3: без него ему не назначить место. */
+export async function openResidencyAction(
+  _previous: AccountActionState,
+  formData: FormData,
+): Promise<AccountActionState> {
+  const actor = await actorFromSession();
+  if (actor === null) {
+    return { error: 'users.errors.unauthorized' };
+  }
+
+  try {
+    await openResidencyForAccount(actor, textField(formData, 'userId'));
+    revalidatePath('/settings/users');
+    // Схема мест и список жильцов дома читают проживания: без этого админ там не появится.
+    revalidatePath('/beds');
+    revalidatePath('/residents');
+
+    return { done: 'users.done.residencyOpened' };
   } catch (error) {
     return toErrorState(error);
   }

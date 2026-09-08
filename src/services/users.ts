@@ -8,7 +8,7 @@ import {
   updateUser,
   updateUserAuthState,
 } from '@/db/repositories/users';
-import { createResidency } from '@/db/repositories/residencies';
+import { createResidency, listResidencies } from '@/db/repositories/residencies';
 
 import { nextNumberForOrg } from './contract-numbers';
 import { revokeAllUserSessions } from '@/db/repositories/sessions';
@@ -21,7 +21,7 @@ import { plusMilliseconds, now } from '@/lib/time';
 import { AUDIT_ACTIONS, recordAudit } from './audit';
 
 import type { AccessContext } from '@/db/access';
-import type { User } from '@/db/schema';
+import type { Residency, User } from '@/db/schema';
 import type { AuditActor } from './audit';
 
 /**
@@ -133,11 +133,12 @@ export async function createAccount(
 
   /*
    * Дом админа лежит в учётной записи, дом жильца — в проживании (D11).
-   * Нужен он и там, и там: аккаунт жильца без дома некуда заселять,
-   * а §1.2 начинает заселение именно с создания аккаунта.
+   * Админ — тоже жилец своего дома: место, договор и ротации у него те же
+   * (§6 «включая админа»), поэтому проживание заводится обоим, а не только
+   * жильцу (P9-3). У суперадмина дома нет — и проживания тоже.
    */
   const houseId = input.role === 'admin' ? (input.houseId ?? null) : null;
-  const residencyHouseId = input.role === 'resident' ? (input.houseId ?? null) : null;
+  const residencyHouseId = input.role === 'superadmin' ? null : (input.houseId ?? null);
 
   if (input.role === 'admin' && houseId === null) {
     throw new ValidationError('Админу нужен дом');
@@ -185,29 +186,76 @@ export async function createAccount(
      * ничем, кроме прямой записи в базу (P2-42).
      */
     if (residencyHouseId !== null) {
-      // Номер присваивается сразу: договор собирают позже, но ссылаться
-      // на проживание по номеру начинают с первого дня (T8.1).
-      const contractNumber = await nextNumberForOrg(actor.context.orgId, tx);
-      const residency = await createResidency(
-        actor.context,
-        { userId: user.id, houseId: residencyHouseId, status: 'created', contractNumber },
-        tx,
-      );
-
-      await recordAudit(
-        auditActor(actor),
-        {
-          action: AUDIT_ACTIONS.residencyCreated,
-          entityType: 'residency',
-          entityId: residency.id,
-          after: { userId: user.id, houseId: residencyHouseId, status: 'created', contractNumber },
-        },
-        tx,
-      );
+      await openResidency(actor, user.id, residencyHouseId, tx);
     }
 
     return { user, temporaryPassword };
   });
+}
+
+/**
+ * Проживание для учётной записи в доме. Номер договора присваивается сразу:
+ * договор собирают позже, но ссылаться на проживание по номеру начинают
+ * с первого дня (T8.1). Заведение попадает в журнал.
+ */
+async function openResidency(
+  actor: UserActor,
+  userId: string,
+  houseId: string,
+  tx: Executor,
+): Promise<Residency> {
+  const contractNumber = await nextNumberForOrg(actor.context.orgId, tx);
+  const residency = await createResidency(
+    actor.context,
+    { userId, houseId, status: 'created', contractNumber },
+    tx,
+  );
+
+  await recordAudit(
+    auditActor(actor),
+    {
+      action: AUDIT_ACTIONS.residencyCreated,
+      entityType: 'residency',
+      entityId: residency.id,
+      after: { userId, houseId, status: 'created', contractNumber },
+    },
+    tx,
+  );
+
+  return residency;
+}
+
+/**
+ * Проживание для учётной записи, заведённой до P9-3: у админов, созданных
+ * раньше 9 сентября 2026, проживания нет, и назначить им место нечем.
+ * Повторный вызов ничего не заводит — возвращает то, что есть.
+ */
+export async function openResidencyForAccount(
+  actor: UserActor,
+  userId: string,
+  executor: Executor = getDb(),
+): Promise<Residency> {
+  // То же право, что заводит проживание вместе с учётной записью.
+  assertCan(actor.context, 'user.create');
+
+  const target = await requireUser(actor.context, userId, executor);
+
+  if (target.role === 'superadmin') {
+    throw new ValidationError('Суперадмин не заселяется: у него нет дома');
+  }
+
+  const [existing] = await listResidencies(actor.context, { userId: target.id }, executor);
+  if (existing !== undefined) {
+    return existing;
+  }
+
+  if (target.houseId === null) {
+    throw new ValidationError('У учётной записи нет дома: заселять некуда');
+  }
+
+  const houseId = target.houseId;
+
+  return executor.transaction((tx) => openResidency(actor, target.id, houseId, tx));
 }
 
 /**
@@ -303,6 +351,23 @@ export async function changeAccountRole(
       },
       tx,
     );
+
+    /*
+     * Админ и жилец живут в доме, и проживание у них обязано быть (P9-3).
+     * Есть — остаётся как есть, даже если админа назначили на другой дом:
+     * переезд человека — отдельное решение, а не следствие смены роли.
+     * Нет — заводится в доме роли: у нового админа это его дом, у бывшего
+     * админа, ставшего жильцом, — дом, которым он управлял.
+     */
+    const residencyHouseId = role === 'admin' ? nextHouseId : target.houseId;
+
+    if (role !== 'superadmin' && residencyHouseId !== null) {
+      const [existing] = await listResidencies(actor.context, { userId: target.id }, tx);
+
+      if (existing === undefined) {
+        await openResidency(actor, target.id, residencyHouseId, tx);
+      }
+    }
 
     return updated ?? target;
   });

@@ -342,6 +342,41 @@ describe('смена роли', () => {
     });
   });
 
+  it('перевод жильца в админы оставляет его проживание как есть', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '1124');
+
+      await changeAccountRole(fixture.superadmin, fixture.own.userId, 'admin', fixture.houseB, tx);
+
+      const residencies = await tx
+        .select()
+        .from(schema.residencies)
+        .where(eq(schema.residencies.userId, fixture.own.userId));
+
+      // Назначили на другой дом — живёт по-прежнему в своём: переезд не следствие роли (P9-3).
+      expect(residencies).toHaveLength(1);
+      expect(residencies[0]?.houseId).toBe(fixture.houseA);
+    });
+  });
+
+  it('админу без проживания при смене роли заводится проживание в его доме', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '1125');
+      const adminUserId = fixture.admin.context.userId;
+
+      await changeAccountRole(fixture.superadmin, adminUserId, 'resident', null, tx);
+
+      const residencies = await tx
+        .select()
+        .from(schema.residencies)
+        .where(eq(schema.residencies.userId, adminUserId));
+
+      expect(residencies).toHaveLength(1);
+      expect(residencies[0]?.houseId).toBe(fixture.houseA);
+      expect(residencies[0]?.status).toBe('created');
+    });
+  });
+
   it('при переводе в жильцы дом обнуляется', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '1122');

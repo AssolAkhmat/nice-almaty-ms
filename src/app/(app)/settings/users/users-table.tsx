@@ -11,7 +11,12 @@ import { Pagination } from '@/components/ui/pagination';
 import { Table, type TableColumn } from '@/components/ui/table';
 import { parseInstant } from '@/lib/time';
 
-import { allowPasswordResetAction, archiveAccountAction, type AccountActionState } from './actions';
+import {
+  allowPasswordResetAction,
+  archiveAccountAction,
+  openResidencyAction,
+  type AccountActionState,
+} from './actions';
 
 export interface AccountRow {
   id: string;
@@ -23,6 +28,8 @@ export interface AccountRow {
   isSelf: boolean;
   canAllowReset: boolean;
   canArchive: boolean;
+  /** Админ без проживания, заведённый до P9-3: ему нечем назначить место. */
+  canOpenResidency: boolean;
 }
 
 const INITIAL: AccountActionState = {};
@@ -52,6 +59,10 @@ export function UsersTable({ rows }: { rows: readonly AccountRow[] }) {
   );
   const [archiveState, archiveAction, isArchivePending] = useActionState(
     archiveAccountAction,
+    INITIAL,
+  );
+  const [residencyState, residencyAction, isResidencyPending] = useActionState(
+    openResidencyAction,
     INITIAL,
   );
 
@@ -115,6 +126,21 @@ export function UsersTable({ rows }: { rows: readonly AccountRow[] }) {
             </form>
           ) : null}
 
+          {row.canOpenResidency ? (
+            <form action={residencyAction}>
+              <input name="userId" type="hidden" value={row.id} />
+              <Button
+                data-testid={`open-residency-${row.phone}`}
+                disabled={isResidencyPending}
+                size="sm"
+                type="submit"
+                variant="secondary"
+              >
+                {t('users.actions.openResidency')}
+              </Button>
+            </form>
+          ) : null}
+
           {row.canArchive && row.status === 'active' && !row.isSelf ? (
             <Button
               data-testid={`archive-${row.phone}`}
@@ -152,6 +178,16 @@ export function UsersTable({ rows }: { rows: readonly AccountRow[] }) {
       {archiveState.error !== undefined ? (
         <p className="text-danger text-[13px]" role="alert">
           {t(archiveState.error)}
+        </p>
+      ) : null}
+      {residencyState.done !== undefined ? (
+        <p className="text-success text-[13px]" data-testid="residency-opened" role="status">
+          {t(residencyState.done)}
+        </p>
+      ) : null}
+      {residencyState.error !== undefined ? (
+        <p className="text-danger text-[13px]" role="alert">
+          {t(residencyState.error)}
         </p>
       ) : null}
 

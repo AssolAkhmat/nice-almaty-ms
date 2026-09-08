@@ -2,6 +2,7 @@ import { getTranslations } from 'next-intl/server';
 import { redirect } from 'next/navigation';
 
 import { listHouses } from '@/db/repositories/houses';
+import { listResidencies } from '@/db/repositories/residencies';
 import { can } from '@/lib/authz';
 import { getCurrentSession } from '@/lib/session';
 import { listAccounts } from '@/services/users';
@@ -24,12 +25,20 @@ export default async function UsersPage() {
   const t = await getTranslations('users');
   const { context } = session;
 
-  const [accounts, houses] = await Promise.all([
+  const [accounts, houses, residencies] = await Promise.all([
     listAccounts({ context }),
     listHouses(context, {}),
+    listResidencies(context, {}),
   ]);
 
   const houseNames = new Map(houses.map((house) => [house.id, house.name]));
+  const withResidency = new Set(residencies.map((residency) => residency.userId));
+  /*
+   * Проживание заводится вместе с учётной записью (P9-3); кнопка нужна
+   * только записям старше этого правила — админам без проживания, которым
+   * иначе не назначить место. Право то же, что на создание учётной записи.
+   */
+  const canOpenResidency = can(context, 'user.create');
 
   const rows: AccountRow[] = accounts.map((account) => ({
     id: account.id,
@@ -44,6 +53,11 @@ export default async function UsersPage() {
       userId: account.id,
     }),
     canArchive: can(context, 'user.archive', { houseId: account.houseId, userId: account.id }),
+    canOpenResidency:
+      canOpenResidency &&
+      account.role === 'admin' &&
+      account.status === 'active' &&
+      !withResidency.has(account.id),
   }));
 
   return (

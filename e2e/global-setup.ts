@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { inArray, like, or } from 'drizzle-orm';
+import { and, eq, inArray, like, notInArray, or, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 
@@ -217,6 +217,49 @@ async function removeLeftoverAccounts(db: ReturnType<typeof drizzle>): Promise<v
   await db.delete(schema.sessions).where(inArray(schema.sessions.userId, ids));
   await db.delete(schema.residentProfiles).where(inArray(schema.residentProfiles.userId, ids));
   await db.delete(schema.users).where(inArray(schema.users.id, ids));
+}
+
+/**
+ * Проживания сидовых админов, заведённые кнопкой «Завести проживание»
+ * (P9-3). Сид заводит админов без проживания — ровно так выглядят учётные
+ * записи, созданные до правила, — и приёмка проверяет на них саму кнопку.
+ * Заведённое ею проживание убирается перед следующим прогоном, иначе
+ * кнопка показалась бы один раз и больше никогда. Снимаются только
+ * проживания без места: за ними нет ни счетов, ни документов.
+ */
+async function removeOpenedAdminResidencies(db: ReturnType<typeof drizzle>): Promise<void> {
+  const admins = await db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(
+      inArray(
+        schema.users.phone,
+        Object.values(E2E_ACCOUNTS).filter((phone) => phone !== SUPERADMIN_PHONE),
+      ),
+    );
+
+  if (admins.length === 0) {
+    return;
+  }
+
+  const ids = admins.map((row) => row.id);
+  const placed = (
+    await db
+      .select({ residencyId: schema.bedAssignments.residencyId })
+      .from(schema.bedAssignments)
+      .innerJoin(schema.residencies, eq(schema.residencies.id, schema.bedAssignments.residencyId))
+      .where(inArray(schema.residencies.userId, ids))
+  ).map((row) => row.residencyId);
+
+  await db
+    .delete(schema.residencies)
+    .where(
+      and(
+        inArray(schema.residencies.userId, ids),
+        eq(schema.residencies.status, 'created'),
+        placed.length === 0 ? sql`true` : notInArray(schema.residencies.id, placed),
+      ),
+    );
 }
 
 /**
@@ -630,6 +673,7 @@ export default async function globalSetup(): Promise<void> {
     await resetPhaseSixJobs(db);
     await removeSeededResidents(db);
     await removeLeftoverAccounts(db);
+    await removeOpenedAdminResidencies(db);
     await removeProbeSettings(db);
     await removeLeftoverEligibilityGroups(db);
     await removeLeftoverAreas(db);

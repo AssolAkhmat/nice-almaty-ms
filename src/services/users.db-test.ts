@@ -6,13 +6,18 @@ import { afterAll, describe, expect, it } from 'vitest';
 import * as schema from '@/db/schema';
 import { testDatabaseUrl } from '@/db/testing/database-url';
 import { listAuditEntries } from '@/db/repositories/audit-log';
-import { ForbiddenError, NotFoundError, UnauthorizedError } from '@/lib/errors';
+import { ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from '@/lib/errors';
 import { hashPassword } from '@/lib/password';
 import { minusMilliseconds, now, plusMilliseconds } from '@/lib/time';
 
 import { AUDIT_ACTIONS } from './audit';
 import { signIn } from './auth';
-import { allowPasswordReset, createAccount, PASSWORD_RESET_TTL_MS } from './users';
+import {
+  allowPasswordReset,
+  createAccount,
+  openResidencyForAccount,
+  PASSWORD_RESET_TTL_MS,
+} from './users';
 
 import type { AccessContext } from '@/db/access';
 import type { Database, Transaction } from '@/db/client';
@@ -146,7 +151,7 @@ describe('создание аккаунта жильца (§1.2 п.1)', () => {
     });
   });
 
-  it('аккаунт админа проживания не заводит: он не заселяется', async () => {
+  it('аккаунт админа заводит проживание в его доме: админ тоже жилец (D11, P9-3)', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '100012');
 
@@ -161,7 +166,97 @@ describe('создание аккаунта жильца (§1.2 п.1)', () => {
         .from(schema.residencies)
         .where(eq(schema.residencies.userId, created.user.id));
 
+      expect(residencies).toHaveLength(1);
+      expect(residencies[0]?.houseId).toBe(fixture.houseA);
+      expect(residencies[0]?.status).toBe('created');
+      // Дом админа остаётся и в учётной записи: им он управляет.
+      expect(created.user.houseId).toBe(fixture.houseA);
+    });
+  });
+
+  it('аккаунт суперадмина проживания не заводит: дома у него нет', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '100013');
+
+      const created = await createAccount(
+        { context: fixture.superadmin },
+        { phone: `+77054100013`, role: 'superadmin' },
+        tx,
+      );
+
+      const residencies = await tx
+        .select()
+        .from(schema.residencies)
+        .where(eq(schema.residencies.userId, created.user.id));
+
       expect(residencies).toHaveLength(0);
+    });
+  });
+});
+
+describe('проживание для учётной записи, заведённой до P9-3', () => {
+  it('админу без проживания заводится проживание в его доме и попадает в журнал', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '100020');
+
+      const residency = await openResidencyForAccount(
+        { context: fixture.superadmin },
+        fixture.adminBId,
+        tx,
+      );
+
+      expect(residency.userId).toBe(fixture.adminBId);
+      expect(residency.status).toBe('created');
+      expect(residency.contractNumber).not.toBeNull();
+
+      const entries = await listAuditEntries(fixture.superadmin, { entityId: residency.id }, tx);
+      expect(entries.map((entry) => entry.action)).toContain(AUDIT_ACTIONS.residencyCreated);
+    });
+  });
+
+  it('повторный вызов ничего не заводит: проживание одно', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '100021');
+
+      const first = await openResidencyForAccount(
+        { context: fixture.superadmin },
+        fixture.adminBId,
+        tx,
+      );
+      const second = await openResidencyForAccount(
+        { context: fixture.superadmin },
+        fixture.adminBId,
+        tx,
+      );
+
+      expect(second.id).toBe(first.id);
+
+      const residencies = await tx
+        .select()
+        .from(schema.residencies)
+        .where(eq(schema.residencies.userId, fixture.adminBId));
+
+      expect(residencies).toHaveLength(1);
+    });
+  });
+
+  it('суперадмину проживание не заводится', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '100022');
+
+      await expect(
+        openResidencyForAccount({ context: fixture.superadmin }, fixture.superadmin.userId, tx),
+      ).rejects.toThrow(ValidationError);
+    });
+  });
+
+  it('админ проживания не заводит даже себе', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '100023');
+
+      await expect(
+        openResidencyForAccount({ context: fixture.adminA }, fixture.adminA.userId, tx),
+      ).rejects.toThrow(ForbiddenError);
     });
   });
 });
