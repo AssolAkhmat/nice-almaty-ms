@@ -187,19 +187,26 @@ export async function houseLayout(
     }
   }
 
-  return areas.map((area) => ({
-    area,
-    beds: beds
-      .filter((bed) => bed.areaId === area.id)
-      .map((bed) => ({
-        bedId: bed.id,
-        label: bed.label,
-        tier: bed.tier,
-        number: bed.number,
-        defaultPrice: bed.defaultPrice,
-        occupiedBy: occupancy.get(bed.id) ?? null,
-      })),
-  }));
+  /*
+   * Только жилые комнаты: места бывают лишь в них, а общая зона на схеме
+   * «занято 0 из 0» ничего не сообщает и только удлиняет список (T9.9).
+   * Зоны с чек-листами живут в настройке дома и в ротациях.
+   */
+  return areas
+    .filter((area) => area.type === 'living')
+    .map((area) => ({
+      area,
+      beds: beds
+        .filter((bed) => bed.areaId === area.id)
+        .map((bed) => ({
+          bedId: bed.id,
+          label: bed.label,
+          tier: bed.tier,
+          number: bed.number,
+          defaultPrice: bed.defaultPrice,
+          occupiedBy: occupancy.get(bed.id) ?? null,
+        })),
+    }));
 }
 
 /** Место жильца: для него самого — единственная видимая часть схемы. */

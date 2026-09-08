@@ -91,6 +91,11 @@ async function seed(tx: Transaction, suffix: string) {
     })
     .returning();
 
+  // Общая зона: мест в ней не бывает, и на схеме дома ей не место (T9.9).
+  await tx
+    .insert(schema.areas)
+    .values({ houseId: houseA?.id ?? '', name: 'Кухня', type: 'common' });
+
   const [foreignRoom] = await tx
     .insert(schema.areas)
     .values({ houseId: houseB?.id ?? '', name: 'Комната 1', type: 'living' })
@@ -343,7 +348,9 @@ describe('схема дома', () => {
 
       const layout = await houseLayout(fixture.admin, fixture.houseA, { executor: tx });
 
+      // Одна комната: кухня из фикстуры на схему не попадает — мест в ней не бывает.
       expect(layout).toHaveLength(1);
+      expect(layout[0]?.area.name).toBe('Комната 1');
       expect(layout[0]?.beds).toHaveLength(2);
 
       const occupied = layout[0]?.beds.find((bed) => bed.bedId === fixture.lowerBed);
