@@ -3,7 +3,7 @@
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 
-import { AppError } from '@/lib/errors';
+import { actionErrorKey } from '@/lib/action-failure';
 import { getCurrentSession } from '@/lib/session';
 import { buildContract, markKeysIssued, signContract } from '@/services/contracts';
 
@@ -39,7 +39,7 @@ function text(formData: FormData, name: string): string {
 }
 
 function failure(error: unknown): ContractActionState {
-  return { error: error instanceof AppError ? error.message : 'contract.errors.unknown' };
+  return { error: actionErrorKey(error, 'contract.errors.unknown') };
 }
 
 export async function buildContractAction(

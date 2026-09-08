@@ -2,7 +2,7 @@
 
 import { headers } from 'next/headers';
 
-import { AppError } from '@/lib/errors';
+import { actionErrorKey } from '@/lib/action-failure';
 import { getCurrentSession } from '@/lib/session';
 import { parseInstant, tryParseBusinessDate } from '@/lib/time';
 import { approveAbsence, rejectAbsence, submitAbsence } from '@/services/absences';
@@ -41,7 +41,7 @@ function text(formData: FormData, name: string): string {
 }
 
 function failure(error: unknown): AbsenceActionState {
-  return { error: error instanceof AppError ? error.message : 'absences.errors.unknown' };
+  return { error: actionErrorKey(error, 'absences.errors.unknown') };
 }
 
 /** Время возвращения приходит из `datetime-local` — без зоны, читается по Алматы. */

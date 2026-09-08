@@ -3,7 +3,7 @@
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 
-import { AppError } from '@/lib/errors';
+import { actionErrorKey } from '@/lib/action-failure';
 import { getCurrentSession } from '@/lib/session';
 import { tryParseBusinessDate } from '@/lib/time';
 import { assignBedToResidency } from '@/services/beds';
@@ -66,7 +66,7 @@ export async function assignBedAction(
     });
   } catch (error) {
     return {
-      error: error instanceof AppError ? error.message : 'beds.errors.unknown',
+      error: actionErrorKey(error, 'beds.errors.unknown'),
     };
   }
 

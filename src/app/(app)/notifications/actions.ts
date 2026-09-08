@@ -1,6 +1,6 @@
 'use server';
 
-import { AppError } from '@/lib/errors';
+import { actionErrorKey } from '@/lib/action-failure';
 import { getCurrentSession } from '@/lib/session';
 import { listInbox, markRead } from '@/services/notifications';
 
@@ -16,7 +16,7 @@ export interface NotificationActionState {
 }
 
 function failure(error: unknown): NotificationActionState {
-  return { error: error instanceof AppError ? error.message : 'notifications.errors.unknown' };
+  return { error: actionErrorKey(error, 'notifications.errors.unknown') };
 }
 
 export async function markReadAction(

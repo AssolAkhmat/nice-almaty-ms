@@ -2,7 +2,7 @@
 
 import { headers } from 'next/headers';
 
-import { AppError } from '@/lib/errors';
+import { actionErrorKey } from '@/lib/action-failure';
 import { getCurrentSession } from '@/lib/session';
 import { parseInstant, tryParseBusinessDate } from '@/lib/time';
 import {
@@ -60,7 +60,7 @@ function list(formData: FormData, name: string): string[] {
 }
 
 function failure(error: unknown): CalendarActionState {
-  return { error: error instanceof AppError ? error.message : 'rotationCalendar.errors.unknown' };
+  return { error: actionErrorKey(error, 'rotationCalendar.errors.unknown') };
 }
 
 export async function moveOccurrenceAction(

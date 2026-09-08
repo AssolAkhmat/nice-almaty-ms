@@ -3,6 +3,7 @@
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 
+import { actionErrorKey } from '@/lib/action-failure';
 import { AppError, ConflictError, ValidationError } from '@/lib/errors';
 import { getCurrentSession } from '@/lib/session';
 import { createDamage, reverseDamage } from '@/services/damages';
@@ -50,7 +51,7 @@ function failure(error: unknown): DamageActionState {
     return { error: `damages.errors.${error.code}` };
   }
 
-  return { error: 'damages.errors.unknown' };
+  return { error: actionErrorKey(error, 'damages.errors.unknown') };
 }
 
 /** Списание касается депозитов, поэтому обновляется и экран депозита. */

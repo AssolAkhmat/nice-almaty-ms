@@ -3,7 +3,7 @@
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 
-import { AppError } from '@/lib/errors';
+import { actionErrorKey } from '@/lib/action-failure';
 import { getCurrentSession } from '@/lib/session';
 import {
   archiveHouseArea,
@@ -46,7 +46,7 @@ function text(formData: FormData, name: string): string {
 }
 
 function failure(error: unknown): HouseSetupActionState {
-  return { error: error instanceof AppError ? error.message : 'houseSetup.errors.unknown' };
+  return { error: actionErrorKey(error, 'houseSetup.errors.unknown') };
 }
 
 function refresh(): void {

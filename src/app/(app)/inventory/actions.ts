@@ -3,7 +3,7 @@
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 
-import { AppError } from '@/lib/errors';
+import { actionErrorKey } from '@/lib/action-failure';
 import { getCurrentSession } from '@/lib/session';
 import { consumeItem, receiveItem, transferItem } from '@/services/inventory';
 import { closeInventoryAudit, saveAuditFact, startAudit } from '@/services/inventory-audit';
@@ -45,7 +45,7 @@ function text(formData: FormData, name: string): string {
 }
 
 function failure(error: unknown): InventoryActionState {
-  return { error: error instanceof AppError ? error.message : 'inventory.errors.unknown' };
+  return { error: actionErrorKey(error, 'inventory.errors.unknown') };
 }
 
 function refresh(): void {

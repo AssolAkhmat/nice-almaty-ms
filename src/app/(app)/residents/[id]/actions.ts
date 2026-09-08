@@ -3,7 +3,7 @@
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 
-import { AppError } from '@/lib/errors';
+import { actionErrorKey } from '@/lib/action-failure';
 import { getCurrentSession } from '@/lib/session';
 import { tryParseBusinessDate } from '@/lib/time';
 import {
@@ -73,7 +73,7 @@ export async function changeRoleAction(
     );
   } catch (error) {
     return {
-      error: error instanceof AppError ? error.message : 'residents.errors.unknown',
+      error: actionErrorKey(error, 'residents.errors.unknown'),
     };
   }
 
@@ -83,7 +83,7 @@ export async function changeRoleAction(
 }
 
 function terminationFailure(error: unknown): TerminationActionState {
-  return { error: error instanceof AppError ? error.message : 'terminations.errors.unknown' };
+  return { error: actionErrorKey(error, 'terminations.errors.unknown') };
 }
 
 /**

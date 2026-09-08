@@ -3,7 +3,7 @@
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 
-import { AppError } from '@/lib/errors';
+import { actionErrorKey } from '@/lib/action-failure';
 import { getCurrentSession } from '@/lib/session';
 import { tryParseBusinessDate } from '@/lib/time';
 import { reviewDocument, submitDocument } from '@/services/documents';
@@ -42,7 +42,7 @@ function text(formData: FormData, name: string): string {
 
 function failure(error: unknown): DocumentActionState {
   // Коды ошибок сервисного слоя — это ключи перевода, а не готовый текст.
-  return { error: error instanceof AppError ? error.message : 'documents.errors.unknown' };
+  return { error: actionErrorKey(error, 'documents.errors.unknown') };
 }
 
 export async function submitDocumentAction(

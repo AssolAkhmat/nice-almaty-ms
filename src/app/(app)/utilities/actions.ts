@@ -3,6 +3,7 @@
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 
+import { actionErrorKey } from '@/lib/action-failure';
 import { AppError, ConflictError, ValidationError } from '@/lib/errors';
 import { getCurrentSession } from '@/lib/session';
 import { tryParseBusinessDate } from '@/lib/time';
@@ -51,7 +52,7 @@ function failure(error: unknown): UtilityActionState {
     return { error: `utilities.errors.${error.code}` };
   }
 
-  return { error: 'utilities.errors.unknown' };
+  return { error: actionErrorKey(error, 'utilities.errors.unknown') };
 }
 
 /** Доли уходят в счета, поэтому обновляется и раздел счетов. */

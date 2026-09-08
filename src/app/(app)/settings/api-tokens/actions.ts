@@ -3,7 +3,7 @@
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 
-import { AppError } from '@/lib/errors';
+import { actionErrorKey } from '@/lib/action-failure';
 import { getCurrentSession } from '@/lib/session';
 import { issueApiToken, revokeToken } from '@/services/api-tokens';
 
@@ -44,7 +44,7 @@ function text(formData: FormData, name: string): string {
 }
 
 function failure(error: unknown): TokenActionState {
-  return { error: error instanceof AppError ? error.message : 'apiTokens.errors.unknown' };
+  return { error: actionErrorKey(error, 'apiTokens.errors.unknown') };
 }
 
 export async function issueTokenAction(

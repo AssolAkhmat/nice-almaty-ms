@@ -3,6 +3,7 @@
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 
+import { actionErrorKey } from '@/lib/action-failure';
 import { AppError } from '@/lib/errors';
 import { getCurrentSession } from '@/lib/session';
 import { subscribeToPush, unsubscribeFromPush } from '@/services/notifications';
@@ -54,7 +55,7 @@ export async function subscribePushAction(formData: FormData): Promise<PushActio
     return { done: 'notifications.push.enabled' };
   } catch (error) {
     return {
-      error: error instanceof AppError ? error.message : 'notifications.errors.subscription',
+      error: actionErrorKey(error, 'notifications.errors.subscription'),
     };
   }
 }
@@ -79,7 +80,7 @@ export async function unsubscribePushAction(formData: FormData): Promise<PushAct
     return { done: 'notifications.push.disabled' };
   } catch (error) {
     return {
-      error: error instanceof AppError ? error.message : 'notifications.errors.subscription',
+      error: actionErrorKey(error, 'notifications.errors.subscription'),
     };
   }
 }

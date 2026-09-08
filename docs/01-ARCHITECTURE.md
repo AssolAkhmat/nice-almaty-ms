@@ -211,7 +211,10 @@ Business API — это обязательство владельца, а не �
 
 Адаптер `PdfRenderer`, драйвер `chromium`:
 - Docker: системный `chromium` + `puppeteer-core`;
-- Vercel: `@sparticuz/chromium` + `puppeteer-core`.
+- Vercel: `@sparticuz/chromium` + `puppeteer-core`. Пакет в зависимостях (P9-2),
+  объявлен внешним для сборщика, архивы браузера из `bin/` включены в функцию
+  явно через `outputFileTracingIncludes`; в standalone-вывод для Docker
+  не трассируется. Проверка на живом — `GET /api/health?pdf=1`.
 
 Вход: HTML-шаблон договора из БД (`contract_templates.body_html`) с токенами вида
 `{{resident.full_name}}`, подставленные значения, PNG подписи (data URL).
@@ -220,4 +223,6 @@ Business API — это обязательство владельца, а не �
 ## Наблюдаемость
 
 `pino` в JSON, `request_id` в каждой записи. Ошибки серверных экшенов не показывают
-пользователю стек — только код ошибки и `request_id`. `/api/health` проверяет БД и хранилище.
+пользователю стек — только код ошибки и `request_id`; сбой, не являющийся
+`AppError`, уходит в журнал целиком через `actionErrorKey` (`src/lib/action-failure.ts`,
+инцидент I12). `/api/health` проверяет БД и хранилище, с `?pdf=1` — и печать.

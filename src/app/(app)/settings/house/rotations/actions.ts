@@ -2,7 +2,7 @@
 
 import { headers } from 'next/headers';
 
-import { AppError } from '@/lib/errors';
+import { actionErrorKey } from '@/lib/action-failure';
 import { getCurrentSession } from '@/lib/session';
 import { generateGeneralCleaning, setCancelRegularOnGeneral } from '@/services/general-cleaning';
 import { archiveRow, saveRow } from '@/services/rotation-rows';
@@ -71,7 +71,7 @@ function number(formData: FormData, name: string): number {
 }
 
 function failure(error: unknown): RotationSetupActionState {
-  return { error: error instanceof AppError ? error.message : 'rotationSetup.errors.unknown' };
+  return { error: actionErrorKey(error, 'rotationSetup.errors.unknown') };
 }
 
 /*
