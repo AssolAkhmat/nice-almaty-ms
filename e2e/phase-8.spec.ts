@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 
-import { E2E_ACCOUNTS } from './global-setup';
+import { E2E_ACCOUNTS, E2E_PASSWORD } from './global-setup';
 import { login } from './support/login';
-import { unique } from './support/onboarding';
+import { createResident, RESIDENT_PASSWORD, signInAs, unique } from './support/onboarding';
 
 /**
  * Приёмка фазы 8 (docs/tasks/PHASE-8.md).
@@ -198,5 +198,80 @@ test.describe('версии шаблона договора', () => {
     await page.getByTestId('template-body').fill(text);
     await page.getByTestId('template-save').click();
     await expect(page.getByRole('status')).toBeVisible();
+  });
+});
+
+/**
+ * Сквозная проверка фазы: тип, заведённый суперадмином, доходит до жильца.
+ *
+ * Дом у каждой ширины свой — жилец заводится в нём, как в приёмках прошлых фаз;
+ * сам тип документа общий на сеть, поэтому код у каждой ширины свой.
+ */
+const HOUSES: Readonly<Record<string, string>> = {
+  'mobile-375': 'Дом 9',
+  'tablet-768': 'Дом 10',
+  'desktop-1440': 'Дом 11',
+};
+
+test.describe('приёмка фазы 8', () => {
+  test('заведённый тип документа виден жильцу, а счёт — с нулевым остатком', async ({
+    page,
+  }, testInfo) => {
+    const suffix = unique(testInfo.project.name.replace(/[^a-z0-9]/gi, '').toLowerCase()).replace(
+      /-/g,
+      '_',
+    );
+    const typeCode = `probe_doc_${suffix}`;
+    const accountCode = `probe_acc_${suffix}`;
+    const typeName = `Справка приёмки ${suffix}`;
+
+    await login(page);
+
+    // 1. Тип документа: заводится в настройках сети.
+    await page.goto('/settings/document-types');
+    await page.getByTestId('new-type-code').fill(typeCode);
+    await page.getByTestId('new-type-name-ru').fill(typeName);
+    await page.locator('#new-name-kk').fill(typeName);
+    await page.locator('#new-name-en').fill(typeName);
+    await page.getByTestId('create-type-submit').click();
+    await expect(page.getByText(typeCode).filter({ visible: true }).first()).toBeVisible();
+
+    // 2. Счёт: заводится там же и сразу показывает нулевой остаток.
+    await page.goto('/settings/accounts');
+    await page.getByTestId('new-account-code').fill(accountCode);
+    await page.getByTestId('new-account-name').fill(`Касса приёмки ${suffix}`);
+    await page.getByTestId('new-account-type').selectOption('cash');
+    await page.getByTestId('create-account-submit').click();
+
+    const accountRow = page
+      .getByRole('row', { name: new RegExp(accountCode) })
+      .filter({ visible: true })
+      .first();
+    const accountCard = page.getByText(accountCode).filter({ visible: true }).first();
+    await expect(accountCard).toBeVisible();
+    if ((await accountRow.count()) > 0) {
+      await expect(accountRow).toContainText('0');
+    }
+
+    // 3. Жилец видит новый тип среди своих документов.
+    // Помощник сам входит суперадмином, а /login при живой сессии уводит на дэшборд:
+    // перед ним сессию надо закрыть.
+    await page.context().clearCookies();
+    const resident = await createResident(page, HOUSES[testInfo.project.name] ?? 'Дом 1');
+    await signInAs(page, resident, RESIDENT_PASSWORD);
+    await page.goto('/documents');
+
+    await expect(page.locator('main')).toContainText(typeName);
+
+    // 4. Уборка: тип уходит в архив, чтобы не копиться на экране заселения.
+    // Вход через signInAs: у жильца открыта своя сессия, и /login просто увёл бы на дэшборд.
+    await signInAs(page, E2E_ACCOUNTS.superadmin, E2E_PASSWORD);
+    await page.goto('/settings/document-types');
+    await page.getByTestId(`archive-${typeCode}`).filter({ visible: true }).first().click();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: /Архив|Мұрағат|Archive/i })
+      .click();
+    await expect(page.getByTestId(`archive-${typeCode}`)).toHaveCount(0);
   });
 });
