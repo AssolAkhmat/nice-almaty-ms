@@ -87,6 +87,8 @@ export const AUDIT_ACTIONS = {
   fineCancelled: 'fine.cancelled',
   discountApproved: 'discount.approved',
   ratingRuleSaved: 'rating_rule.saved',
+  documentTypeSaved: 'document_type.saved',
+  documentTypeArchived: 'document_type.archived',
   inventoryItemCreated: 'inventory_item.created',
   inventoryItemUpdated: 'inventory_item.updated',
   inventoryMoved: 'inventory_item.moved',

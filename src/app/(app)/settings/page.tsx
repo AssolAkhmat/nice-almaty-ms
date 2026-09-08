@@ -68,6 +68,17 @@ export default async function SettingsPage() {
         </Card>
       ) : null}
 
+      {can(session.context, 'settings.org.read') ? (
+        <Card>
+          <CardTitle>
+            <AppLink className="text-primary hover:underline" href="/settings/document-types">
+              {t('documentTypes.title')}
+            </AppLink>
+          </CardTitle>
+          <p className="text-text-muted mt-1 text-[13px]">{t('documentTypes.subtitle')}</p>
+        </Card>
+      ) : null}
+
       {can(session.context, 'rating.rules') ? (
         <Card>
           <CardTitle>

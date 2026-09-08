@@ -31,6 +31,7 @@
       "residency": "Residency",
       "resident_profile": "Resident profile",
       "document": "Document",
+      "document_type": "Document type",
       "file": "File",
       "invoice": "Invoice",
       "ledger_entry": "Ledger entry",
@@ -480,6 +481,70 @@
       "unauthorized": "Sign-in required",
       "unknown": "The action could not be completed",
       "upload": "The file could not be uploaded"
+    }
+  },
+  "documentTypes": {
+    "title": "Document types",
+    "subtitle": "What a resident must upload and how long it stays valid",
+    "empty": "No document types",
+    "columns": {
+      "name": "Name",
+      "code": "Code",
+      "validity": "Validity",
+      "issueDate": "From issue date",
+      "required": "Required",
+      "order": "Order",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "fields": {
+      "nameRu": "Name (русский)",
+      "nameKk": "Name (қазақша)",
+      "nameEn": "Name (English)",
+      "requiresIssueDate": "Count validity from the issue date",
+      "isRequired": "Required for move-in"
+    },
+    "values": {
+      "forever": "No expiry",
+      "months": "{count} mo.",
+      "yes": "Yes",
+      "no": "No"
+    },
+    "statuses": {
+      "active": "Active",
+      "archived": "Archived"
+    },
+    "actions": {
+      "edit": "Edit",
+      "archive": "Archive"
+    },
+    "create": {
+      "title": "New document type",
+      "submit": "Create",
+      "codeHint": "Lowercase latin: the code goes into the storage path and never changes",
+      "validityHint": "Empty means the document never expires"
+    },
+    "edit": {
+      "title": "Type “{name}”",
+      "submit": "Save"
+    },
+    "archiveConfirm": {
+      "title": "Archive type “{name}”?",
+      "description": "The type disappears from the move-in list. Uploaded documents stay: nothing is deleted."
+    },
+    "done": {
+      "saved": "Document type saved",
+      "archived": "Document type archived"
+    },
+    "errors": {
+      "codeInvalid": "Code: lowercase latin, digits and underscore, at least two characters",
+      "codeTaken": "A type with this code already exists",
+      "nameRequired": "The name is required in all three locales",
+      "validityInvalid": "Validity is 1 to 120 months, or empty",
+      "forbidden": "Only a superadmin edits document types",
+      "not_found": "Document type not found",
+      "unauthorized": "Session expired, sign in again",
+      "validation_error": "Check the fields you filled in"
     }
   },
   "contract": {

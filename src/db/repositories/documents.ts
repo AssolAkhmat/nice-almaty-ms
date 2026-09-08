@@ -110,6 +110,25 @@ export type DocumentInput = Omit<
   'orgId' | 'status' | 'reviewedBy' | 'reviewedAt'
 >;
 
+/**
+ * Правка типа документа. Код сюда не приходит: он записан в путях уже
+ * загруженных файлов, и менять его нельзя (T8.2).
+ */
+export async function updateDocumentType(
+  context: AccessContext,
+  documentTypeId: string,
+  patch: Partial<Omit<NewDocumentType, 'id' | 'orgId' | 'code'>>,
+  executor: Executor = getDb(),
+): Promise<DocumentType | null> {
+  const [type] = await executor
+    .update(documentTypes)
+    .set({ ...patch, updatedAt: now() })
+    .where(and(typeScope(context), eq(documentTypes.id, documentTypeId)))
+    .returning();
+
+  return type ?? null;
+}
+
 export async function createDocument(
   context: AccessContext,
   input: DocumentInput,
