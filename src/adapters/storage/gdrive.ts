@@ -419,6 +419,14 @@ export function createGdriveStorage(config: GdriveConfig): StorageProvider {
      * Resumable upload session: клиент шлёт байты прямо в Drive, минуя
      * приложение. Ради этого вся загрузка и сделана двухшаговой (D4) —
      * лимит тела запроса на Vercel меньше, чем фотография с телефона.
+     *
+     * Сессия привязана к `Origin` страницы, которая пришлёт байты: сервер
+     * загрузки Google отдаёт CORS-заголовки на `PUT` по адресу сессии только
+     * тому origin, который был назван при её открытии. Сессия, открытая
+     * сервером без `Origin`, из браузера не заполняется вовсе — браузер
+     * прячет ответ без `Access-Control-Allow-Origin` за `Failed to fetch`
+     * (инцидент I11; требование записано в документации Cloud Storage,
+     * общий сервер загрузки у обоих API).
      */
     async createUploadTarget(key: string, meta: UploadMeta): Promise<UploadTarget> {
       const { directories, name } = splitKey(key);
@@ -430,6 +438,7 @@ export function createGdriveStorage(config: GdriveConfig): StorageProvider {
           'content-type': 'application/json; charset=UTF-8',
           'x-upload-content-type': meta.mime,
           'x-upload-content-length': String(meta.sizeBytes),
+          ...(meta.origin !== undefined && meta.origin !== '' ? { origin: meta.origin } : {}),
         },
         body: JSON.stringify({ name, parents: [parentId], mimeType: meta.mime }),
       });

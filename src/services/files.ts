@@ -54,6 +54,8 @@ export interface UploadSessionInput {
   mime: string;
   sizeBytes: number;
   originalName: string;
+  /** Origin страницы, из которой пойдут байты; пусто — их пришлёт сервер. */
+  origin?: string | undefined;
 }
 
 export interface UploadSessionResult {
@@ -162,7 +164,11 @@ export async function createUploadSession(
   );
 
   const target = await storage
-    .createUploadTarget(path, { mime: input.mime, sizeBytes: input.sizeBytes })
+    .createUploadTarget(path, {
+      mime: input.mime,
+      sizeBytes: input.sizeBytes,
+      origin: input.origin,
+    })
     .catch(async (error: unknown) => {
       // Сессия без цели загрузки бесполезна: пусть она будет явно негодной,
       // а не вечно ожидающей байтов, которые некуда прислать.
@@ -193,6 +199,8 @@ export interface RotationPhotoInput {
   mime: string;
   sizeBytes: number;
   originalName: string;
+  /** Origin страницы, из которой пойдут байты; пусто — их пришлёт сервер. */
+  origin?: string | undefined;
 }
 
 /** Назначение файла-фотографии уборки: из него собирается путь хранения. */
@@ -266,7 +274,11 @@ export async function createRotationPhotoSession(
   );
 
   const target = await storage
-    .createUploadTarget(path, { mime: input.mime, sizeBytes: input.sizeBytes })
+    .createUploadTarget(path, {
+      mime: input.mime,
+      sizeBytes: input.sizeBytes,
+      origin: input.origin,
+    })
     .catch(async (error: unknown) => {
       await updateFile(actor.context, file.id, { status: 'failed' }, executor);
       throw error;
@@ -297,6 +309,8 @@ export interface HouseUploadInput {
   mime: string;
   sizeBytes: number;
   originalName: string;
+  /** Origin страницы, из которой пойдут байты; пусто — их пришлёт сервер. */
+  origin?: string | undefined;
 }
 
 /** Назначения файлов дома. Перечень закрыт: путь хранения из него собирается. */
@@ -362,7 +376,11 @@ export async function createHouseUploadSession(
   );
 
   const target = await storage
-    .createUploadTarget(path, { mime: input.mime, sizeBytes: input.sizeBytes })
+    .createUploadTarget(path, {
+      mime: input.mime,
+      sizeBytes: input.sizeBytes,
+      origin: input.origin,
+    })
     .catch(async (error: unknown) => {
       await updateFile(actor.context, file.id, { status: 'failed' }, executor);
       throw error;

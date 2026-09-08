@@ -58,6 +58,14 @@ export const POST = apiRoute(async (request, { requestId }) => {
 
   const body = parsed.data;
 
+  /*
+   * Откуда пойдут байты. Браузер ставит `Origin` на каждый POST сам, и по нему
+   * хранилище привязывает сессию прямой загрузки: без этого ответ Drive на
+   * `PUT` из браузера не несёт CORS-заголовков (инцидент I11). У бота
+   * заголовка нет — он и шлёт байты не из браузера.
+   */
+  const origin = request.headers.get('origin') ?? undefined;
+
   async function openSession() {
     if ('residency_id' in body) {
       return createUploadSession(actor, {
@@ -66,6 +74,7 @@ export const POST = apiRoute(async (request, { requestId }) => {
         mime: body.mime,
         sizeBytes: body.size_bytes,
         originalName: body.original_name,
+        origin,
       });
     }
 
@@ -75,6 +84,7 @@ export const POST = apiRoute(async (request, { requestId }) => {
         mime: body.mime,
         sizeBytes: body.size_bytes,
         originalName: body.original_name,
+        origin,
       });
     }
 
@@ -84,6 +94,7 @@ export const POST = apiRoute(async (request, { requestId }) => {
       mime: body.mime,
       sizeBytes: body.size_bytes,
       originalName: body.original_name,
+      origin,
     });
   }
 

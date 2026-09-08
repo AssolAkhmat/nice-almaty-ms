@@ -363,6 +363,32 @@ describe('прямая загрузка', () => {
     expect(session?.headers['x-upload-content-length']).toBe('1024');
   });
 
+  it('сессия открывается с Origin браузера: без него Drive не отдаёт CORS-заголовки на PUT', async () => {
+    const drive = fakeDrive();
+    const storage = storageOf(drive);
+
+    await storage.createUploadTarget(KEY, {
+      mime: 'image/jpeg',
+      sizeBytes: 1024,
+      origin: 'https://nice.example',
+    });
+
+    const session = drive.calls.find((call) => call.url.includes('uploadType=resumable'));
+
+    expect(session?.headers.origin).toBe('https://nice.example');
+  });
+
+  it('без известного Origin сессия открывается без него: байты пришлёт сам сервер', async () => {
+    const drive = fakeDrive();
+    const storage = storageOf(drive);
+
+    await storage.createUploadTarget(KEY, { mime: 'image/jpeg', sizeBytes: 1024 });
+
+    const session = drive.calls.find((call) => call.url.includes('uploadType=resumable'));
+
+    expect(session?.headers).not.toHaveProperty('origin');
+  });
+
   it('публичных ссылок драйвер не выдаёт никогда', async () => {
     const drive = fakeDrive();
     const storage = storageOf(drive);

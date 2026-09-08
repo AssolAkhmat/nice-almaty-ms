@@ -14,7 +14,7 @@ import { MAX_UPLOAD_BYTES } from '@/domain/files';
 import { hashSessionToken, SESSION_COOKIE_NAME } from '@/lib/session-token';
 
 import type * as StorageModule from '@/adapters/storage';
-import type { StorageProvider } from '@/adapters/storage';
+import type { StorageProvider, UploadMeta } from '@/adapters/storage';
 import type * as DbClientModule from '@/db/client';
 import type { Database, Transaction } from '@/db/client';
 
@@ -272,6 +272,39 @@ describe('POST /api/v1/files/upload-session', () => {
       expect(body.upload.method).toBe('PUT');
       expect(body.upload.url).toBe(`/api/v1/files/${body.file_id}/blob`);
       expect(body.max_bytes).toBe(MAX_UPLOAD_BYTES);
+    });
+  });
+
+  it('Origin браузера уходит в хранилище: сессия Drive привязывается к нему', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '4016');
+      const local = currentStorage;
+      if (local === null) {
+        throw new Error('хранилище теста не поднято');
+      }
+
+      const seen: UploadMeta[] = [];
+      currentStorage = {
+        ...local,
+        createUploadTarget: (key, meta) => {
+          seen.push(meta);
+
+          return local.createUploadTarget(key, meta);
+        },
+      };
+
+      const response = await postUploadSession(
+        authorized(fixture.a.token, {
+          method: 'POST',
+          body: sessionBody(fixture.a.residencyId),
+          headers: { origin: 'https://nice.example' },
+        }),
+      );
+
+      expect(response.status).toBe(201);
+      expect(seen).toEqual([
+        { mime: 'image/jpeg', sizeBytes: 4096, origin: 'https://nice.example' },
+      ]);
     });
   });
 
