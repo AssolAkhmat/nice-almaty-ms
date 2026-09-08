@@ -1,9 +1,9 @@
 import { getTranslations } from 'next-intl/server';
 import { redirect } from 'next/navigation';
 
-import { requireArea, requireBed } from '@/db/repositories/areas';
-import { findOpenAssignment, listResidencies } from '@/db/repositories/residencies';
+import { listResidencies } from '@/db/repositories/residencies';
 import { getCurrentSession } from '@/lib/session';
+import { myPlacement } from '@/services/beds';
 import { listOwnPushSubscriptions, pushKeyForBrowser } from '@/services/notifications';
 import { readProfile } from '@/services/resident-profiles';
 
@@ -15,6 +15,12 @@ export const dynamic = 'force-dynamic';
 /**
  * «Мой профиль» (docs/04-MODULES/01-onboarding.md).
  * Комната и место — только чтение: их назначает админ.
+ *
+ * Место читается через своё проживание, а не через схему дома: у жильца
+ * в контексте дома нет (P2-5), и прямой запрос места отвечал ему «не найдено»,
+ * роняя весь экран, как только админ назначал место (инцидент I13). Проживание
+ * берётся своё, а не первое видимое: у админа и суперадмина видимость шире
+ * собственной, и первым попадалось бы чужое (та же ошибка, что в I6).
  */
 export default async function ProfilePage() {
   const session = await getCurrentSession();
@@ -29,15 +35,11 @@ export default async function ProfilePage() {
 
   const subscriptions = await listOwnPushSubscriptions(context);
 
-  const [residency] = await listResidencies(context, {});
-  const assignment = residency === undefined ? null : await findOpenAssignment(residency.id);
+  const [residency] = await listResidencies(context, { userId: session.user.id });
+  const own = residency === undefined ? null : await myPlacement({ context }, residency.id);
 
-  let placement: PlacementView = { room: null, bed: null };
-  if (assignment !== null) {
-    const bed = await requireBed(context, assignment.bedId);
-    const area = await requireArea(context, bed.areaId);
-    placement = { room: area.name, bed: bed.label };
-  }
+  const placement: PlacementView =
+    own === null ? { room: null, bed: null } : { room: own.area.name, bed: own.bed.label };
 
   const values: ProfileFormValues = {
     lastName: profile.lastName ?? '',
