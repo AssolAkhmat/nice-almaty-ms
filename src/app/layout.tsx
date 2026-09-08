@@ -24,6 +24,18 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: t('name'),
     description: t('description'),
+    /*
+     * Значок вкладки (T9.11): домик `#FEE274` на `#004AAD` по правилам
+     * дизайн-системы, без градиентов. SVG — основной, ICO — для браузеров
+     * без поддержки SVG в значках. Оба лежат в `public/` и пропущены
+     * middleware: браузер просит их и без сессии.
+     */
+    icons: {
+      icon: [
+        { url: '/favicon.svg', type: 'image/svg+xml' },
+        { url: '/favicon.ico', sizes: '48x48' },
+      ],
+    },
   };
 }
 

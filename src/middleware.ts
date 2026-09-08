@@ -51,6 +51,6 @@ export const config = {
    * входа: значок не ставился, worker не регистрировался (P6-29).
    */
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|offline.html|icons/).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|favicon.svg|manifest.webmanifest|sw.js|offline.html|icons/).*)',
   ],
 };
