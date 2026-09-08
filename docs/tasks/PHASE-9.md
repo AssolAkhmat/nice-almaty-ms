@@ -140,5 +140,11 @@
 - Коммит: `fix(app): экраны переживают пустую базу`
 
 ### T9.14 — Закрытие фазы
-- [ ] `docs/08-DECISIONS.md`, `PROGRESS.md`, `MAINTENANCE.md`
+- [x] `docs/08-DECISIONS.md`: P9-1 — P9-6, инциденты I11 — I16, `[ОТКРЫТО]`
+      по переезду проживания админа
+- [x] `PROGRESS.md` обновлён; `docs/tasks/MAINTENANCE.md`: два наблюдения фазы
+- [x] Модель ротаций для фазы 10 написана и ждёт владельца (`docs/tasks/PHASE-10.md`,
+      `docs/OWNER-NOTES.md`)
+- [x] Прогоны на закрытии: `pnpm verify`, `pnpm test:db`, `pnpm test:e2e`,
+      `pnpm test:e2e:empty`
 - Коммит: `docs: закрытие фазы 9`
