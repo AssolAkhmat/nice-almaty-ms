@@ -1,3 +1,5 @@
+import { sql } from 'drizzle-orm';
+
 import { lastContractNumber, updateResidency } from '@/db/repositories/residencies';
 import { nextContractNumber } from '@/domain/contract-number';
 import { todayInAlmaty, type BusinessDate } from '@/lib/time';
@@ -10,20 +12,32 @@ import type { Residency } from '@/db/schema';
  * Номер договора: присваивает система (T8.1, указание владельца).
  *
  * Год берётся по календарю Алматы, как все границы суток в системе.
- * Уникальность держит индекс `residencies_org_contract_number_unique`:
- * если два заселения уйдут в базу одновременно и получат один номер,
- * второе упадёт с ошибкой — это лучше двух договоров с одним номером.
  */
 function yearOf(today: BusinessDate): number {
   return Number(today.slice(0, 4));
 }
 
+/**
+ * Следующий свободный номер сети.
+ *
+ * Выдача блокируется на время транзакции: без этого два заселения, ушедшие
+ * в базу одновременно, читали максимум до того, как соседнее успевало записать
+ * своё, и выбирали один номер. Уникальный индекс превращал это в отказ
+ * на ровном месте — приёмки трёх ширин заводят жильцов параллельно, и
+ * заведение аккаунта падало без причины, видимой человеку.
+ *
+ * Блокировка советующая и живёт до конца транзакции: таблицу она не трогает,
+ * очередь короткая, а последовательность PostgreSQL дала бы дыры в нумерации
+ * при откате. Индекс остаётся последним рубежом.
+ */
 export async function nextNumberForOrg(
   orgId: string,
   executor: Executor,
   today: BusinessDate = todayInAlmaty(),
 ): Promise<string> {
   const year = yearOf(today);
+
+  await executor.execute(sql`select pg_advisory_xact_lock(hashtextextended(${orgId}, ${year}))`);
 
   return nextContractNumber(await lastContractNumber(orgId, year, executor), year);
 }
@@ -45,8 +59,14 @@ export async function ensureContractNumber(
     return residency.contractNumber;
   }
 
-  const number = await nextNumberForOrg(context.orgId, executor, today);
-  await updateResidency(context, residency.id, { contractNumber: number }, executor);
+  /*
+   * Транзакция здесь обязательна: блокировка выдачи живёт до её конца,
+   * и без неё номер успел бы уйти второму договору между выбором и записью.
+   */
+  return executor.transaction(async (tx) => {
+    const number = await nextNumberForOrg(context.orgId, tx, today);
+    await updateResidency(context, residency.id, { contractNumber: number }, tx);
 
-  return number;
+    return number;
+  });
 }
