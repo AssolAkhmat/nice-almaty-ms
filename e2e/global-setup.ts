@@ -220,6 +220,28 @@ async function removeLeftoverAccounts(db: ReturnType<typeof drizzle>): Promise<v
 }
 
 /**
+ * Типы документов и счета, заведённые приёмкой фазы 8. Интерфейс их не удаляет —
+ * там только архивация, — а копиться от прогона к прогону им нельзя: экраны
+ * настроек росли бы бесконечно, как это уже случилось со списком аккаунтов
+ * (I3, I5), и интеграционный тест скелета сети считал бы чужие строки.
+ */
+async function removeProbeSettings(db: ReturnType<typeof drizzle>): Promise<void> {
+  await db.delete(schema.documentTypes).where(like(schema.documentTypes.code, 'probe\\_%'));
+
+  const probeAccounts = await db
+    .select({ id: schema.accounts.id })
+    .from(schema.accounts)
+    .where(like(schema.accounts.code, 'probe\\_%'));
+
+  if (probeAccounts.length > 0) {
+    const ids = probeAccounts.map((row) => row.id);
+
+    await db.delete(schema.ledgerLines).where(inArray(schema.ledgerLines.accountId, ids));
+    await db.delete(schema.accounts).where(inArray(schema.accounts.id, ids));
+  }
+}
+
+/**
  * Группы допуска, заведённые прогоном. Интерфейс их не удаляет — в модуле 11
  * такого действия нет, — а копиться от запуска к запуску им нельзя: экран
  * настройки ротаций рос бы бесконечно, и приёмка однажды перестала бы
@@ -608,6 +630,7 @@ export default async function globalSetup(): Promise<void> {
     await resetPhaseSixJobs(db);
     await removeSeededResidents(db);
     await removeLeftoverAccounts(db);
+    await removeProbeSettings(db);
     await removeLeftoverEligibilityGroups(db);
     await removeLeftoverAreas(db);
     await removeAcceptanceHouseData(db);

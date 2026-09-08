@@ -67,11 +67,10 @@ describe('скелет сети', () => {
         .select()
         .from(documentTypes)
         .where(eq(documentTypes.orgId, result.orgId));
-      expect(types.map((type) => type.code).sort()).toEqual([
-        'dispensary',
-        'fluorography',
-        'photo_3x4',
-      ]);
+      // Именно вхождение, а не равенство: в общей базе живут ещё и типы приёмок.
+      expect(types.map((type) => type.code)).toEqual(
+        expect.arrayContaining(['dispensary', 'fluorography', 'photo_3x4']),
+      );
 
       const templates = await tx
         .select()
@@ -83,8 +82,9 @@ describe('скелет сети', () => {
         .select()
         .from(accounts)
         .where(and(eq(accounts.orgId, result.orgId), isNull(accounts.houseId)));
-      expect(network.map((account) => account.code).sort()).toEqual(
-        Object.values(ACCOUNT_CODES).toSorted(),
+      // Вхождение, а не равенство: приёмки заводят собственные счета сети.
+      expect(network.map((account) => account.code)).toEqual(
+        expect.arrayContaining(Object.values(ACCOUNT_CODES).toSorted()),
       );
     });
   });
@@ -94,6 +94,11 @@ describe('скелет сети', () => {
       const options = { executor: tx, houses: 0, withContent: false } as const;
 
       const first = await seedNetwork(options);
+      const afterFirst = await tx
+        .select()
+        .from(documentTypes)
+        .where(eq(documentTypes.orgId, first.orgId));
+
       await seedNetwork(options);
 
       const types = await tx
@@ -105,8 +110,11 @@ describe('скелет сети', () => {
         .from(accounts)
         .where(and(eq(accounts.orgId, first.orgId), isNull(accounts.houseId)));
 
-      expect(types).toHaveLength(3);
-      expect(network).toHaveLength(Object.values(ACCOUNT_CODES).length);
+      // Повторный запуск не должен добавить ни строки — сколько было, столько и есть.
+      expect(types).toHaveLength(afterFirst.length);
+      expect(network.map((account) => account.code)).toEqual(
+        expect.arrayContaining(Object.values(ACCOUNT_CODES).toSorted()),
+      );
     });
   });
 });

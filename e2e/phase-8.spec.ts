@@ -64,3 +64,51 @@ test.describe('типы документов', () => {
     await expect(page).toHaveURL(/\/settings$/);
   });
 });
+
+test.describe('план счетов', () => {
+  test('суперадмин заводит счёт, переименовывает и убирает в архив', async ({ page }, testInfo) => {
+    const code = `probe_${unique(testInfo.project.name.replace(/[^a-z0-9]/gi, '').toLowerCase()).replace(/-/g, '_')}`;
+
+    await login(page);
+    await page.goto('/settings/accounts');
+
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+
+    await page.getByTestId('new-account-code').fill(code);
+    await page.getByTestId('new-account-name').fill('Касса проверки');
+    await page.getByTestId('new-account-type').selectOption('cash');
+    await page.getByTestId('create-account-submit').click();
+
+    await expect(page.getByText(code).filter({ visible: true }).first()).toBeVisible();
+
+    await page.getByTestId(`rename-${code}`).filter({ visible: true }).first().click();
+    await page.locator('#rename-account-name').fill('Касса охраны');
+    await page.getByTestId('rename-account-submit').click();
+
+    await expect(page.getByText('Касса охраны').filter({ visible: true }).first()).toBeVisible();
+
+    await page.getByTestId(`archive-account-${code}`).filter({ visible: true }).first().click();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: /Архив|Мұрағат|Archive/i })
+      .click();
+
+    await expect(page.getByTestId(`rename-${code}`)).toHaveCount(0);
+  });
+
+  test('системный счёт сети в архив не убирается', async ({ page }) => {
+    await login(page);
+    await page.goto('/settings/accounts');
+
+    // Депозитный фонд заведён сидом как системный: кнопки архивации у него нет.
+    await expect(page.getByTestId('rename-deposit_fund').first()).toBeAttached();
+    await expect(page.getByTestId('archive-account-deposit_fund')).toHaveCount(0);
+  });
+
+  test('админ дома в план счетов не попадает', async ({ page }) => {
+    await login(page, E2E_ACCOUNTS.adminHouse1);
+    await page.goto('/settings/accounts');
+
+    await expect(page).toHaveURL(/\/settings$/);
+  });
+});

@@ -35,6 +35,7 @@
       "file": "File",
       "invoice": "Invoice",
       "ledger_entry": "Ledger entry",
+      "account": "Account",
       "damage": "Damage",
       "utility_period": "Utility period",
       "area_checklist": "Area checklist",
@@ -543,6 +544,68 @@
       "validityInvalid": "Validity is 1 to 120 months, or empty",
       "forbidden": "Only a superadmin edits document types",
       "not_found": "Document type not found",
+      "unauthorized": "Session expired, sign in again",
+      "validation_error": "Check the fields you filled in"
+    }
+  },
+  "chartOfAccounts": {
+    "title": "Chart of accounts",
+    "subtitle": "Network accounts and house funds with balances",
+    "empty": "No accounts",
+    "columns": {
+      "name": "Name",
+      "code": "Code",
+      "type": "Type",
+      "house": "House",
+      "balance": "Balance",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "types": {
+      "cash": "Cash",
+      "kaspi": "Kaspi",
+      "common_fund": "Common fund",
+      "deposit_fund": "Deposit fund",
+      "utility_fund": "Utility fund",
+      "house_fund": "House fund"
+    },
+    "values": {
+      "network": "Whole network"
+    },
+    "statuses": {
+      "active": "Active",
+      "system": "System",
+      "archived": "Archived"
+    },
+    "actions": {
+      "rename": "Rename",
+      "archive": "Archive"
+    },
+    "create": {
+      "title": "New account",
+      "submit": "Create",
+      "codeHint": "Lowercase latin: the code shows up in ledger entries and never changes"
+    },
+    "rename": {
+      "title": "Account “{name}”",
+      "submit": "Save"
+    },
+    "archiveConfirm": {
+      "title": "Archive account “{name}”?",
+      "description": "The account leaves the pickers. Its ledger entries stay: nothing is deleted."
+    },
+    "done": {
+      "saved": "Account saved",
+      "archived": "Account archived"
+    },
+    "errors": {
+      "codeInvalid": "Code: lowercase latin, digits and underscore, at least two characters",
+      "codeTaken": "An account with this code already exists",
+      "nameRequired": "The name is required",
+      "typeInvalid": "This account type is not created by hand",
+      "systemAccount": "A system account cannot be archived: typical entries rely on it",
+      "forbidden": "Only a superadmin edits the chart of accounts",
+      "not_found": "Account not found",
       "unauthorized": "Session expired, sign in again",
       "validation_error": "Check the fields you filled in"
     }

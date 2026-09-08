@@ -88,6 +88,8 @@ export const AUDIT_ACTIONS = {
   discountApproved: 'discount.approved',
   ratingRuleSaved: 'rating_rule.saved',
   documentTypeSaved: 'document_type.saved',
+  accountSaved: 'account.saved',
+  accountArchived: 'account.archived',
   documentTypeArchived: 'document_type.archived',
   inventoryItemCreated: 'inventory_item.created',
   inventoryItemUpdated: 'inventory_item.updated',
