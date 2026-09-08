@@ -257,7 +257,8 @@
     },
     "done": {
       "personalSaved": "Settings saved",
-      "networkSaved": "Network settings saved"
+      "networkSaved": "Network settings saved",
+      "phoneChanged": "Number changed. Sign in with the new number."
     },
     "errors": {
       "unauthorized": "Sign-in required",
@@ -266,7 +267,16 @@
       "validation_error": "Check the entered data",
       "conflict": "Data changed, try again",
       "rate_limited": "Too often, try later",
-      "internal": "Something went wrong"
+      "internal": "Something went wrong",
+      "wrongPassword": "Wrong current password",
+      "phoneTaken": "This number is already used by another account"
+    },
+    "phone": {
+      "title": "Phone number",
+      "hint": "This is your login: after the change, sign in with the new number. The password stays the same.",
+      "newPhone": "New number",
+      "currentPassword": "Current password",
+      "submit": "Change number"
     }
   },
   "users": {
@@ -293,7 +303,8 @@
     "actions": {
       "allowReset": "Allow reset",
       "archive": "Archive",
-      "openResidency": "Open residency"
+      "openResidency": "Open residency",
+      "changePhone": "Change phone"
     },
     "create": {
       "title": "Create account",
@@ -309,7 +320,8 @@
     "done": {
       "resetAllowed": "Reset allowed for 24 hours. One sign-in will pass with any password.",
       "archived": "Account archived",
-      "residencyOpened": "Residency opened: a bed can now be assigned"
+      "residencyOpened": "Residency opened: a bed can now be assigned",
+      "phoneChanged": "Number changed"
     },
     "errors": {
       "unauthorized": "Sign-in required",
@@ -319,6 +331,12 @@
       "conflict": "An account with this phone already exists",
       "rate_limited": "Too often, try later",
       "internal": "Something went wrong"
+    },
+    "changePhone": {
+      "title": "Change phone {phone}",
+      "description": "The new number becomes the account login. The password stays the same and active sessions continue.",
+      "newPhone": "New number",
+      "submit": "Change"
     }
   },
   "validation": {

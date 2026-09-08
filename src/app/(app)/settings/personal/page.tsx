@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { getCurrentSession } from '@/lib/session';
 
 import { PersonalForm } from './personal-form';
+import { PhoneForm } from './phone-form';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +27,13 @@ export default async function PersonalSettingsPage() {
 
       <Card>
         <PersonalForm locale={session.user.locale} theme={session.user.theme} />
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('settings.phone.title')}</CardTitle>
+        </CardHeader>
+        <PhoneForm phone={session.user.phone} />
       </Card>
 
       <Card>

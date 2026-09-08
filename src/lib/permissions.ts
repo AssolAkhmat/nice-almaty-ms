@@ -30,6 +30,7 @@ export const ACTIONS = [
   'user.moveAdmin',
   'user.archive',
   'user.allowPasswordReset',
+  'user.changePhone',
   'resident.revealSensitive',
   'file.upload',
   'file.read',
@@ -102,6 +103,7 @@ export const PERMISSIONS: PermissionMatrix = {
     'user.moveAdmin': 'org',
     'user.archive': 'org',
     'user.allowPasswordReset': 'org',
+    'user.changePhone': 'org',
     'resident.revealSensitive': 'org',
     'file.upload': 'org',
     'file.read': 'org',
@@ -165,6 +167,11 @@ export const PERMISSIONS: PermissionMatrix = {
     'user.moveAdmin': 'none',
     'user.archive': 'none',
     'user.allowPasswordReset': 'house',
+    /*
+     * Телефон — это логин. Свой меняет каждый (с действующим паролем), чужой —
+     * админ в своём доме и суперадмин: тот же круг, что выдаёт разрешение сброса (T9.7).
+     */
+    'user.changePhone': 'house',
     'resident.revealSensitive': 'house',
     'file.upload': 'house',
     'file.read': 'house',
@@ -250,6 +257,7 @@ export const PERMISSIONS: PermissionMatrix = {
     'user.moveAdmin': 'none',
     'user.archive': 'none',
     'user.allowPasswordReset': 'none',
+    'user.changePhone': 'self',
     /*
      * Свои ИИН и УДЛ жилец вправе увидеть: он их и вводил, а вечная маска
      * на собственных данных — дефект, а не защита. Раскрытие всё равно

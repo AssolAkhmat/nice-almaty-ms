@@ -6,7 +6,13 @@ import { afterAll, describe, expect, it } from 'vitest';
 import * as schema from '@/db/schema';
 import { testDatabaseUrl } from '@/db/testing/database-url';
 import { listAuditEntries } from '@/db/repositories/audit-log';
-import { ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from '@/lib/errors';
+import {
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+  UnauthorizedError,
+  ValidationError,
+} from '@/lib/errors';
 import { hashPassword } from '@/lib/password';
 import { minusMilliseconds, now, plusMilliseconds } from '@/lib/time';
 
@@ -14,6 +20,7 @@ import { AUDIT_ACTIONS } from './audit';
 import { signIn } from './auth';
 import {
   allowPasswordReset,
+  changeAccountPhone,
   createAccount,
   openResidencyForAccount,
   PASSWORD_RESET_TTL_MS,
@@ -411,6 +418,154 @@ describe('кто вправе выдавать разрешение', () => {
       await expect(
         allowPasswordReset({ context: fixture.superadmin }, stranger?.id ?? '', tx),
       ).rejects.toBeInstanceOf(NotFoundError);
+    });
+  });
+});
+
+describe('смена номера телефона (T9.7)', () => {
+  it('свой номер меняется с действующим паролем и попадает в журнал', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '100030');
+
+      const updated = await changeAccountPhone(
+        { context: fixture.adminA },
+        fixture.adminA.userId,
+        { phone: '+7 (705) 100-00-30', currentPassword: PASSWORD },
+        tx,
+      );
+
+      expect(updated.phone).toBe('+77051000030');
+
+      const entries = await listAuditEntries(
+        fixture.superadmin,
+        { entityId: fixture.adminA.userId },
+        tx,
+      );
+      const change = entries.find((entry) => entry.action === AUDIT_ACTIONS.userPhoneChanged);
+      expect(change?.before).toMatchObject({ phone: fixture.adminAPhone });
+      expect(change?.after).toMatchObject({ phone: '+77051000030' });
+    });
+  });
+
+  it('свой номер без пароля или с неверным не меняется', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '100031');
+
+      await expect(
+        changeAccountPhone(
+          { context: fixture.adminA },
+          fixture.adminA.userId,
+          { phone: '+77051000031' },
+          tx,
+        ),
+      ).rejects.toThrow(ValidationError);
+      await expect(
+        changeAccountPhone(
+          { context: fixture.adminA },
+          fixture.adminA.userId,
+          { phone: '+77051000031', currentPassword: 'не тот пароль' },
+          tx,
+        ),
+      ).rejects.toThrow(ValidationError);
+
+      const [user] = await tx
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, fixture.adminA.userId));
+      expect(user?.phone).toBe(fixture.adminAPhone);
+    });
+  });
+
+  it('суперадмин меняет чужой номер без пароля', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '100032');
+
+      const updated = await changeAccountPhone(
+        { context: fixture.superadmin },
+        fixture.adminBId,
+        { phone: '+77051000032' },
+        tx,
+      );
+
+      expect(updated.phone).toBe('+77051000032');
+    });
+  });
+
+  it('занятый номер не отдаётся', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '100033');
+
+      await expect(
+        changeAccountPhone(
+          { context: fixture.superadmin },
+          fixture.adminBId,
+          { phone: fixture.adminAPhone },
+          tx,
+        ),
+      ).rejects.toThrow(ConflictError);
+    });
+  });
+
+  it('админ меняет номер жильца своего дома — по дому проживания', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '100034');
+
+      const created = await createAccount(
+        { context: fixture.superadmin },
+        { phone: '+77054100034', role: 'resident', houseId: fixture.houseA },
+        tx,
+      );
+
+      const updated = await changeAccountPhone(
+        { context: fixture.adminA },
+        created.user.id,
+        { phone: '+77054100035' },
+        tx,
+      );
+
+      expect(updated.phone).toBe('+77054100035');
+    });
+  });
+
+  it('админ чужого дома не видит учётную запись — она неотличима от несуществующей', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '100036');
+
+      await expect(
+        changeAccountPhone(
+          { context: fixture.adminA },
+          fixture.adminBId,
+          { phone: '+77051000036' },
+          tx,
+        ),
+      ).rejects.toThrow(NotFoundError);
+    });
+  });
+
+  it('жилец чужой номер не меняет', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '100037');
+
+      const created = await createAccount(
+        { context: fixture.superadmin },
+        { phone: '+77054100037', role: 'resident', houseId: fixture.houseA },
+        tx,
+      );
+      const resident: AccessContext = {
+        orgId: fixture.orgId,
+        userId: created.user.id,
+        role: 'resident',
+        houseId: null,
+      };
+
+      await expect(
+        changeAccountPhone(
+          { context: resident },
+          fixture.adminA.userId,
+          { phone: '+77051000037' },
+          tx,
+        ),
+      ).rejects.toThrow(NotFoundError);
     });
   });
 });

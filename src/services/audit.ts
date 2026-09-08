@@ -22,6 +22,7 @@ export const AUDIT_ACTIONS = {
   userArchived: 'user.archived',
   userRoleChanged: 'user.role_changed',
   userHouseChanged: 'user.house_changed',
+  userPhoneChanged: 'user.phone_changed',
   houseCreated: 'house.created',
   houseUpdated: 'house.updated',
   houseArchived: 'house.archived',

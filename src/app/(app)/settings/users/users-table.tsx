@@ -6,6 +6,7 @@ import { useActionState, useState } from 'react';
 import { Badge, StatusPill } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Field, Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Pagination } from '@/components/ui/pagination';
 import { Table, type TableColumn } from '@/components/ui/table';
@@ -14,6 +15,7 @@ import { parseInstant } from '@/lib/time';
 import {
   allowPasswordResetAction,
   archiveAccountAction,
+  changePhoneAction,
   openResidencyAction,
   type AccountActionState,
 } from './actions';
@@ -30,6 +32,8 @@ export interface AccountRow {
   canArchive: boolean;
   /** Админ без проживания, заведённый до P9-3: ему нечем назначить место. */
   canOpenResidency: boolean;
+  /** Чужой номер: суперадмину и админу своего дома (T9.7). */
+  canChangePhone: boolean;
 }
 
 const INITIAL: AccountActionState = {};
@@ -46,6 +50,7 @@ export function UsersTable({ rows }: { rows: readonly AccountRow[] }) {
   const t = useTranslations();
   const format = useFormatter();
   const [pendingArchive, setPendingArchive] = useState<AccountRow | null>(null);
+  const [pendingPhone, setPendingPhone] = useState<AccountRow | null>(null);
   const [page, setPage] = useState(1);
 
   const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
@@ -65,6 +70,7 @@ export function UsersTable({ rows }: { rows: readonly AccountRow[] }) {
     openResidencyAction,
     INITIAL,
   );
+  const [phoneState, phoneAction, isPhonePending] = useActionState(changePhoneAction, INITIAL);
 
   const columns: TableColumn<AccountRow>[] = [
     {
@@ -141,6 +147,19 @@ export function UsersTable({ rows }: { rows: readonly AccountRow[] }) {
             </form>
           ) : null}
 
+          {row.canChangePhone ? (
+            <Button
+              data-testid={`change-phone-${row.phone}`}
+              onClick={() => {
+                setPendingPhone(row);
+              }}
+              size="sm"
+              variant="secondary"
+            >
+              {t('users.actions.changePhone')}
+            </Button>
+          ) : null}
+
           {row.canArchive && row.status === 'active' && !row.isSelf ? (
             <Button
               data-testid={`archive-${row.phone}`}
@@ -190,6 +209,16 @@ export function UsersTable({ rows }: { rows: readonly AccountRow[] }) {
           {t(residencyState.error)}
         </p>
       ) : null}
+      {phoneState.done !== undefined ? (
+        <p className="text-success text-[13px]" data-testid="phone-changed" role="status">
+          {t(phoneState.done)}
+        </p>
+      ) : null}
+      {phoneState.error !== undefined ? (
+        <p className="text-danger text-[13px]" role="alert">
+          {t(phoneState.error)}
+        </p>
+      ) : null}
 
       <Table
         caption={t('users.title')}
@@ -230,6 +259,46 @@ export function UsersTable({ rows }: { rows: readonly AccountRow[] }) {
           </form>
         }
       />
+
+      <Modal
+        description={t('users.changePhone.description')}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingPhone(null);
+          }
+        }}
+        open={pendingPhone !== null}
+        title={t('users.changePhone.title', { phone: pendingPhone?.phone ?? '' })}
+      >
+        {pendingPhone !== null ? (
+          <form
+            action={(formData) => {
+              phoneAction(formData);
+              setPendingPhone(null);
+            }}
+            className="flex flex-col gap-4"
+            data-testid="change-phone-form"
+          >
+            <input name="userId" type="hidden" value={pendingPhone.id} />
+            <Field htmlFor="change-phone-value" label={t('users.changePhone.newPhone')}>
+              <Input
+                data-testid="change-phone-value"
+                defaultValue={pendingPhone.phone}
+                id="change-phone-value"
+                inputMode="tel"
+                name="phone"
+                required
+                type="tel"
+              />
+            </Field>
+            <div className="flex justify-end">
+              <Button data-testid="change-phone-submit" disabled={isPhonePending} type="submit">
+                {t('users.changePhone.submit')}
+              </Button>
+            </div>
+          </form>
+        ) : null}
+      </Modal>
     </div>
   );
 }

@@ -15,7 +15,7 @@ import { revokeAllUserSessions } from '@/db/repositories/sessions';
 import { normalizePhone } from '@/domain/phone';
 import { assertCan } from '@/lib/authz';
 import { ConflictError, ValidationError } from '@/lib/errors';
-import { generateTemporaryPassword, hashPassword } from '@/lib/password';
+import { generateTemporaryPassword, hashPassword, verifyPassword } from '@/lib/password';
 import { plusMilliseconds, now } from '@/lib/time';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
@@ -256,6 +256,75 @@ export async function openResidencyForAccount(
   const houseId = target.houseId;
 
   return executor.transaction((tx) => openResidency(actor, target.id, houseId, tx));
+}
+
+export interface ChangePhoneInput {
+  phone: string;
+  /** Обязателен, когда человек меняет собственный номер: это его логин. */
+  currentPassword?: string | undefined;
+}
+
+/**
+ * Смена номера телефона (T9.7). Номер — логин, поэтому свой меняется только
+ * с действующим паролем; чужой меняет админ своего дома или суперадмин —
+ * тот же круг, что выдаёт разрешение сброса пароля. Каждая смена в журнале:
+ * до 9 сентября 2026 экрана не было, и номер суперадмина правили в базе
+ * мимо `audit_log`. Сессии остаются: сменился логин, а не его владелец.
+ */
+export async function changeAccountPhone(
+  actor: UserActor,
+  userId: string,
+  input: ChangePhoneInput,
+  executor: Executor = getDb(),
+): Promise<User> {
+  const target = await requireUser(actor.context, userId, executor);
+
+  /*
+   * Дом жильца лежит в проживании, а не в учётной записи (D11): для проверки
+   * «свой дом» он берётся оттуда. Видимость проживаний уже отфильтрована
+   * по контексту, чужой дом сюда не попадёт.
+   */
+  const [residency] = await listResidencies(actor.context, { userId: target.id }, executor);
+  const houseId = target.houseId ?? residency?.houseId ?? null;
+
+  assertCan(actor.context, 'user.changePhone', { houseId, userId: target.id });
+
+  if (target.id === actor.context.userId) {
+    const password = input.currentPassword ?? '';
+
+    if (password === '' || !(await verifyPassword(target.passwordHash, password))) {
+      throw new ValidationError('Неверный текущий пароль', { field: 'currentPassword' });
+    }
+  }
+
+  const phone = normalizePhone(input.phone);
+
+  if (phone === target.phone) {
+    return target;
+  }
+
+  const taken = await findUserByPhone(phone, executor);
+  if (taken !== null && taken.id !== target.id) {
+    throw new ConflictError('Учётная запись с таким телефоном уже есть');
+  }
+
+  return executor.transaction(async (tx) => {
+    const updated = await updateUser(actor.context, target.id, { phone }, tx);
+
+    await recordAudit(
+      auditActor(actor),
+      {
+        action: AUDIT_ACTIONS.userPhoneChanged,
+        entityType: 'user',
+        entityId: target.id,
+        before: { phone: target.phone },
+        after: { phone },
+      },
+      tx,
+    );
+
+    return updated ?? { ...target, phone };
+  });
 }
 
 /**

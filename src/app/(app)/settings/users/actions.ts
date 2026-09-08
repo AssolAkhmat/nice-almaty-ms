@@ -8,6 +8,7 @@ import { getCurrentSession } from '@/lib/session';
 import {
   allowPasswordReset,
   archiveAccount,
+  changeAccountPhone,
   createAccount,
   openResidencyForAccount,
 } from '@/services/users';
@@ -138,6 +139,28 @@ export async function openResidencyAction(
     revalidatePath('/residents');
 
     return { done: 'users.done.residencyOpened' };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+/** Чужой номер меняют суперадмин и админ своего дома; пароль не спрашивается (T9.7). */
+export async function changePhoneAction(
+  _previous: AccountActionState,
+  formData: FormData,
+): Promise<AccountActionState> {
+  const actor = await actorFromSession();
+  if (actor === null) {
+    return { error: 'users.errors.unauthorized' };
+  }
+
+  try {
+    await changeAccountPhone(actor, textField(formData, 'userId'), {
+      phone: textField(formData, 'phone'),
+    });
+    revalidatePath('/settings/users');
+
+    return { done: 'users.done.phoneChanged' };
   } catch (error) {
     return toErrorState(error);
   }

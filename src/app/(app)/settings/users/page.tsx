@@ -33,6 +33,9 @@ export default async function UsersPage() {
 
   const houseNames = new Map(houses.map((house) => [house.id, house.name]));
   const withResidency = new Set(residencies.map((residency) => residency.userId));
+  const houseOfResident = new Map(
+    residencies.map((residency) => [residency.userId, residency.houseId]),
+  );
   /*
    * Проживание заводится вместе с учётной записью (P9-3); кнопка нужна
    * только записям старше этого правила — админам без проживания, которым
@@ -58,6 +61,18 @@ export default async function UsersPage() {
       account.role === 'admin' &&
       account.status === 'active' &&
       !withResidency.has(account.id),
+    /*
+     * Чужой номер меняют суперадмин и админ своего дома; свой — в личных
+     * настройках, с паролем. Дом жильца — в проживании, поэтому право
+     * проверяется по нему, как и в сервисе (T9.7).
+     */
+    canChangePhone:
+      account.id !== context.userId &&
+      account.status === 'active' &&
+      can(context, 'user.changePhone', {
+        houseId: account.houseId ?? houseOfResident.get(account.id) ?? null,
+        userId: account.id,
+      }),
   }));
 
   return (
