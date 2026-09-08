@@ -72,6 +72,12 @@ export const residencies = pgTable(
      * там же ключи и будут добавлены. Колонки заведены сразу, чтобы не менять
      * форму таблицы дважды.
      */
+    /**
+     * Версия шаблона, по которой собран договор (T8.5). Пусто, пока договор
+     * не собирали. Подпись и пересборка идут по ней, а не по действующему
+     * шаблону: подписанный документ не должен меняться задним числом.
+     */
+    contractTemplateId: uuid('contract_template_id'),
     contractFileId: uuid('contract_file_id'),
     signatureFileId: uuid('signature_file_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

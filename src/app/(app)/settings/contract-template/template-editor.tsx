@@ -15,11 +15,13 @@ export function TemplateEditor({
   name,
   bodyHtml,
   tokens,
+  version,
   canManage,
 }: {
   name: string;
   bodyHtml: string;
   tokens: readonly string[];
+  version: number;
   canManage: boolean;
 }) {
   const t = useTranslations();
@@ -75,6 +77,10 @@ export function TemplateEditor({
           ) : null}
         </div>
       ))}
+
+      <p className="text-text-muted text-[13px]" data-testid="template-version">
+        {t('contractTemplate.version', { version })}
+      </p>
 
       <Card>
         <CardHeader>

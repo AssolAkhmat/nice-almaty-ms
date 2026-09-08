@@ -113,15 +113,22 @@ test.describe('план счетов', () => {
   });
 });
 
+/**
+ * Шаблон договора один на всю сеть, и три ширины, правящие его одновременно,
+ * мешали бы друг другу — как задание рассылки в приёмке фазы 6 (P6-42).
+ * Экран, палитру и предпросмотр смотрят все три ширины: они ничего не меняют.
+ * Сохранение идёт на одной.
+ */
+const TEMPLATE_PROJECT = 'mobile-375';
+
 test.describe('шаблон договора', () => {
-  test('суперадмин вставляет токен, смотрит предпросмотр и сохраняет', async ({ page }) => {
+  test('суперадмин вставляет токен и смотрит предпросмотр', async ({ page }) => {
     await login(page);
     await page.goto('/settings/contract-template');
 
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 
     const body = page.getByTestId('template-body');
-    const before = await body.inputValue();
 
     // Токен встаёт туда, где курсор: приёмка ставит его в конец текста.
     await body.click();
@@ -134,18 +141,11 @@ test.describe('шаблон договора', () => {
     await expect(preview).toBeVisible();
     await expect(preview).toContainText('Алматы, ул. Абая, 1');
     await expect(preview).not.toContainText('{{');
-
-    await page.getByTestId('template-save').click();
-    await expect(page.getByRole('status')).toBeVisible();
-
-    // Возврат к исходному тексту: приёмка не оставляет за собой изменённый договор.
-    await page.reload();
-    await page.getByTestId('template-body').fill(before);
-    await page.getByTestId('template-save').click();
-    await expect(page.getByRole('status')).toBeVisible();
   });
 
-  test('неизвестный токен не сохраняется и назван по имени', async ({ page }) => {
+  test('неизвестный токен не сохраняется и назван по имени', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== TEMPLATE_PROJECT, 'шаблон в сети один');
+
     await login(page);
     await page.goto('/settings/contract-template');
 
@@ -169,5 +169,34 @@ test.describe('шаблон договора', () => {
     await page.goto('/settings/contract-template');
 
     await expect(page).toHaveURL(/\/settings$/);
+  });
+});
+
+test.describe('версии шаблона договора', () => {
+  test('правка заводит следующую версию', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== TEMPLATE_PROJECT, 'шаблон в сети один');
+
+    await login(page);
+    await page.goto('/settings/contract-template');
+
+    const version = page.getByTestId('template-version');
+    const before = Number(/(\d+)/.exec((await version.innerText()).trim())?.[1] ?? '0');
+    expect(before).toBeGreaterThan(0);
+
+    const body = page.getByTestId('template-body');
+    const text = await body.inputValue();
+
+    await body.fill(`${text}<p>{{today}}</p>`);
+    await page.getByTestId('template-save').click();
+    await expect(page.getByRole('status')).toBeVisible();
+
+    await page.reload();
+    const after = Number(/(\d+)/.exec((await version.innerText()).trim())?.[1] ?? '0');
+    expect(after).toBe(before + 1);
+
+    // Приёмка возвращает прежний текст — но уже следующей версией: прежние остаются в истории.
+    await page.getByTestId('template-body').fill(text);
+    await page.getByTestId('template-save').click();
+    await expect(page.getByRole('status')).toBeVisible();
   });
 });

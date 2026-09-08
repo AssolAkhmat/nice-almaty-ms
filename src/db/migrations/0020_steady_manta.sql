@@ -1,0 +1,1 @@
+ALTER TABLE "residencies" ADD COLUMN "contract_template_id" uuid;

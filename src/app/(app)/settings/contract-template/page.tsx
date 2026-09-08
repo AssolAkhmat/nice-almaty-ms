@@ -54,6 +54,7 @@ export default async function ContractTemplatePage() {
           canManage={can(context, 'settings.org.write')}
           name={template.name}
           tokens={CONTRACT_TOKENS}
+          version={template.version}
         />
       )}
     </section>

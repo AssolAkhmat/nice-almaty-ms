@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -184,6 +185,56 @@ describe('шаблон договора', () => {
       await expect(previewContractTemplate(fixture.admin, '<p>{{today}}</p>')).rejects.toThrow(
         ForbiddenError,
       );
+    });
+  });
+});
+
+/**
+ * Версионирование (T8.5). Договор, который уже собран, обязан остаться
+ * читаемым в том виде, в каком его подписывали: правка шаблона заводит
+ * новую версию, а прежние остаются на месте.
+ */
+describe('версии шаблона', () => {
+  it('правка заводит новую версию, а прежняя остаётся в истории', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '4101');
+
+      const before = await readContractTemplate(fixture.superadmin, tx);
+
+      const saved = await saveContractTemplate(
+        fixture.superadmin,
+        { name: 'Договор 2027', bodyHtml: '<p>{{house.name}}</p>' },
+        tx,
+      );
+
+      expect(saved.version).toBe(before.version + 1);
+      expect(saved.id).not.toBe(before.id);
+
+      const versions = await tx
+        .select()
+        .from(schema.contractTemplates)
+        .where(eq(schema.contractTemplates.orgId, fixture.orgId));
+
+      expect(versions).toHaveLength(2);
+      expect(versions.filter((row) => row.isActive)).toHaveLength(1);
+      expect(versions.find((row) => row.id === before.id)?.bodyHtml).toContain('contract_number');
+    });
+  });
+
+  it('читается всегда действующая версия', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '4102');
+
+      await saveContractTemplate(
+        fixture.superadmin,
+        { name: 'Договор 2027', bodyHtml: '<p>{{today}}</p>' },
+        tx,
+      );
+
+      const current = await readContractTemplate(fixture.superadmin, tx);
+
+      expect(current.version).toBe(2);
+      expect(current.bodyHtml).toBe('<p>{{today}}</p>');
     });
   });
 });

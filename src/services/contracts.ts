@@ -88,6 +88,38 @@ export async function activeTemplate(
 }
 
 /**
+ * Шаблон, по которому собран договор этого проживания (T8.5).
+ *
+ * Пусто у проживаний, чей договор собирали до версионирования, — им достаётся
+ * действующий шаблон. У остальных берётся именно их версия: подпись
+ * пересобирает документ, и он обязан остаться тем же, что человек прочитал.
+ */
+async function templateOfResidency(
+  residency: Residency,
+  executor: Executor,
+): Promise<ContractTemplate> {
+  if (residency.contractTemplateId !== null) {
+    const [stored] = await executor
+      .select()
+      .from(contractTemplates)
+      .where(eq(contractTemplates.id, residency.contractTemplateId))
+      .limit(1);
+
+    if (stored !== undefined) {
+      return stored;
+    }
+  }
+
+  const active = await activeTemplate(residency.orgId, executor);
+
+  if (active === null) {
+    throw new NotFoundError('Активный шаблон договора не задан');
+  }
+
+  return active;
+}
+
+/**
  * Значения токенов для конкретного проживания. ИИН расшифровывается тем же
  * действием, что и в профиле, поэтому раскрытие остаётся в журнале —
  * договор не должен быть лазейкой в обход этого правила.
@@ -247,7 +279,8 @@ export async function buildContract(
     const updated = await updateResidency(
       actor.context,
       residency.id,
-      { contractFileId: file.id },
+      // Версия запоминается вместе с файлом: подпись и пересборка пойдут по ней.
+      { contractFileId: file.id, contractTemplateId: template.id },
       tx,
     );
 
@@ -261,7 +294,12 @@ export async function buildContract(
         action: AUDIT_ACTIONS.contractGenerated,
         entityType: 'residency',
         entityId: residency.id,
-        after: { contractFileId: file.id, templateVersion: template.version, contractNumber },
+        after: {
+          contractFileId: file.id,
+          templateId: template.id,
+          templateVersion: template.version,
+          contractNumber,
+        },
       },
       tx,
     );
@@ -302,10 +340,7 @@ export async function signContract(
     throw new ValidationError('contracts.signatureMustBePng');
   }
 
-  const template = await activeTemplate(actor.context.orgId, executor);
-  if (template === null) {
-    throw new NotFoundError('Активный шаблон договора не задан');
-  }
+  const template = await templateOfResidency(residency, executor);
 
   const bytes = await storage.get(signature.path);
   if (bytes === null) {

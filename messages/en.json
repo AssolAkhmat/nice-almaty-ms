@@ -643,7 +643,8 @@
       "not_found": "No active contract template",
       "unauthorized": "Session expired, sign in again",
       "validation_error": "Check the fields you filled in"
-    }
+    },
+    "version": "Version {version}. Editing starts the next one; earlier versions stay, so contracts never change retroactively."
   },
   "contract": {
     "title": "Contract",

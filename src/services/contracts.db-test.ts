@@ -13,6 +13,7 @@ import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '@
 import { parseBusinessDate } from '@/lib/time';
 
 import { buildContract, markKeysIssued, signContract } from './contracts';
+import { saveContractTemplate } from './contract-templates';
 import { saveProfile } from './resident-profiles';
 
 import type { PdfRenderer } from '@/adapters/pdf';
@@ -185,6 +186,8 @@ async function seed(tx: Transaction, suffix: string) {
     userId: user?.id ?? '',
     resident: actor(context('resident', user?.id ?? '', null)),
     admin: adminActor,
+    // Правка шаблона — дело суперадмина: он понадобился проверке версий (T8.5).
+    superadmin: actor(context('superadmin', admin?.id ?? '', null)),
   };
 }
 
@@ -514,6 +517,53 @@ describe('ключи выданы', () => {
       await expect(
         markKeysIssued(fixture.resident, fixture.residencyId, { executor: tx }),
       ).rejects.toThrow(ForbiddenError);
+    });
+  });
+});
+
+/**
+ * Версия шаблона у договора (T8.5).
+ *
+ * Правка шаблона заводит новую версию, а уже собранный договор остаётся
+ * на своей: подписанный документ не должен измениться задним числом.
+ */
+describe('версия шаблона у договора', () => {
+  it('подпись пересобирает договор по той версии, по которой он собран', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6101');
+      const storage = freshStorage();
+      const build = fakePdf();
+
+      const built = await buildContract(fixture.admin, fixture.residencyId, {
+        executor: tx,
+        storage,
+        pdf: build.renderer,
+        today: TODAY,
+      });
+
+      expect(built.residency.contractTemplateId).not.toBeNull();
+      expect(build.printed[0] ?? '').toContain('Договор найма');
+
+      // Суперадмин правит шаблон: появляется вторая версия.
+      await saveContractTemplate(
+        fixture.superadmin,
+        { name: 'Договор найма 2027', bodyHtml: '<p>ВТОРАЯ ВЕРСИЯ {{house.name}}</p>' },
+        tx,
+      );
+
+      const sign = fakePdf();
+      const signatureId = await signatureFile(tx, storage, fixture);
+
+      await signContract(fixture.resident, fixture.residencyId, signatureId, {
+        executor: tx,
+        storage,
+        pdf: sign.renderer,
+        today: TODAY,
+      });
+
+      const signed = sign.printed[0] ?? '';
+      expect(signed).not.toContain('ВТОРАЯ ВЕРСИЯ');
+      expect(signed).toContain('Договор найма');
     });
   });
 });

@@ -74,13 +74,29 @@ export async function saveContractTemplate(
 
   const before = await readContractTemplate(actor, executor);
 
+  /*
+   * Правка не переписывает строку, а заводит следующую версию (T8.5).
+   * Договор, собранный по прежней, ссылается на неё и остаётся тем же
+   * документом: подписанное не меняется задним числом.
+   */
   return executor.transaction(async (tx) => {
-    const [updated] = await tx
+    await tx
       .update(contractTemplates)
-      .set({ name: input.name.trim(), bodyHtml: input.bodyHtml, updatedAt: now() })
+      .set({ isActive: false, updatedAt: now() })
       .where(
-        and(eq(contractTemplates.orgId, actor.context.orgId), eq(contractTemplates.id, before.id)),
-      )
+        and(eq(contractTemplates.orgId, actor.context.orgId), eq(contractTemplates.isActive, true)),
+      );
+
+    const [updated] = await tx
+      .insert(contractTemplates)
+      .values({
+        orgId: actor.context.orgId,
+        name: input.name.trim(),
+        version: before.version + 1,
+        bodyHtml: input.bodyHtml,
+        tokens: [],
+        isActive: true,
+      })
       .returning();
 
     if (updated === undefined) {
@@ -93,8 +109,8 @@ export async function saveContractTemplate(
         action: AUDIT_ACTIONS.contractTemplateSaved,
         entityType: 'contract_template',
         entityId: updated.id,
-        before: { name: before.name, bodyHtml: before.bodyHtml },
-        after: { name: updated.name, bodyHtml: updated.bodyHtml },
+        before: { version: before.version, name: before.name, bodyHtml: before.bodyHtml },
+        after: { version: updated.version, name: updated.name, bodyHtml: updated.bodyHtml },
       },
       tx,
     );
