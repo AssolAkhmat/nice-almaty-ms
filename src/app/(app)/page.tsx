@@ -144,6 +144,7 @@ export default async function DashboardPage({
 
     return (
       <section className="flex flex-col gap-6">
+        <h1>{t('title')}</h1>
         <TerminationNotice
           balance={view.balance}
           daysLeft={view.daysLeft}
@@ -155,8 +156,13 @@ export default async function DashboardPage({
     );
   }
 
+  /*
+   * Заголовок есть и здесь: дэшборд первого дня — тоже экран, а не заглушка,
+   * и приёмка на пустой базе ищет его на каждом экране (T9.13).
+   */
   return (
     <section className="flex flex-col gap-6">
+      <h1>{t('title')}</h1>
       <OnboardingWizard steps={onboarding.steps} />
     </section>
   );

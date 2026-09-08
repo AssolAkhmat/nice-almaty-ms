@@ -24,6 +24,7 @@
     "db:migrate": "node scripts/db-guard.mjs drizzle-kit migrate",
     "db:studio": "node scripts/db-guard.mjs drizzle-kit studio",
     "test:e2e": "playwright test",
+    "test:e2e:empty": "playwright test --config playwright.empty.config.ts",
     "worker": "tsx src/workers/index.ts",
     "test:db": "vitest run --config vitest.db.config.ts",
     "db:seed": "node scripts/db-guard.mjs tsx src/db/seed.cli.ts"

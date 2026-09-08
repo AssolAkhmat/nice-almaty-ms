@@ -4,6 +4,7 @@ out/
 coverage/
 playwright-report/
 test-results/
+test-results-empty/
 pnpm-lock.yaml
 src/db/migrations/
 

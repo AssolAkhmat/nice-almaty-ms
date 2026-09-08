@@ -994,8 +994,8 @@
     "account": "Account",
     "code": "Code",
     "balance": "Balance",
-    "noAccounts": "No accounts",
-    "noAccountsHint": "The chart of accounts is seeded at installation",
+    "noAccounts": "Chart of accounts is empty",
+    "noAccountsHint": "The network has no accounts: restore the skeleton with pnpm db:seed --skeleton or create the accounts in network settings. Until then there are no entries, reports or reconciliation.",
     "reconciliation": "Deposit fund reconciliation",
     "matches": "Matches",
     "mismatch": "Mismatch",
@@ -1057,7 +1057,8 @@
     "done": {
       "expense": "Expense recorded",
       "reversed": "Entry reversed"
-    }
+    },
+    "noAccountsLink": "Open the chart of accounts"
   },
   "damages": {
     "title": "Damage",

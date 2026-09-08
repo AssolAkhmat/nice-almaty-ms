@@ -152,6 +152,9 @@ jobs:
 
       - run: pnpm test:e2e
 
+      - name: Приёмка на пустой базе
+        run: pnpm test:e2e:empty
+
       - if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:

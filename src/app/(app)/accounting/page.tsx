@@ -1,8 +1,10 @@
 import { getTranslations } from 'next-intl/server';
 import { redirect } from 'next/navigation';
 
-import { listAccounts } from '@/db/repositories/accounts';
+import { AppLink } from '@/components/ui/app-link';
 import { EmptyState } from '@/components/ui/empty-state';
+import { listAccounts } from '@/db/repositories/accounts';
+import { ACCOUNT_CODES } from '@/db/schema';
 import { can } from '@/lib/authz';
 import { getCurrentSession } from '@/lib/session';
 import { addMonths, startOfMonth, todayInAlmaty, tryParseBusinessDate } from '@/lib/time';
@@ -96,7 +98,32 @@ export default async function AccountingPage({
   const taxRateBp = rateFromPercent(params.taxRate, 300);
   const acquiringRateBp = rateFromPercent(params.acquiringRate, 95);
 
-  const [balances, reconciliation, journal, accounts, tax] = await Promise.all([
+  /*
+   * План счетов читается первым: без депозитного фонда сверка и отчёты
+   * бросают «счёт не заведён», и экран падал серверной ошибкой — ровно так
+   * выглядела боевая база после инцидента I9. Пустой план — состояние,
+   * а не поломка: экран говорит, чем его заполнить (T9.13).
+   */
+  const accounts = await listAccounts(context);
+
+  if (!accounts.some((account) => account.code === ACCOUNT_CODES.depositFund)) {
+    return (
+      <section className="flex flex-col gap-6">
+        {header}
+        <EmptyState
+          action={
+            <AppLink className="text-primary hover:underline" href="/settings/accounts">
+              {t('noAccountsLink')}
+            </AppLink>
+          }
+          description={t('noAccountsHint')}
+          title={t('noAccounts')}
+        />
+      </section>
+    );
+  }
+
+  const [balances, reconciliation, journal, tax] = await Promise.all([
     trialBalance(actor, { from, to }),
     reconcileDepositFund(actor),
     readLedgerJournal(actor, {
@@ -104,7 +131,6 @@ export default async function AccountingPage({
       to,
       ...(params.source === undefined || params.source === '' ? {} : { sourceType: params.source }),
     }),
-    listAccounts(context),
     readTaxReport(actor, { from, to }, {}, { taxRateBp, acquiringRateBp }),
   ]);
 

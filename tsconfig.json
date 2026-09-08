@@ -39,6 +39,7 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "e2e/**/*.ts",
+    "e2e-empty/**/*.ts",
     "scripts/**/*.ts"
   ],
   "exclude": ["node_modules", ".next", "out", "coverage"]
