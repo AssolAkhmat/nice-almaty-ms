@@ -31,10 +31,15 @@ export function Modal({
   return (
     <DialogPrimitive.Root onOpenChange={onOpenChange} open={open}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 bg-black/40" />
+        {/*
+         * Слой выше нижней навигации (z-20): без него на телефоне вкладки
+         * перекрывали низ окна, и последний пункт меню «Ещё» уходил под них (T9.10).
+         * Тосты остаются выше (z-50): сообщение о результате видно и поверх окна.
+         */}
+        <DialogPrimitive.Overlay className="fixed inset-0 z-30 bg-black/40" />
         <DialogPrimitive.Content
           className={cn(
-            'fixed top-1/2 left-1/2 w-[calc(100vw-2rem)] max-w-[720px] -translate-x-1/2 -translate-y-1/2',
+            'fixed top-1/2 left-1/2 z-40 w-[calc(100vw-2rem)] max-w-[720px] -translate-x-1/2 -translate-y-1/2',
             'rounded-card border-border bg-bg max-h-[calc(100dvh-2rem)] overflow-y-auto border p-4 md:p-6',
             className,
           )}
