@@ -10,6 +10,7 @@ import {
   signInAs,
   unique,
 } from './support/onboarding';
+import { setRosterAndNorm } from './support/rotations';
 
 /**
  * Приёмка фазы 6 (docs/07-ROADMAP.md).
@@ -140,12 +141,13 @@ test.describe('приёмка фазы 6', () => {
     await form.getByTestId('row-name-new').fill(rowName);
     await form.getByTestId('row-weekday-new').selectOption(weekdayOf(today));
     await form.getByTestId('row-start-new').fill(today);
-    await form.locator('label').filter({ hasText: bed }).locator('input[type="number"]').fill('0');
-    await form.locator('label').filter({ hasText: zone }).locator('input[type="number"]').fill('0');
     await form.getByTestId('row-save-new').click();
 
     await expect(page.locator(`input[value="${rowName}"]`)).toBeVisible();
     await page.reload();
+
+    // Состав из одного места и норма из одной зоны — с даты старта (фаза 10).
+    await setRosterAndNorm(page, rowName, [bed], [zone]);
 
     await page.getByTestId('schedule-until').fill(today);
     await page.getByTestId('schedule-generate').click();
