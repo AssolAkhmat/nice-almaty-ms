@@ -69,6 +69,8 @@ export const AUDIT_ACTIONS = {
   eligibilityGroupSaved: 'eligibility_group.saved',
   areaEligibilitySet: 'area_eligibility.set',
   rotationRowSaved: 'rotation_row.saved',
+  rotationRosterSaved: 'rotation_roster.saved',
+  rotationNormSaved: 'rotation_norm.saved',
   rotationRowArchived: 'rotation_row.archived',
   rotationMoved: 'rotation.moved',
   rotationCancelled: 'rotation.cancelled',

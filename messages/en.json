@@ -1394,6 +1394,21 @@
       "tooManyDuties": "Zones need more people than the row has beds"
     }
   },
+  "rotationDaySetup": {
+    "errors": {
+      "effectiveBeforeStart": "A version cannot start before the row's first rotation",
+      "rosterEmpty": "A roster needs at least one bed",
+      "bedTwice": "The same bed is in the roster twice",
+      "bedOtherHouse": "The bed belongs to another house",
+      "roomRosterBeds": "A room row roster uses beds of that same room",
+      "normEmpty": "A day norm needs at least one zone",
+      "roomNormSingleZone": "A room row has one zone — the room itself",
+      "areaOtherHouse": "The zone belongs to another house",
+      "checklistArea": "The checklist belongs to another zone",
+      "zoneTwice": "The same zone is in the norm twice",
+      "peopleInvalid": "People per zone must be a whole number from one"
+    }
+  },
   "rotationSchedule": {
     "title": "Schedule",
     "until": "Generate until",

@@ -16,7 +16,11 @@ import {
   residentProfiles,
   rotationAssignments,
   rotationOccurrences,
+  rotationDayNormZones,
+  rotationDayNorms,
   rotationDebts,
+  rotationRowRosterSlots,
+  rotationRowRosters,
   rotationRowSlots,
   rotationRowZones,
   rotationRows,
@@ -660,6 +664,207 @@ export async function listRowSlots(
     .from(rotationRowSlots)
     .where(eq(rotationRowSlots.rowId, rowId))
     .orderBy(asc(rotationRowSlots.position), asc(rotationRowSlots.id));
+}
+
+/**
+ * Версии состава ряда и нормы дня (план фазы 10, §2.2, §2.3).
+ *
+ * Правка «с даты» не переписывает прошлое: она заводит версию, а прошлые
+ * недели остаются на прежней. Повторная правка той же даты заменяет
+ * содержимое версии — это одна и та же правка, а не вторая.
+ */
+export interface RosterVersionRecord {
+  id: string;
+  effectiveFrom: BusinessDate;
+  bedIds: string[];
+}
+
+export interface NormZoneRecord {
+  areaId: string;
+  checklistId: string;
+  people: number;
+}
+
+export interface NormVersionRecord {
+  id: string;
+  effectiveFrom: BusinessDate;
+  zones: NormZoneRecord[];
+}
+
+export async function listRowRosters(
+  context: AccessContext,
+  rowId: string,
+  executor: Executor = getDb(),
+): Promise<RosterVersionRecord[]> {
+  await requireRotationRow(context, rowId, executor);
+
+  const versions = await executor
+    .select()
+    .from(rotationRowRosters)
+    .where(eq(rotationRowRosters.rowId, rowId))
+    .orderBy(asc(rotationRowRosters.effectiveFrom), asc(rotationRowRosters.id));
+
+  if (versions.length === 0) {
+    return [];
+  }
+
+  const slots = await executor
+    .select()
+    .from(rotationRowRosterSlots)
+    .where(
+      inArray(
+        rotationRowRosterSlots.rosterId,
+        versions.map((version) => version.id),
+      ),
+    )
+    .orderBy(asc(rotationRowRosterSlots.position), asc(rotationRowRosterSlots.id));
+
+  return versions.map((version) => ({
+    id: version.id,
+    effectiveFrom: version.effectiveFrom as BusinessDate,
+    bedIds: slots.filter((slot) => slot.rosterId === version.id).map((slot) => slot.bedId),
+  }));
+}
+
+export async function replaceRowRoster(
+  context: AccessContext,
+  input: { rowId: string; effectiveFrom: BusinessDate; bedIds: readonly string[] },
+  executor: Executor = getDb(),
+): Promise<RosterVersionRecord> {
+  await requireRotationRow(context, input.rowId, executor);
+
+  const [existing] = await executor
+    .select()
+    .from(rotationRowRosters)
+    .where(
+      and(
+        eq(rotationRowRosters.rowId, input.rowId),
+        eq(rotationRowRosters.effectiveFrom, input.effectiveFrom),
+      ),
+    )
+    .limit(1);
+
+  let rosterId = existing?.id ?? '';
+
+  if (existing === undefined) {
+    const [created] = await executor
+      .insert(rotationRowRosters)
+      .values({ rowId: input.rowId, effectiveFrom: input.effectiveFrom })
+      .returning();
+
+    if (created === undefined) {
+      throw new Error('Версия состава ряда не создана');
+    }
+
+    rosterId = created.id;
+  } else {
+    await executor
+      .delete(rotationRowRosterSlots)
+      .where(eq(rotationRowRosterSlots.rosterId, rosterId));
+  }
+
+  if (input.bedIds.length > 0) {
+    await executor
+      .insert(rotationRowRosterSlots)
+      .values(input.bedIds.map((bedId, position) => ({ rosterId, position, bedId })));
+  }
+
+  return { id: rosterId, effectiveFrom: input.effectiveFrom, bedIds: [...input.bedIds] };
+}
+
+export async function listDayNorms(
+  context: AccessContext,
+  rowId: string,
+  executor: Executor = getDb(),
+): Promise<NormVersionRecord[]> {
+  await requireRotationRow(context, rowId, executor);
+
+  const versions = await executor
+    .select()
+    .from(rotationDayNorms)
+    .where(eq(rotationDayNorms.rowId, rowId))
+    .orderBy(asc(rotationDayNorms.effectiveFrom), asc(rotationDayNorms.id));
+
+  if (versions.length === 0) {
+    return [];
+  }
+
+  const zones = await executor
+    .select()
+    .from(rotationDayNormZones)
+    .where(
+      inArray(
+        rotationDayNormZones.normId,
+        versions.map((version) => version.id),
+      ),
+    )
+    .orderBy(asc(rotationDayNormZones.position), asc(rotationDayNormZones.id));
+
+  return versions.map((version) => ({
+    id: version.id,
+    effectiveFrom: version.effectiveFrom as BusinessDate,
+    zones: zones
+      .filter((zone) => zone.normId === version.id)
+      .map((zone) => ({
+        areaId: zone.areaId,
+        checklistId: zone.checklistId,
+        people: zone.people,
+      })),
+  }));
+}
+
+export async function replaceDayNorm(
+  context: AccessContext,
+  input: {
+    rowId: string;
+    effectiveFrom: BusinessDate;
+    zones: readonly NormZoneRecord[];
+  },
+  executor: Executor = getDb(),
+): Promise<NormVersionRecord> {
+  await requireRotationRow(context, input.rowId, executor);
+
+  const [existing] = await executor
+    .select()
+    .from(rotationDayNorms)
+    .where(
+      and(
+        eq(rotationDayNorms.rowId, input.rowId),
+        eq(rotationDayNorms.effectiveFrom, input.effectiveFrom),
+      ),
+    )
+    .limit(1);
+
+  let normId = existing?.id ?? '';
+
+  if (existing === undefined) {
+    const [created] = await executor
+      .insert(rotationDayNorms)
+      .values({ rowId: input.rowId, effectiveFrom: input.effectiveFrom })
+      .returning();
+
+    if (created === undefined) {
+      throw new Error('Версия нормы дня не создана');
+    }
+
+    normId = created.id;
+  } else {
+    await executor.delete(rotationDayNormZones).where(eq(rotationDayNormZones.normId, normId));
+  }
+
+  if (input.zones.length > 0) {
+    await executor.insert(rotationDayNormZones).values(
+      input.zones.map((zone, position) => ({
+        normId,
+        position,
+        areaId: zone.areaId,
+        checklistId: zone.checklistId,
+        people: zone.people,
+      })),
+    );
+  }
+
+  return { id: normId, effectiveFrom: input.effectiveFrom, zones: [...input.zones] };
 }
 
 export interface RowZoneInput {
