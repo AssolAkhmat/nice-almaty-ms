@@ -7,7 +7,7 @@ import * as schema from '@/db/schema';
 import { testDatabaseUrl } from '@/db/testing/database-url';
 import { startOfDayUtc, toAlmatyParts, type BusinessDate } from '@/lib/time';
 
-import { seedNetwork } from './seed';
+import { houseSlug, seedNetwork } from './seed';
 import { BEDS_PER_ROOM, FURNISHED_HOUSES, OCCUPANCY, ROOMS_PER_HOUSE } from './seed-content';
 
 import type { Database, Executor, Transaction } from './client';
@@ -53,6 +53,85 @@ async function runSeed(tx: Transaction) {
     executor: tx as unknown as Executor,
     passwordFor: (phone) => `пароль-${phone}`,
   });
+}
+
+/**
+ * Ряды дома вместе с версиями и занятиями. Сид идёт поверх живой базы
+ * и заведённые ряды не трогает, а на машине разработчика они могут быть
+ * прежней формы: проверяется сборка с чистого листа, внутри отката.
+ */
+async function removeRows(tx: Transaction, houseId: string): Promise<void> {
+  const occurrenceIds = (
+    await tx
+      .select({ id: schema.rotationOccurrences.id })
+      .from(schema.rotationOccurrences)
+      .where(eq(schema.rotationOccurrences.houseId, houseId))
+  ).map((row) => row.id);
+
+  if (occurrenceIds.length > 0) {
+    const assignmentIds = (
+      await tx
+        .select({ id: schema.rotationAssignments.id })
+        .from(schema.rotationAssignments)
+        .where(inArray(schema.rotationAssignments.occurrenceId, occurrenceIds))
+    ).map((row) => row.id);
+
+    if (assignmentIds.length > 0) {
+      await tx
+        .delete(schema.rotationDebts)
+        .where(inArray(schema.rotationDebts.sourceAssignmentId, assignmentIds));
+      await tx
+        .delete(schema.rotationAssignments)
+        .where(inArray(schema.rotationAssignments.id, assignmentIds));
+    }
+
+    await tx
+      .delete(schema.rotationOccurrences)
+      .where(inArray(schema.rotationOccurrences.id, occurrenceIds));
+  }
+
+  const rowIds = (
+    await tx
+      .select({ id: schema.rotationRows.id })
+      .from(schema.rotationRows)
+      .where(eq(schema.rotationRows.houseId, houseId))
+  ).map((row) => row.id);
+
+  if (rowIds.length === 0) {
+    return;
+  }
+
+  const rosterIds = (
+    await tx
+      .select({ id: schema.rotationRowRosters.id })
+      .from(schema.rotationRowRosters)
+      .where(inArray(schema.rotationRowRosters.rowId, rowIds))
+  ).map((row) => row.id);
+
+  if (rosterIds.length > 0) {
+    await tx
+      .delete(schema.rotationRowRosterSlots)
+      .where(inArray(schema.rotationRowRosterSlots.rosterId, rosterIds));
+    await tx
+      .delete(schema.rotationRowRosters)
+      .where(inArray(schema.rotationRowRosters.id, rosterIds));
+  }
+
+  const normIds = (
+    await tx
+      .select({ id: schema.rotationDayNorms.id })
+      .from(schema.rotationDayNorms)
+      .where(inArray(schema.rotationDayNorms.rowId, rowIds))
+  ).map((row) => row.id);
+
+  if (normIds.length > 0) {
+    await tx
+      .delete(schema.rotationDayNormZones)
+      .where(inArray(schema.rotationDayNormZones.normId, normIds));
+    await tx.delete(schema.rotationDayNorms).where(inArray(schema.rotationDayNorms.id, normIds));
+  }
+
+  await tx.delete(schema.rotationRows).where(inArray(schema.rotationRows.id, rowIds));
 }
 
 /** Жильцы сида узнаются по номеру: приёмки пользуются другими диапазонами. */
@@ -157,6 +236,82 @@ describe('состав сида', () => {
 
         expect(startWeekday).toBe(row.weekday);
       }
+    });
+  });
+
+  /**
+   * Модель фазы 10: ряд — состав мест и норма зон с датой вступления. Ряды
+   * делят места дома по дням, каждый жилец убирает раз в неделю (§2.2),
+   * число людей на зону — из её чек-листа (кухня на двоих).
+   */
+  it('составы делят места по дням, нормы берут число людей из чек-листа', async () => {
+    await inRollback(async (tx) => {
+      const [first] = await tx
+        .select({ id: schema.houses.id })
+        .from(schema.houses)
+        .where(eq(schema.houses.slug, houseSlug(1)));
+
+      if (first !== undefined) {
+        await removeRows(tx, first.id);
+      }
+
+      const result = await runSeed(tx);
+      const houseId = result.houseIds[0] ?? '';
+
+      const rows = await tx
+        .select()
+        .from(schema.rotationRows)
+        .where(eq(schema.rotationRows.houseId, houseId));
+      const rowIds = rows.map((row) => row.id);
+
+      const rosters = await tx
+        .select()
+        .from(schema.rotationRowRosters)
+        .where(inArray(schema.rotationRowRosters.rowId, rowIds));
+      const slots = await tx
+        .select()
+        .from(schema.rotationRowRosterSlots)
+        .where(
+          inArray(
+            schema.rotationRowRosterSlots.rosterId,
+            rosters.map((roster) => roster.id),
+          ),
+        );
+
+      const houseBeds = await tx
+        .select({ id: schema.beds.id })
+        .from(schema.beds)
+        .where(eq(schema.beds.houseId, houseId));
+
+      // Каждое место дома — ровно в одном составе.
+      expect(rosters).toHaveLength(rows.length);
+      expect(slots.map((slot) => slot.bedId).sort()).toEqual(houseBeds.map((bed) => bed.id).sort());
+
+      const norms = await tx
+        .select()
+        .from(schema.rotationDayNorms)
+        .where(inArray(schema.rotationDayNorms.rowId, rowIds));
+      const normZones = await tx
+        .select()
+        .from(schema.rotationDayNormZones)
+        .where(
+          inArray(
+            schema.rotationDayNormZones.normId,
+            norms.map((norm) => norm.id),
+          ),
+        );
+
+      expect(norms).toHaveLength(rows.length);
+
+      const [kitchen] = await tx
+        .select({ id: schema.areas.id })
+        .from(schema.areas)
+        .where(and(eq(schema.areas.houseId, houseId), eq(schema.areas.name, 'Кухня')));
+      const kitchenZones = normZones.filter((zone) => zone.areaId === kitchen?.id);
+
+      // Кухня стоит в норме каждого дня и всюду на двоих — как в её чек-листе.
+      expect(kitchenZones).toHaveLength(rows.length);
+      expect(kitchenZones.every((zone) => zone.people === 2)).toBe(true);
     });
   });
 

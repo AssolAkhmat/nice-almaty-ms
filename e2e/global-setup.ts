@@ -1,12 +1,13 @@
-import { fileURLToPath } from 'node:url';
 import { and, eq, inArray, like, notInArray, or, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 
-import { dotEnvFallback } from '../scripts/read-dotenv';
 import * as schema from '../src/db/schema';
 import { hashPassword } from '../src/lib/password';
 import { adminPhone, houseSlug, seedNetwork, SUPERADMIN_PHONE } from '../src/db/seed';
+
+import { databaseUrl } from './support/db';
+import { PHASE_TEN_PHONE_PREFIX } from './support/phase-10-house';
 
 import type { Executor } from '../src/db/client';
 
@@ -48,6 +49,13 @@ export const E2E_ACCOUNTS = {
   adminHouse9: adminPhone(9),
   adminHouse10: adminPhone(10),
   adminHouse11: adminPhone(11),
+  /*
+   * Дома приёмки фазы 10 — по одному на ширину: приёмка строит дом
+   * на пятнадцать жильцов и три ряда, а ряды у дома одни.
+   */
+  adminHouse12: adminPhone(12),
+  adminHouse13: adminPhone(13),
+  adminHouse14: adminPhone(14),
 } as const;
 
 /**
@@ -438,7 +446,7 @@ async function removeLeftoverAreas(db: ReturnType<typeof drizzle>): Promise<void
  * до строки. Убирается всё, что прогон в этих домах заводит: периоды
  * с их строками и снимками распределения и ущербы с долями.
  */
-export const ACCEPTANCE_HOUSES = [3, 4, 5, 6, 7, 8, 9, 10, 11] as const;
+export const ACCEPTANCE_HOUSES = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14] as const;
 
 /**
  * Задания фазы 6 и разосланные ими уведомления.
@@ -484,11 +492,20 @@ async function resetPhaseSixJobs(db: ReturnType<typeof drizzle>): Promise<void> 
  * `pnpm db:seed`: тогда в домах приёмок появляются чужие жильцы, и доля
  * коммуналки делится не на тех. Приёмка обязана считать только своих.
  */
+/**
+ * Жильцы, заведённые мимо экранов: сидовые (`+7702…`) и дом приёмки
+ * фазы 10 (`+7703…`). Приёмка строит его заново каждый прогон.
+ */
 async function removeSeededResidents(db: ReturnType<typeof drizzle>): Promise<void> {
   const seeded = await db
     .select({ id: schema.users.id })
     .from(schema.users)
-    .where(like(schema.users.phone, '+7702%'));
+    .where(
+      or(
+        like(schema.users.phone, '+7702%'),
+        like(schema.users.phone, `${PHASE_TEN_PHONE_PREFIX}%`),
+      ),
+    );
 
   if (seeded.length === 0) {
     return;
@@ -668,16 +685,11 @@ async function removeAcceptanceHouseData(db: ReturnType<typeof drizzle>): Promis
 }
 
 export default async function globalSetup(): Promise<void> {
-  const fileEnv = dotEnvFallback(fileURLToPath(new URL('../.env', import.meta.url)));
-
-  const url =
-    process.env.E2E_DATABASE_URL ??
-    process.env.TEST_DATABASE_URL ??
-    fileEnv.E2E_DATABASE_URL ??
-    fileEnv.TEST_DATABASE_URL ??
-    'postgres://nice:nice@127.0.0.1:5432/nice_almaty';
-
-  const client = postgres(url, { max: 1, connect_timeout: 10, onnotice: () => undefined });
+  const client = postgres(databaseUrl(), {
+    max: 1,
+    connect_timeout: 10,
+    onnotice: () => undefined,
+  });
   const db = drizzle(client, { schema });
 
   try {
@@ -689,8 +701,8 @@ export default async function globalSetup(): Promise<void> {
       executor: db as unknown as Executor,
       passwordFor: () => E2E_PASSWORD,
       withContent: false,
-      // Дома с третьего по одиннадцатый отданы приёмкам, по одному на ширину.
-      houses: 11,
+      // Дома с третьего по четырнадцатый отданы приёмкам, по одному на ширину.
+      houses: 14,
     });
 
     /*

@@ -66,6 +66,18 @@ const ZONES = [
  */
 const ROTATION_WEEKDAYS = [2, 4, 0] as const;
 
+/**
+ * Норма каждого дня — свой список зон (план фазы 10 §2.3): ряды делят места
+ * дома по дням, и каждый убирает раз в неделю (§2.2). Число людей на зону
+ * берётся из её чек-листа, поэтому кухня всюду на двоих, и зон в норме
+ * ровно столько, чтобы четырём местам ряда хватило работы без дырок.
+ */
+const DAY_NORMS: readonly (readonly string[])[] = [
+  ['Кухня', 'Санузел', 'Коридор'],
+  ['Кухня', 'Двор', 'Коридор'],
+  ['Кухня', 'Санузел', 'Двор'],
+];
+
 const FIRST_NAMES = ['Алишер', 'Данияр', 'Ерлан', 'Мадина', 'Айгерим', 'Тимур'];
 const LAST_NAMES = ['Абдуллаев', 'Сериков', 'Нурланов', 'Жумабек', 'Оспанова', 'Калиев'];
 
@@ -159,11 +171,15 @@ async function ensureRooms(
   return rooms;
 }
 
-async function ensureZones(
-  executor: Executor,
-  houseId: string,
-): Promise<{ areaId: string; checklistId: string }[]> {
-  const result: { areaId: string; checklistId: string }[] = [];
+interface SeedZone {
+  name: string;
+  areaId: string;
+  checklistId: string;
+  people: number;
+}
+
+async function ensureZones(executor: Executor, houseId: string): Promise<SeedZone[]> {
+  const result: SeedZone[] = [];
 
   for (const [index, zone] of ZONES.entries()) {
     const [existing] = await executor
@@ -204,7 +220,7 @@ async function ensureZones(
       )[0]?.id ??
       '';
 
-    result.push({ areaId, checklistId });
+    result.push({ name: zone.name, areaId, checklistId, people: zone.people });
   }
 
   return result;
@@ -277,18 +293,33 @@ async function ensureResidents(
   return seeded;
 }
 
+/**
+ * Ряды делят места дома по дням недели поровну, по порядку комнат:
+ * место входит ровно в один ряд, и каждый жилец убирает раз в неделю (§2.2).
+ */
+function bedsOfRow(allBeds: readonly string[], index: number): string[] {
+  const size = Math.ceil(allBeds.length / ROTATION_WEEKDAYS.length);
+
+  return allBeds.slice(index * size, (index + 1) * size);
+}
+
 async function ensureRows(
   executor: Executor,
   orgId: string,
   houseId: string,
   rooms: { areaId: string; bedIds: string[] }[],
-  zones: { areaId: string; checklistId: string }[],
+  zones: readonly SeedZone[],
   month: BusinessDate,
 ): Promise<void> {
   const allBeds = rooms.flatMap((room) => room.bedIds);
+  const zoneByName = new Map(zones.map((zone) => [zone.name, zone]));
 
   for (const [index, weekday] of ROTATION_WEEKDAYS.entries()) {
     const name = `Ряд ${index + 1}`;
+    const rowBeds = bedsOfRow(allBeds, index);
+    const rowZones = (DAY_NORMS[index] ?? [])
+      .map((zoneName) => zoneByName.get(zoneName))
+      .filter((zone): zone is SeedZone => zone !== undefined);
 
     const [existing] = await executor
       .select({ id: rotationRows.id })
@@ -325,7 +356,7 @@ async function ensureRows(
       .returning();
 
     await executor.insert(rotationRowRosterSlots).values(
-      allBeds.map((bedId, position) => ({
+      rowBeds.map((bedId, position) => ({
         rosterId: roster?.id ?? '',
         position,
         bedId,
@@ -338,12 +369,12 @@ async function ensureRows(
       .returning();
 
     await executor.insert(rotationDayNormZones).values(
-      zones.map((zone, position) => ({
+      rowZones.map((zone, position) => ({
         normId: norm?.id ?? '',
         position,
         areaId: zone.areaId,
         checklistId: zone.checklistId,
-        people: 1,
+        people: zone.people,
       })),
     );
   }
