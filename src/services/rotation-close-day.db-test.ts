@@ -258,7 +258,7 @@ describe('автозакрытие дня', () => {
 
       await tx
         .update(schema.rotationAssignments)
-        .set({ userId: null, state: 'needs_reassignment' })
+        .set({ userId: null, state: 'needs_reassignment', emptyReason: 'empty_bed' })
         .where(eq(schema.rotationAssignments.id, fixture.assignmentId));
 
       await closeRotationDay({ executor: tx, instant: TUESDAY_NIGHT });

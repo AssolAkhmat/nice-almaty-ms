@@ -254,6 +254,9 @@ export async function generateSchedule(
               // Пустующее место не исчезает из расписания: админ видит задачу
               // «отмени или назначь вручную» (§6.3), а не молчаливую дыру.
               state: userId === null ? 'needs_reassignment' : 'assigned',
+              // Причина известна прямо здесь и уходит в задачу админу вместе
+              // с дыркой: место пустует или жилец отсутствует (§2.5).
+              emptyReason: living === null ? 'empty_bed' : 'absent',
             },
             executor,
           );
@@ -374,6 +377,7 @@ export async function syncFutureAssignments(
         {
           userId,
           state: userId === null ? 'needs_reassignment' : 'assigned',
+          emptyReason: living === null ? 'empty_bed' : 'absent',
         },
         executor,
       );

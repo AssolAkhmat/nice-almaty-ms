@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   boolean,
+  check,
   date,
   index,
   integer,
@@ -133,12 +134,29 @@ export const rotationRows = pgTable(
     /** 0 — воскресенье, 6 — суббота: как `weekday` в `src/lib/time.ts`. */
     weekday: integer('weekday').notNull(),
     startDate: date('start_date').notNull(),
+    /** Комната ряда типа `room` (§6.4); у ряда общих зон её нет. */
+    roomAreaId: uuid('room_area_id').references(() => areas.id),
     isActive: boolean('is_active').notNull().default(true),
     sortOrder: integer('sort_order').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index('rotation_rows_house_idx').on(table.houseId, table.sortOrder)],
+  (table) => [
+    index('rotation_rows_house_idx').on(table.houseId, table.sortOrder),
+    /*
+     * Один действующий ряд общих зон на дом и день недели (план фазы 10, §2.2):
+     * два ряда на среду означали бы два состава и две очереди в один день.
+     * Комнатных рядов на воскресенье столько же, сколько комнат, — они сюда
+     * не попадают, и снятый с работы ряд места не занимает.
+     */
+    uniqueIndex('rotation_rows_common_weekday_unique')
+      .on(table.houseId, table.weekday)
+      .where(sql`${table.type} = 'common' and ${table.isActive}`),
+    check(
+      'rotation_rows_room_has_area',
+      sql`(${table.type} = 'room' and ${table.roomAreaId} is not null) or (${table.type} <> 'room' and ${table.roomAreaId} is null)`,
+    ),
+  ],
 );
 
 /**
@@ -194,6 +212,112 @@ export const rotationRowZones = pgTable(
   ],
 );
 
+/**
+ * Версия состава ряда (план фазы 10, §2.2): кто участвует, начиная с даты.
+ *
+ * Правка «с 15 октября» заводит новую версию, прошлые недели остаются
+ * на старой. Счётчик недель `k` версией не сбивается — он считается
+ * от даты старта ряда (P10-5).
+ */
+export const rotationRowRosters = pgTable(
+  'rotation_row_rosters',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    rowId: uuid('row_id')
+      .notNull()
+      .references(() => rotationRows.id),
+    effectiveFrom: date('effective_from').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('rotation_row_rosters_row_date_unique').on(table.rowId, table.effectiveFrom),
+  ],
+);
+
+/** Место в версии состава: позиция привязана к месту, а не к человеку (D12). */
+export const rotationRowRosterSlots = pgTable(
+  'rotation_row_roster_slots',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    rosterId: uuid('roster_id')
+      .notNull()
+      .references(() => rotationRowRosters.id),
+    position: integer('position').notNull(),
+    bedId: uuid('bed_id')
+      .notNull()
+      .references(() => beds.id),
+  },
+  (table) => [
+    uniqueIndex('rotation_row_roster_slots_position_unique').on(table.rosterId, table.position),
+    // Место входит в состав один раз: иначе один жилец получил бы две зоны за день.
+    uniqueIndex('rotation_row_roster_slots_bed_unique').on(table.rosterId, table.bedId),
+  ],
+);
+
+/**
+ * Версия нормы дня (план фазы 10, §2.3): какие зоны убираются в этот день.
+ *
+ * Норма привязана к ряду, а не к паре «дом и день недели»: комнатных рядов
+ * на воскресенье столько же, сколько комнат, и общая норма дня их бы склеила
+ * (P10-6). Ряд общих зон на день недели один, поэтому для него это то же самое.
+ */
+export const rotationDayNorms = pgTable(
+  'rotation_day_norms',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    rowId: uuid('row_id')
+      .notNull()
+      .references(() => rotationRows.id),
+    effectiveFrom: date('effective_from').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('rotation_day_norms_row_date_unique').on(table.rowId, table.effectiveFrom),
+  ],
+);
+
+/**
+ * Зона нормы: чек-лист и число людей именно в этот день.
+ *
+ * `people` берётся по умолчанию из `people_needed` чек-листа, но живёт
+ * отдельно: двор в воскресенье — двое, а в чек-листе то же число нужно
+ * генеральной уборке (§6.5, умолчание 5 плана).
+ */
+export const rotationDayNormZones = pgTable(
+  'rotation_day_norm_zones',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    normId: uuid('norm_id')
+      .notNull()
+      .references(() => rotationDayNorms.id),
+    position: integer('position').notNull(),
+    areaId: uuid('area_id')
+      .notNull()
+      .references(() => areas.id),
+    checklistId: uuid('checklist_id')
+      .notNull()
+      .references(() => areaChecklists.id),
+    people: integer('people').notNull().default(1),
+  },
+  (table) => [
+    uniqueIndex('rotation_day_norm_zones_position_unique').on(table.normId, table.position),
+    uniqueIndex('rotation_day_norm_zones_area_unique').on(
+      table.normId,
+      table.areaId,
+      table.checklistId,
+    ),
+    check('rotation_day_norm_zones_people_positive', sql`${table.people} >= 1`),
+  ],
+);
+
 /** Вид занятия: обычное по ряду, комнатное, генеральная уборка, внеплановое. */
 export const rotationOccurrenceTypeEnum = pgEnum('rotation_occurrence_type', [
   'regular',
@@ -243,6 +367,12 @@ export const rotationOccurrences = pgTable(
     /** Заполняется при переносе: исходная дата остаётся видимой в календаре. */
     movedFromDate: date('moved_from_date'),
     cycleIndex: integer('cycle_index'),
+    /**
+     * Сколько человек убирает зону именно в этот день. Берётся из нормы при
+     * материализации; правка недели меняет его (двор 2 -> 1, §2.6). Инвариант 8
+     * считает назначения по этому числу, а не по чек-листу.
+     */
+    peopleNeeded: integer('people_needed').notNull().default(1),
     /** Пусто у сгенерированного расписанием; у внепланового — кто завёл. */
     createdBy: uuid('created_by').references(() => users.id),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -258,8 +388,20 @@ export const rotationOccurrences = pgTable(
     uniqueIndex('rotation_occurrences_row_area_date_unique')
       .on(table.rowId, table.areaId, table.date)
       .where(sql`${table.rowId} is not null`),
+    check('rotation_occurrences_people_positive', sql`${table.peopleNeeded} >= 1`),
   ],
 );
+
+/**
+ * Почему у зоны нет исполнителя (§2.5 плана фазы 10): место пустует,
+ * человек отсутствует, очередь отдала зону недопущенному или людей меньше зон.
+ */
+export const rotationEmptyReasonEnum = pgEnum('rotation_empty_reason', [
+  'empty_bed',
+  'absent',
+  'not_eligible',
+  'no_one',
+]);
 
 /** Откуда взялось назначение: сетка, рука админа или долг по доп. ротациям. */
 export const rotationAssignmentSourceEnum = pgEnum('rotation_assignment_source', [
@@ -295,6 +437,12 @@ export const rotationAssignments = pgTable(
     userId: uuid('user_id').references(() => users.id),
     /** Позиция слота в ряду, из которой пришёл исполнитель. */
     slotPosition: integer('slot_position'),
+    /** Причина пустоты; у назначения с исполнителем её нет. */
+    emptyReason: rotationEmptyReasonEnum('empty_reason'),
+    /** Кто стоял в очереди на зону, но не допущен к ней (§2.5). */
+    queuedUserId: uuid('queued_user_id').references(() => users.id),
+    /** Галочка «списать доп. ротацию»: долг уменьшится при подтверждении (P10-3). */
+    writeOffDebt: boolean('write_off_debt').notNull().default(false),
     source: rotationAssignmentSourceEnum('source').notNull().default('auto'),
     state: rotationAssignmentStateEnum('state').notNull().default('assigned'),
     confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
@@ -315,13 +463,26 @@ export const rotationAssignments = pgTable(
   (table) => [
     index('rotation_assignments_occurrence_idx').on(table.occurrenceId),
     index('rotation_assignments_user_idx').on(table.userId),
+    /*
+     * Дырка обязана называть причину, а исполнитель — её не иметь: по этой
+     * колонке дэшборд собирает «Требует решения», и назначение без причины
+     * молча выпало бы из списка задач админа.
+     */
+    check(
+      'rotation_assignments_empty_has_reason',
+      sql`(${table.userId} is null) = (${table.emptyReason} is not null)`,
+    ),
   ],
 );
 
 /**
- * Долг по дополнительным ротациям (§7). Не сгорает, обнуляется 1 июля —
- * до этой даты запись живёт с `expires_at`, а закрывается выполненной
- * внеплановой ротацией.
+ * Долг по дополнительным ротациям (§7) — книга со знаком (§2.7 плана фазы 10).
+ *
+ * Строка `+1` заводится закрытием дня и порогом рейтинга, строка `−1` —
+ * выполненной доп. ротацией с галочкой списания. Баланс — сумма несгоревших
+ * строк, и он может уйти в минус: минус допустим, это запас, и следующее
+ * «не выполнена» сначала съедает его. Долг не сгорает от времени,
+ * но обнуляется 1 июля: дата записана в самой строке.
  */
 export const rotationDebts = pgTable(
   'rotation_debts',
@@ -333,16 +494,17 @@ export const rotationDebts = pgTable(
       .notNull()
       .references(() => users.id),
     reason: text('reason').notNull(),
-    /** Назначение, за которое долг начислен. */
+    /** Шаг долга: `+1` — начисление, `−1` — списание. */
+    delta: integer('delta').notNull().default(1),
+    /** Назначение, из которого родилась строка: за которое начислен или которым списан. */
     sourceAssignmentId: uuid('source_assignment_id').references(() => rotationAssignments.id),
-    /** Назначение, которым долг закрыт. */
-    resolvedByAssignmentId: uuid('resolved_by_assignment_id').references(
-      () => rotationAssignments.id,
-    ),
     expiresAt: date('expires_at').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index('rotation_debts_user_idx').on(table.userId, table.expiresAt)],
+  (table) => [
+    index('rotation_debts_user_idx').on(table.userId, table.expiresAt),
+    check('rotation_debts_delta_step', sql`${table.delta} in (-1, 1)`),
+  ],
 );
 
 /** Шапка и футер текста для группы, раздельно для обычной и генеральной уборки (§6.7). */
@@ -375,6 +537,14 @@ export type RotationRowSlot = typeof rotationRowSlots.$inferSelect;
 export type NewRotationRowSlot = typeof rotationRowSlots.$inferInsert;
 export type RotationRowZone = typeof rotationRowZones.$inferSelect;
 export type NewRotationRowZone = typeof rotationRowZones.$inferInsert;
+export type RotationRowRoster = typeof rotationRowRosters.$inferSelect;
+export type NewRotationRowRoster = typeof rotationRowRosters.$inferInsert;
+export type RotationRowRosterSlot = typeof rotationRowRosterSlots.$inferSelect;
+export type NewRotationRowRosterSlot = typeof rotationRowRosterSlots.$inferInsert;
+export type RotationDayNorm = typeof rotationDayNorms.$inferSelect;
+export type NewRotationDayNorm = typeof rotationDayNorms.$inferInsert;
+export type RotationDayNormZone = typeof rotationDayNormZones.$inferSelect;
+export type NewRotationDayNormZone = typeof rotationDayNormZones.$inferInsert;
 export type RotationOccurrence = typeof rotationOccurrences.$inferSelect;
 export type NewRotationOccurrence = typeof rotationOccurrences.$inferInsert;
 export type RotationAssignment = typeof rotationAssignments.$inferSelect;

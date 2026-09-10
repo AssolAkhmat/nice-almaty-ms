@@ -305,6 +305,8 @@ export async function saveRow(
               type: input.type,
               weekday: input.weekday,
               startDate,
+              // Комната ряда — та самая единственная зона комнатного ряда (§6.4).
+              roomAreaId: input.type === 'room' ? (zones[0]?.areaId ?? null) : null,
               ...(input.sortOrder === undefined ? {} : { sortOrder: input.sortOrder }),
             },
             tx,
@@ -317,6 +319,7 @@ export async function saveRow(
               type: input.type,
               weekday: input.weekday,
               startDate,
+              roomAreaId: input.type === 'room' ? (zones[0]?.areaId ?? null) : null,
               isActive: true,
               ...(input.sortOrder === undefined ? {} : { sortOrder: input.sortOrder }),
             },

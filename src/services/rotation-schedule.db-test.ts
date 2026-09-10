@@ -698,7 +698,7 @@ describe('исполнители', () => {
 
       await tx
         .update(schema.rotationAssignments)
-        .set({ userId, source: 'manual', state: 'assigned' })
+        .set({ userId, source: 'manual', state: 'assigned', emptyReason: null })
         .where(eq(schema.rotationAssignments.id, target?.id ?? ''));
 
       await refreshFutureAssignments(fixture.admin, fixture.houseId, NEXT_MONDAY, {

@@ -43,6 +43,9 @@ import {
  */
 type ChecklistType = 'regular' | 'general';
 
+/** Почему у зоны нет исполнителя (план фазы 10, §2.5). */
+export type RotationEmptyReason = 'empty_bed' | 'absent' | 'not_eligible' | 'no_one';
+
 function houseScope(
   context: AccessContext,
   column:
@@ -134,11 +137,12 @@ export async function createRotationDebt(
 }
 
 /**
- * Непогашенные долги жильцов на дату: видимость идёт через проживание.
+ * Строки долга жильцов на дату: видимость идёт через проживание.
  *
  * Долг не сгорает от времени, но живёт до 1 июля (§7): дата записана
  * в самом долге, поэтому год сбрасывается без переписывания строк —
- * они просто перестают попадать в выборку.
+ * они просто перестают попадать в выборку. Погашение вычитается не отсюда:
+ * с фазы 10 книга ведётся со знаком, и списание — такая же строка с `−1`.
  */
 export async function listRotationDebts(
   context: AccessContext,
@@ -155,11 +159,7 @@ export async function listRotationDebts(
     .select()
     .from(rotationDebts)
     .where(
-      and(
-        inArray(rotationDebts.userId, own),
-        isNull(rotationDebts.resolvedByAssignmentId),
-        sql`${rotationDebts.expiresAt} > ${filter.on}::date`,
-      ),
+      and(inArray(rotationDebts.userId, own), sql`${rotationDebts.expiresAt} > ${filter.on}::date`),
     )
     .orderBy(asc(rotationDebts.expiresAt), asc(rotationDebts.id));
 }
@@ -506,6 +506,8 @@ export interface CreateRotationRowInput {
   /** 0 — воскресенье, 6 — суббота. */
   weekday: number;
   startDate: BusinessDate;
+  /** Комната ряда типа `room`: у ряда общих зон её нет (§6.4). */
+  roomAreaId?: string | null;
   sortOrder?: number;
 }
 
@@ -525,6 +527,7 @@ export async function createRotationRow(
       type: input.type,
       weekday: input.weekday,
       startDate: input.startDate,
+      roomAreaId: input.type === 'room' ? (input.roomAreaId ?? null) : null,
       sortOrder: input.sortOrder ?? 0,
     })
     .returning();
@@ -589,6 +592,8 @@ export interface UpdateRotationRowInput {
   type?: 'common' | 'room';
   weekday?: number;
   startDate?: BusinessDate;
+  /** Комната ряда: меняется вместе с типом, иначе база отобьёт правку. */
+  roomAreaId?: string | null;
   isActive?: boolean;
   sortOrder?: number;
 }
@@ -835,6 +840,30 @@ export interface CreateAssignmentInput {
   slotPosition?: number | null;
   source?: 'auto' | 'manual' | 'debt';
   state?: 'assigned' | 'needs_reassignment' | 'confirmed' | 'missed' | 'cancelled';
+  /** Причина пустоты; без неё пустое назначение получает «некого назначить». */
+  emptyReason?: RotationEmptyReason | null;
+  /** Кто стоял в очереди на зону, но не допущен к ней (§2.5). */
+  queuedUserId?: string | null;
+  /** Галочка «списать доп. ротацию» (§2.7). */
+  writeOffDebt?: boolean;
+}
+
+/**
+ * Причина пустоты держится в паре с исполнителем, а не отдельно от него.
+ *
+ * База требует того же проверкой `rotation_assignments_empty_has_reason`,
+ * и держать это правило в каждом сервисе значило бы рано или поздно
+ * забыть его в одном: дырка без причины выпала бы из «Требует решения».
+ */
+function emptyReasonFor(
+  userId: string | null,
+  reason: RotationEmptyReason | null | undefined,
+): RotationEmptyReason | null {
+  if (userId !== null) {
+    return null;
+  }
+
+  return reason ?? 'no_one';
 }
 
 export async function createAssignment(
@@ -844,14 +873,19 @@ export async function createAssignment(
 ): Promise<RotationAssignment> {
   await requireOccurrence(context, input.occurrenceId, executor);
 
+  const userId = input.userId ?? null;
+
   const [assignment] = await executor
     .insert(rotationAssignments)
     .values({
       occurrenceId: input.occurrenceId,
-      userId: input.userId ?? null,
+      userId,
       slotPosition: input.slotPosition ?? null,
       source: input.source ?? 'auto',
       state: input.state ?? 'assigned',
+      emptyReason: emptyReasonFor(userId, input.emptyReason),
+      queuedUserId: input.queuedUserId ?? null,
+      writeOffDebt: input.writeOffDebt ?? false,
     })
     .returning();
 
@@ -864,6 +898,10 @@ export async function createAssignment(
 
 export interface UpdateAssignmentInput {
   userId?: string | null;
+  /** Причина пустоты при снятии исполнителя; по умолчанию «некого назначить». */
+  emptyReason?: RotationEmptyReason | null;
+  queuedUserId?: string | null;
+  writeOffDebt?: boolean;
   state?: 'assigned' | 'needs_reassignment' | 'confirmed' | 'missed' | 'cancelled';
   source?: 'auto' | 'manual' | 'debt';
   confirmedAt?: Date | null;
@@ -882,9 +920,19 @@ export async function updateAssignment(
   patch: UpdateAssignmentInput,
   executor: Executor = getDb(),
 ): Promise<RotationAssignment> {
+  /*
+   * Исполнитель и причина пустоты меняются вместе: назначили человека —
+   * причина уходит, сняли — появляется. Иначе проверка базы отбила бы
+   * правку, у которой снаружи всё в порядке.
+   */
+  const reasonPatch =
+    patch.userId === undefined
+      ? {}
+      : { emptyReason: emptyReasonFor(patch.userId, patch.emptyReason) };
+
   const [assignment] = await executor
     .update(rotationAssignments)
-    .set({ ...patch, updatedAt: now() })
+    .set({ ...patch, ...reasonPatch, updatedAt: now() })
     .where(eq(rotationAssignments.id, assignmentId))
     .returning();
 

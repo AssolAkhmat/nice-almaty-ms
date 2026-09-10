@@ -43,6 +43,21 @@ describe('миграции', () => {
     expect(sql).toMatch(/CREATE UNIQUE INDEX[^;]*"job"\s*,\s*"period_key"/);
   });
 
+  /**
+   * Дописано руками к сгенерированной миграции: без этого UPDATE проверка
+   * «дырка обязана назвать причину» не пройдёт по старым назначениям,
+   * и миграция упадёт на любой базе, где ротации уже материализованы.
+   */
+  it('миграция фазы 10 заполняет причину у старых назначений до проверки', () => {
+    const name = migrationFiles().find((file) => file.startsWith('0021_')) ?? '';
+    const sql = readMigration(name);
+    const backfill = sql.indexOf('UPDATE "rotation_assignments" SET "empty_reason"');
+    const constraint = sql.indexOf('rotation_assignments_empty_has_reason');
+
+    expect(backfill).toBeGreaterThan(-1);
+    expect(constraint).toBeGreaterThan(backfill);
+  });
+
   it('журнал drizzle перечисляет все файлы миграций', () => {
     const journal = JSON.parse(
       readFileSync(join(MIGRATIONS_DIR, 'meta', '_journal.json'), 'utf8'),
