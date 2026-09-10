@@ -297,10 +297,20 @@ export interface ResolutionCandidate {
   busyAreaIds: string[];
 }
 
+/**
+ * Ровно то, что подбору нужно от плана дня: кто где стоит и кто отдыхает.
+ * План может прийти из ядра (`dayPlan`) или быть собран из материализованных
+ * занятий дня — тогда он видит и ручные правки недели.
+ */
+export interface DayPlanShape {
+  assignments: readonly { userId: string | null; areaId: string }[];
+  resting: readonly { userId: string | null }[];
+}
+
 export interface CandidatesInput {
   /** Зона, оставшаяся без исполнителя. */
   areaId: string;
-  plan: DayPlan;
+  plan: DayPlanShape;
   /** Жильцы дома в порядке показа: порядок списка не должен прыгать. */
   residentUserIds: readonly string[];
   /** Баланс долга по доп. ротациям; должником делает только положительный (§2.7). */

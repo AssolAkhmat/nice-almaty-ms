@@ -399,7 +399,9 @@
     },
     "rating": {
       "title": "Рейтинг",
-      "hidden": "Рейтинг скрыт настройкой сети"
+      "hidden": "Рейтинг скрыт настройкой сети",
+      "debts": "Долг по дополнительным ротациям: {count}",
+      "reserve": "Запас по дополнительным ротациям: {count}"
     },
     "attention": {
       "title": "Требуется внимание",
@@ -438,7 +440,25 @@
       "onboardingTitle": "Заселение",
       "onboardingEmpty": "Незакрытых заселений нет",
       "expiringDocuments": "Справок истекает в ближайший месяц: {count}",
-      "openCalendar": "Календарь ротаций"
+      "openCalendar": "Календарь ротаций",
+      "holeQueued": "по очереди — {name}, не допущен",
+      "holeWho": "Кого поставить",
+      "holePut": "Поставить",
+      "holeGroupDebt": "С долгом по доп. ротациям",
+      "holeGroupResting": "Отдыхают в этот день",
+      "holeGroupOthers": "Остальные жильцы дома",
+      "holeNotEligible": "не допущен к зоне",
+      "holeBusy": "уже на: {areas}",
+      "holeDebt": "долг {count}",
+      "holeSwapWho": "Кого перевести сюда",
+      "holeSwapOption": "{name} ({area})",
+      "holeReplacement": "На освободившуюся зону «{area}»",
+      "holeLeaveOpen": "Оставить без исполнителя",
+      "holeApplySwap": "Обменять",
+      "holeCancel": "Отменить зону на эту дату",
+      "holePlaced": "Поставлен на зону",
+      "holeSwapped": "Обмен выполнен",
+      "holeCancelled": "Зона на эту дату отменена"
     },
     "network": {
       "title": "Сеть",
@@ -1533,7 +1553,10 @@
       "notScheduled": "Занятие уже не в расписании",
       "alreadyAssigned": "Этот жилец уже стоит на этой зоне в этот день",
       "assignmentSettled": "Назначение уже подтверждено или закрыто: поменяйте отметку, а не снимайте",
-      "whoRequired": "Выберите, кого поставить"
+      "whoRequired": "Выберите, кого поставить",
+      "notHole": "Это назначение — не дырка: у него есть исполнитель",
+      "swapSameDay": "Обмен возможен только внутри одного дня и одного дома",
+      "swapSameZone": "Перевод на ту же зону ничего не меняет"
     }
   },
   "generalCleaning": {

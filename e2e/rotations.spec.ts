@@ -108,4 +108,28 @@ test.describe('календарь ротаций', () => {
       await expect(scheduled).toHaveCount(0);
     }
   });
+
+  test('дэшборд админа: дырка расписания предлагает кандидатов, обмен и отмену', async ({
+    page,
+  }) => {
+    await login(page, E2E_ACCOUNTS.adminHouse1);
+    await page.goto('/');
+
+    const card = page.getByTestId('card-decisions');
+    await expect(card).toBeVisible();
+
+    // Дырка есть — при ней форма «кого поставить» с галочкой списания и отмена
+    // зоны на дату (фаза 10 §2.8). Нет дырок — карточка честно говорит об этом
+    // или показывает вчерашнюю неподтверждённую.
+    const holes = card.locator('[data-testid^="hole-place-"]');
+
+    if ((await holes.count()) > 0) {
+      const first = holes.first();
+      await expect(first.locator('[data-testid^="hole-who-"]')).toBeVisible();
+      await expect(first.locator('[data-testid^="hole-writeoff-"]')).toBeVisible();
+      await expect(card.locator('[data-testid^="hole-cancel-"]').first()).toBeVisible();
+    } else {
+      await expect(card).toContainText(/Нерешённого нет|Не подтверждена/);
+    }
+  });
 });

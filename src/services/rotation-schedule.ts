@@ -57,7 +57,7 @@ const DAYS_IN_WEEK = 7;
  * админ переносит или переназначает руками, и снимать их автоматически
  * значило бы решать за него.
  */
-async function absentOn(
+export async function absentOn(
   actor: UserActor,
   houseId: string,
   date: BusinessDate,
@@ -138,7 +138,7 @@ function rowDates(
  * открытой для всех. Групп у зоны может быть несколько — они складываются,
  * потому что каждая говорит «эти вправе», а не «только эти».
  */
-async function eligibilityOfHouse(
+export async function eligibilityOfHouse(
   actor: UserActor,
   houseId: string,
   executor: Executor,

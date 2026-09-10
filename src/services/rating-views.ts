@@ -37,6 +37,8 @@ export interface RatingCard {
   /** `null` — рейтинг скрыт: числу нечего делать даже в разметке страницы. */
   rating: number | null;
   visible: boolean;
+  /** Баланс книги долга по доп. ротациям; минус — запас (§2.7). Виден и при скрытом рейтинге. */
+  debts: number;
 }
 
 /** Карточка жильца: своё число. `null` — проживания нет, и рейтинга тоже. */
@@ -62,12 +64,21 @@ export async function readMyRatingCard(
     userId: actor.context.userId,
   });
 
+  // Долг — обязательство, а не оценка: жилец видит его и при скрытом рейтинге.
+  const debts = debtBalance(
+    await listRotationDebts(
+      actor.context,
+      { userIds: [actor.context.userId], on: today },
+      executor,
+    ),
+  );
+
   const visible =
     actor.context.role !== 'resident' ||
     (await isRatingVisibleToResidents(actor.context, executor));
 
   if (!visible) {
-    return { rating: null, visible: false };
+    return { rating: null, visible: false, debts };
   }
 
   const events = await listRatingEvents(
@@ -76,7 +87,7 @@ export async function readMyRatingCard(
     executor,
   );
 
-  return { rating: foldRating(events.map((event) => event.delta)), visible: true };
+  return { rating: foldRating(events.map((event) => event.delta)), visible: true, debts };
 }
 
 export interface HouseRatingRow {

@@ -78,6 +78,7 @@ export const AUDIT_ACTIONS = {
   rotationExtraCreated: 'rotation.extra_created',
   rotationAssignmentRemoved: 'rotation.assignment_removed',
   rotationPlaced: 'rotation.placed',
+  rotationSwapped: 'rotation.swapped',
   rotationRangeCancelled: 'rotation.range_cancelled',
   generalCleaningPlanned: 'rotation.general_cleaning_planned',
   rotationConfirmed: 'rotation.confirmed',

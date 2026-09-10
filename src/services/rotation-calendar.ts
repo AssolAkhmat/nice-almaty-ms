@@ -521,6 +521,8 @@ export async function removeAssignment(
 
 export interface PlaceInput {
   occurrenceId: string;
+  /** Конкретная дырка занятия; без неё берётся первая. */
+  assignmentId?: string;
   userId: string;
   /** «Списать доп. ротацию»: при подтверждении выполнения долг −1 (§7, P10-3). */
   writeOffDebt?: boolean;
@@ -557,9 +559,18 @@ export async function placeOnOccurrence(
     throw new ValidationError('rotationCalendar.errors.alreadyAssigned');
   }
 
-  const hole = assignments.find(
-    (item) => item.userId === null && item.state === 'needs_reassignment',
-  );
+  const isHole = (item: RotationAssignment): boolean =>
+    item.userId === null && item.state === 'needs_reassignment';
+  const hole =
+    input.assignmentId === undefined
+      ? assignments.find(isHole)
+      : assignments.find((item) => item.id === input.assignmentId && isHole(item));
+
+  // Названная дырка обязана быть дыркой этого занятия: иначе дэшборд
+  // поставил бы человека не туда, куда показывал.
+  if (input.assignmentId !== undefined && hole === undefined) {
+    throw new NotFoundError('Назначение не найдено');
+  }
   const writeOffDebt = input.writeOffDebt === true;
   const source = writeOffDebt ? 'debt' : 'manual';
 
@@ -606,5 +617,138 @@ export async function placeOnOccurrence(
     );
 
     return placed;
+  });
+}
+
+export interface SwapInput {
+  /** Дырка, которую закрывают переводом. */
+  holeAssignmentId: string;
+  /** Чьё назначение переводят на дырку. */
+  moverAssignmentId: string;
+  /** Кем закрыть освободившуюся зону; пусто — она остаётся дыркой «некого назначить». */
+  replacementUserId: string | null;
+  /** Галочка списания у того, кто встаёт на освободившуюся зону (§2.7). */
+  writeOffDebt?: boolean;
+}
+
+export interface SwapResult {
+  /** Бывшая дырка: теперь на ней переведённый. */
+  hole: RotationAssignment;
+  /** Освободившаяся зона: кандидат или новая дырка. */
+  freed: RotationAssignment;
+}
+
+/**
+ * Обмен в один ход (план фазы 10 §2.8): человек переводится со своей зоны
+ * на дырку, а на его зону встаёт кандидат — или никто, и тогда дырка
+ * переезжает вместе с причиной «некого назначить».
+ *
+ * Обе правки — обычные правки недели в одной транзакции: сетка не трогается,
+ * следующая неделя идёт как раньше. Переводят только незакрытое назначение
+ * того же дня и того же дома: обмен между датами был бы переносом, а перевод
+ * внутри одной зоны ничего не меняет.
+ */
+export async function swapAssignments(
+  actor: UserActor,
+  input: SwapInput,
+  deps: CalendarDeps = {},
+): Promise<SwapResult> {
+  const executor = executorOf(deps);
+
+  assertCan(actor.context, 'rotation.manage', { houseId: actor.context.houseId });
+
+  const found = await listAssignmentsById(
+    [input.holeAssignmentId, input.moverAssignmentId],
+    executor,
+  );
+  const hole = found.find((item) => item.id === input.holeAssignmentId);
+  const mover = found.find((item) => item.id === input.moverAssignmentId);
+
+  if (hole === undefined || mover === undefined) {
+    throw new NotFoundError('Назначение не найдено');
+  }
+
+  if (hole.userId !== null || hole.state !== 'needs_reassignment') {
+    throw new ValidationError('rotationCalendar.errors.notHole');
+  }
+
+  if (mover.userId === null || mover.state !== 'assigned') {
+    throw new ValidationError('rotationCalendar.errors.assignmentSettled');
+  }
+
+  const [holeOccurrence, moverOccurrence] = await Promise.all([
+    requireOccurrence(actor.context, hole.occurrenceId, executor),
+    requireOccurrence(actor.context, mover.occurrenceId, executor),
+  ]);
+
+  if (holeOccurrence.status !== 'scheduled' || moverOccurrence.status !== 'scheduled') {
+    throw new ValidationError('rotationCalendar.errors.notScheduled');
+  }
+
+  if (
+    holeOccurrence.houseId !== moverOccurrence.houseId ||
+    holeOccurrence.date !== moverOccurrence.date
+  ) {
+    throw new ValidationError('rotationCalendar.errors.swapSameDay');
+  }
+
+  if (holeOccurrence.areaId === moverOccurrence.areaId) {
+    throw new ValidationError('rotationCalendar.errors.swapSameZone');
+  }
+
+  const replacement = input.replacementUserId;
+
+  if (replacement !== null) {
+    if (replacement === mover.userId) {
+      throw new ValidationError('rotationCalendar.errors.alreadyAssigned');
+    }
+
+    await assertHouseResident(actor, holeOccurrence.houseId, replacement, executor);
+
+    const onFreedZone = await listAssignmentsFor([moverOccurrence.id], executor);
+
+    if (onFreedZone.some((item) => item.userId === replacement && item.state !== 'cancelled')) {
+      throw new ValidationError('rotationCalendar.errors.alreadyAssigned');
+    }
+  }
+
+  const writeOffDebt = input.writeOffDebt === true && replacement !== null;
+
+  return executor.transaction(async (tx) => {
+    const closed = await updateAssignment(
+      hole.id,
+      { userId: mover.userId, source: 'manual', state: 'assigned', writeOffDebt: false },
+      tx,
+    );
+
+    const freed = await updateAssignment(
+      mover.id,
+      {
+        userId: replacement,
+        source: writeOffDebt ? 'debt' : 'manual',
+        state: replacement === null ? 'needs_reassignment' : 'assigned',
+        writeOffDebt,
+      },
+      tx,
+    );
+
+    await recordAudit(
+      { context: actor.context, ip: actor.ip, requestId: actor.requestId },
+      {
+        action: AUDIT_ACTIONS.rotationSwapped,
+        entityType: 'rotation_occurrence',
+        entityId: holeOccurrence.id,
+        before: { moverUserId: mover.userId, moverAreaId: moverOccurrence.areaId },
+        after: {
+          holeUserId: mover.userId,
+          freedAreaId: moverOccurrence.areaId,
+          freedUserId: replacement,
+          writeOffDebt,
+        },
+      },
+      tx,
+    );
+
+    return { hole: closed, freed };
   });
 }

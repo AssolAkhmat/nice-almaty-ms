@@ -6,14 +6,17 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Money } from '@/components/ui/money';
 
+import { HoleDecisions } from './hole-decisions';
+
 import type { HouseDashboard } from '@/services/dashboard';
 
 /**
  * Дэшборд админа дома (docs/04-MODULES/09-dashboards.md, «Админ дома»).
  *
- * Экран только показывает: ротации дня правятся в календаре, счета —
- * в счетах, коммуналка — в коммуналке. Дублировать действия здесь значило
- * бы держать вторую форму того же самого.
+ * Экран показывает: ротации дня правятся в календаре, счета — в счетах,
+ * коммуналка — в коммуналке. Единственное исключение — дырки расписания
+ * в «Требует решения»: варианты для них система считает именно здесь
+ * (план фазы 10 §2.8), и выбор из них — та же правка недели, что в календаре.
  */
 const STATE_TONE: Readonly<Record<string, 'success' | 'warning' | 'danger' | 'neutral'>> = {
   confirmed: 'success',
@@ -67,24 +70,30 @@ export async function HouseDashboardView({ view }: { view: HouseDashboard }) {
           <CardTitle>{t('decisions')}</CardTitle>
         </CardHeader>
 
-        {view.decisions.length === 0 ? (
+        {view.decisions.length === 0 && view.holes.length === 0 ? (
           <p className="text-text-muted text-[13px]">{t('noDecisions')}</p>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {view.decisions.map((decision) => (
-              <li className="flex flex-wrap items-center gap-2" key={decision.assignmentId}>
-                <Badge tone={decision.kind === 'needs_reassignment' ? 'warning' : 'danger'}>
-                  {decision.kind === 'needs_reassignment'
-                    ? t('needsReassignment')
-                    : t('unconfirmed', { date: decision.date })}
-                </Badge>
-                <span className="text-[13px]">
-                  {decision.areaName}
-                  {decision.name === null ? '' : ` · ${decision.name}`}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <div className="flex flex-col gap-4">
+            {view.holes.length > 0 && <HoleDecisions holes={view.holes} />}
+
+            {view.decisions.length > 0 && (
+              <ul className="flex flex-col gap-2">
+                {view.decisions.map((decision) => (
+                  <li className="flex flex-wrap items-center gap-2" key={decision.assignmentId}>
+                    <Badge tone={decision.kind === 'needs_reassignment' ? 'warning' : 'danger'}>
+                      {decision.kind === 'needs_reassignment'
+                        ? t('needsReassignment')
+                        : t('unconfirmed', { date: decision.date })}
+                    </Badge>
+                    <span className="text-[13px]">
+                      {decision.areaName}
+                      {decision.name === null ? '' : ` · ${decision.name}`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
       </Card>
 

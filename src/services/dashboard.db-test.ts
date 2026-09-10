@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { afterAll, describe, expect, it } from 'vitest';
 
+import { createRotationDebt } from '@/db/repositories/rotations';
 import * as schema from '@/db/schema';
 import { testDatabaseUrl } from '@/db/testing/database-url';
 import { addDays, parseBusinessDate, parseInstant, type BusinessDate } from '@/lib/time';
@@ -430,6 +431,167 @@ describe('дэшборд жильца', () => {
       );
 
       expect(view).toBeNull();
+    });
+  });
+});
+
+/**
+ * «Требует решения» фазы 10 (`docs/tasks/PHASE-10.md` §2.5, §2.8): дырки
+ * с причиной, кандидаты в порядке §6.3, обмены в один ход, горизонт — неделя.
+ */
+describe('дырки с причиной и вариантами', () => {
+  /** Второе место пустует, вторая зона — кухня: на неделе 0 кухня без исполнителя. */
+  async function withHole(
+    tx: Transaction,
+    fixture: Awaited<ReturnType<typeof seed>>,
+    until: BusinessDate = MONDAY,
+  ) {
+    const [bed] = await tx.select().from(schema.beds).where(eq(schema.beds.id, fixture.bedId));
+    const [emptyBed] = await tx
+      .insert(schema.beds)
+      .values({
+        houseId: fixture.houseId,
+        areaId: bed?.areaId ?? '',
+        label: 'М2',
+        tier: 'upper',
+        number: 2,
+      })
+      .returning();
+    const [kitchen] = await tx
+      .insert(schema.areas)
+      .values({ houseId: fixture.houseId, type: 'common', name: 'Кухня' })
+      .returning();
+    const [kitchenChecklist] = await tx
+      .insert(schema.areaChecklists)
+      .values({ areaId: kitchen?.id ?? '', type: 'regular', title: 'Кухня', peopleNeeded: 1 })
+      .returning();
+
+    await saveRow(
+      fixture.network,
+      {
+        houseId: fixture.houseId,
+        name: 'Общие зоны',
+        type: 'common',
+        weekday: 1,
+        startDate: MONDAY,
+        slots: [{ bedId: fixture.bedId }, { bedId: emptyBed?.id ?? '' }],
+        zones: [
+          { areaId: fixture.yardId, checklistId: fixture.checklistId },
+          { areaId: kitchen?.id ?? '', checklistId: kitchenChecklist?.id ?? '' },
+        ],
+      },
+      { executor: tx },
+    );
+
+    await generateSchedule(fixture.network, fixture.houseId, until, {
+      executor: tx,
+      today: MONDAY,
+    });
+
+    return { kitchenId: kitchen?.id ?? '' };
+  }
+
+  /** Жилец без места в составе: кандидат «остальные жильцы дома». */
+  async function outsider(
+    tx: Transaction,
+    fixture: Awaited<ReturnType<typeof seed>>,
+    suffix: string,
+  ) {
+    const [user] = await tx
+      .insert(schema.users)
+      .values({
+        orgId: fixture.orgId,
+        phone: `+7708${suffix}`,
+        passwordHash: 'x',
+        role: 'resident',
+      })
+      .returning();
+    await tx.insert(schema.residencies).values({
+      orgId: fixture.orgId,
+      userId: user?.id ?? '',
+      houseId: fixture.houseId,
+      status: 'active',
+      moveInDate: '2026-09-01',
+    });
+
+    return user?.id ?? '';
+  }
+
+  it('дырка называет причину, кандидатов и обмен', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6721');
+      const { kitchenId } = await withHole(tx, fixture);
+
+      const view = await readHouseDashboard(fixture.network, fixture.houseId, {
+        executor: tx,
+        today: MONDAY,
+      });
+
+      expect(view.decisions).toEqual([]);
+      expect(view.holes).toHaveLength(1);
+
+      const hole = view.holes[0];
+      expect(hole?.date).toBe(MONDAY);
+      expect(hole?.areaId).toBe(kitchenId);
+      expect(hole?.areaName).toBe('Кухня');
+      expect(hole?.reason).toBe('empty_bed');
+      expect(hole?.queuedName).toBeNull();
+
+      // Единственный жилец уже на дворе: кандидатом на кухню он остаётся с пометкой.
+      expect(hole?.candidates.map((item) => item.userId)).toEqual([fixture.dwellerId]);
+      expect(hole?.candidates[0]?.source).toBe('resident');
+      expect(hole?.candidates[0]?.eligible).toBe(true);
+      expect(hole?.candidates[0]?.busyAreaNames).toEqual(['Двор']);
+
+      // Обмен: перевести его со двора на кухню; двор закрыть некем.
+      expect(hole?.swaps).toHaveLength(1);
+      expect(hole?.swaps[0]?.userId).toBe(fixture.dwellerId);
+      expect(hole?.swaps[0]?.fromAreaName).toBe('Двор');
+      expect(hole?.swaps[0]?.replacements).toEqual([]);
+    });
+  });
+
+  it('должник — первый кандидат, отдыхающий и остальные — за ним', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6722');
+      await withHole(tx, fixture);
+      const debtor = await outsider(tx, fixture, '6722');
+
+      await createRotationDebt(
+        {
+          userId: debtor,
+          reason: 'rating.threshold:20',
+          expiresAt: parseBusinessDate('2027-07-01'),
+        },
+        tx,
+      );
+
+      const view = await readHouseDashboard(fixture.network, fixture.houseId, {
+        executor: tx,
+        today: MONDAY,
+      });
+
+      const candidates = view.holes[0]?.candidates ?? [];
+      expect(candidates.map((item) => item.userId)).toEqual([debtor, fixture.dwellerId]);
+      expect(candidates[0]?.source).toBe('debt');
+      expect(candidates[0]?.debt).toBe(1);
+
+      // Освободившийся двор после обмена закрывает тот же должник.
+      expect(view.holes[0]?.swaps[0]?.replacements.map((item) => item.userId)).toEqual([debtor]);
+    });
+  });
+
+  it('горизонт — неделя вперёд: дырка через две недели ещё не задача', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6723');
+      await withHole(tx, fixture, addDays(MONDAY, 14));
+
+      const view = await readHouseDashboard(fixture.network, fixture.houseId, {
+        executor: tx,
+        today: MONDAY,
+      });
+
+      expect(view.holes.map((hole) => hole.date)).toEqual([MONDAY, addDays(MONDAY, 7)]);
     });
   });
 });

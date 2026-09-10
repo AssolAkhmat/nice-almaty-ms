@@ -43,7 +43,7 @@ export interface ResidentDashboardProps {
   cleaning: DashboardCleaning | null;
   invoice: DashboardInvoiceView | null;
   deposit: { balance: number; transactions: { id: string; type: string; amount: number }[] };
-  rating: { value: number | null; visible: boolean };
+  rating: { value: number | null; visible: boolean; debts: number };
   attention: { documents: DashboardAttention[]; steps: string[] };
 }
 
@@ -199,6 +199,12 @@ export function ResidentDashboard({
         ) : (
           <p className="text-text-muted text-[13px]">{t('rating.hidden')}</p>
         )}
+
+        <p className="text-text-muted mt-2 text-[13px]" data-testid="dashboard-debts">
+          {rating.debts < 0
+            ? t('rating.reserve', { count: -rating.debts })
+            : t('rating.debts', { count: rating.debts })}
+        </p>
       </Card>
 
       <Card data-testid="card-attention">

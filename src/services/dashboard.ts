@@ -19,6 +19,7 @@ import { listDiscounts, listFines } from '@/db/repositories/rating';
 import { listUtilityPeriods } from '@/db/repositories/utilities';
 import { listInvoicesFor } from './invoices';
 import { readHouseRating, readMyRatingCard, type HouseRatingRow } from './rating-views';
+import { readHoleDecisions, type HoleDecision } from './rotation-decisions';
 import { REFUND_DEADLINE_DAYS } from './expiry-reminders';
 import { listRemoteTasks } from './remote';
 import { readRotationStats } from './rotation-stats';
@@ -89,7 +90,7 @@ export interface ResidentDashboard {
   nextCleaning: NextCleaning | null;
   invoice: DashboardInvoice | null;
   deposit: DashboardDeposit;
-  rating: { value: number | null; visible: boolean };
+  rating: { value: number | null; visible: boolean; debts: number };
   attention: {
     documents: AttentionDocument[];
     steps: OnboardingStepKey[];
@@ -259,7 +260,11 @@ export async function readResidentDashboard(
         createdAt: transaction.createdAt,
       })),
     },
-    rating: { value: rating?.rating ?? null, visible: rating?.visible ?? false },
+    rating: {
+      value: rating?.rating ?? null,
+      visible: rating?.visible ?? false,
+      debts: rating?.debts ?? 0,
+    },
     attention: {
       documents,
       steps: onboarding.steps.filter((step) => !step.done).map((step) => step.key),
@@ -301,7 +306,10 @@ export interface HouseDashboard {
   houseId: string;
   today: BusinessDate;
   cleanings: TodayCleaning[];
+  /** Вчерашние уборки без отметки: сегодня их последний день (§7). */
   decisions: DecisionItem[];
+  /** Дырки расписания с причиной и вариантами (план фазы 10 §2.8). */
+  holes: HoleDecision[];
   money: HouseMoney;
   rating: { average: number | null; best: HouseRatingRow[]; worst: HouseRatingRow[] };
   utilities: { month: BusinessDate; status: 'missing' | 'draft' | 'closed' };
@@ -373,18 +381,17 @@ export async function readHouseDashboard(
     }));
 
   /*
-   * Требует решения ровно две вещи: дыра в расписании — её закрывает
-   * админ, — и вчерашняя уборка без отметки, у которой сегодня последний
-   * день (§7). Остальное система разбирает сама.
+   * Требует решения ровно две вещи: дырка в расписании — она идёт отдельным
+   * списком с причиной и вариантами (`holes`), — и вчерашняя уборка без
+   * отметки, у которой сегодня последний день (§7). Остальное система
+   * разбирает сама.
    */
   const decisions: DecisionItem[] = calendar.occurrences
     .filter((item) => item.occurrence.status === 'scheduled')
     .flatMap((item) =>
       item.assignments
         .filter(
-          (assignment) =>
-            assignment.state === 'needs_reassignment' ||
-            (assignment.state === 'assigned' && item.occurrence.date === yesterday),
+          (assignment) => assignment.state === 'assigned' && item.occurrence.date === yesterday,
         )
         .map((assignment) => ({
           assignmentId: assignment.id,
@@ -398,13 +405,14 @@ export async function readHouseDashboard(
         })),
     );
 
-  const [invoices, remote, rating, periods, residencies, documents] = await Promise.all([
+  const [invoices, remote, rating, periods, residencies, documents, holes] = await Promise.all([
     listInvoicesFor(actor, { houseId, periodMonth: month }, { executor, today }),
     listRemoteTasks(actor, { houseId }, { executor, today }),
     readHouseRating(actor, houseId, { executor, today }),
     listPeriodsOfHouse(actor, houseId, { executor, today }),
     listResidencies(actor.context, { houseId }, executor),
     listDocuments(actor.context, { status: 'approved' }, executor),
+    readHoleDecisions(actor, houseId, { executor, today }),
   ]);
 
   const issued = invoices.reduce((sum, row) => sum + row.invoice.total, 0);
@@ -435,6 +443,7 @@ export async function readHouseDashboard(
     today,
     cleanings,
     decisions,
+    holes,
     money: {
       month,
       issued,

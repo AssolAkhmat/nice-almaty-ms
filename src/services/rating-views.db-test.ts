@@ -120,7 +120,7 @@ describe('карточка жильца (§5.6)', () => {
 
       const card = await readMyRatingCard(fixture.dweller, { executor: tx, today: TODAY });
 
-      expect(card).toEqual({ rating: 52, visible: true });
+      expect(card).toEqual({ rating: 52, visible: true, debts: 0 });
     });
   });
 

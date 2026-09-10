@@ -399,7 +399,9 @@
     },
     "rating": {
       "title": "Rating",
-      "hidden": "Rating is hidden by a network setting"
+      "hidden": "Rating is hidden by a network setting",
+      "debts": "Extra rotation debt: {count}",
+      "reserve": "Extra rotation reserve: {count}"
     },
     "attention": {
       "title": "Needs attention",
@@ -438,7 +440,25 @@
       "onboardingTitle": "Move-in",
       "onboardingEmpty": "No open move-ins",
       "expiringDocuments": "Documents expiring within a month: {count}",
-      "openCalendar": "Rotation calendar"
+      "openCalendar": "Rotation calendar",
+      "holeQueued": "by turn — {name}, not eligible",
+      "holeWho": "Who to put",
+      "holePut": "Put",
+      "holeGroupDebt": "With extra rotation debt",
+      "holeGroupResting": "Resting that day",
+      "holeGroupOthers": "Other residents",
+      "holeNotEligible": "not eligible for the zone",
+      "holeBusy": "already on: {areas}",
+      "holeDebt": "debt {count}",
+      "holeSwapWho": "Who to move here",
+      "holeSwapOption": "{name} ({area})",
+      "holeReplacement": "Onto the freed zone \"{area}\"",
+      "holeLeaveOpen": "Leave without an assignee",
+      "holeApplySwap": "Swap",
+      "holeCancel": "Cancel the zone for this date",
+      "holePlaced": "Put on the zone",
+      "holeSwapped": "Swap applied",
+      "holeCancelled": "The zone is cancelled for this date"
     },
     "network": {
       "title": "Network",
@@ -1533,7 +1553,10 @@
       "notScheduled": "The rotation is no longer scheduled",
       "alreadyAssigned": "This resident is already on this zone that day",
       "assignmentSettled": "The assignment is already confirmed or closed: change the mark instead",
-      "whoRequired": "Choose who to put"
+      "whoRequired": "Choose who to put",
+      "notHole": "This assignment is not a gap: it has an assignee",
+      "swapSameDay": "A swap works only within one day and one house",
+      "swapSameZone": "Moving onto the same zone changes nothing"
     }
   },
   "generalCleaning": {

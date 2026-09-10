@@ -17,6 +17,7 @@ import {
   reassignAssignment,
   readCalendar,
   removeAssignment,
+  swapAssignments,
 } from './rotation-calendar';
 import { saveNorm } from './rotation-day-setup';
 import { saveRow } from './rotation-rows';
@@ -576,48 +577,48 @@ describe('внеплановая ротация', () => {
  * исполнителя с зоны на дату и поставить человека на зону дня — в дырку
  * или сверх нормы, с галочкой «списать доп. ротацию».
  */
+/** Норма §3: двор на двоих и кухня; третье место пустует — на кухне дырка. */
+async function yardForTwo(
+  tx: Transaction,
+  fixture: Awaited<ReturnType<typeof seed>>,
+): Promise<void> {
+  const row = await saveRow(
+    fixture.admin,
+    {
+      houseId: fixture.houseId,
+      name: 'Общие зоны',
+      type: 'common',
+      weekday: 1,
+      startDate: MONDAY,
+      slots: fixture.beds.map((bedId) => ({ bedId })),
+      zones: [
+        { areaId: fixture.yard, checklistId: fixture.yardChecklist },
+        { areaId: fixture.kitchen, checklistId: fixture.kitchenChecklist },
+      ],
+    },
+    { executor: tx },
+  );
+
+  await saveNorm(
+    fixture.admin,
+    {
+      rowId: row.id,
+      effectiveFrom: MONDAY,
+      zones: [
+        { areaId: fixture.yard, checklistId: fixture.yardChecklist, people: 2 },
+        { areaId: fixture.kitchen, checklistId: fixture.kitchenChecklist },
+      ],
+    },
+    { executor: tx, today: MONDAY },
+  );
+
+  await generateSchedule(fixture.admin, fixture.houseId, NEXT_MONDAY, {
+    executor: tx,
+    today: MONDAY,
+  });
+}
+
 describe('правки недели: снять и поставить', () => {
-  /** Норма §3: двор на двоих и кухня; третье место пустует — на кухне дырка. */
-  async function yardForTwo(
-    tx: Transaction,
-    fixture: Awaited<ReturnType<typeof seed>>,
-  ): Promise<void> {
-    const row = await saveRow(
-      fixture.admin,
-      {
-        houseId: fixture.houseId,
-        name: 'Общие зоны',
-        type: 'common',
-        weekday: 1,
-        startDate: MONDAY,
-        slots: fixture.beds.map((bedId) => ({ bedId })),
-        zones: [
-          { areaId: fixture.yard, checklistId: fixture.yardChecklist },
-          { areaId: fixture.kitchen, checklistId: fixture.kitchenChecklist },
-        ],
-      },
-      { executor: tx },
-    );
-
-    await saveNorm(
-      fixture.admin,
-      {
-        rowId: row.id,
-        effectiveFrom: MONDAY,
-        zones: [
-          { areaId: fixture.yard, checklistId: fixture.yardChecklist, people: 2 },
-          { areaId: fixture.kitchen, checklistId: fixture.kitchenChecklist },
-        ],
-      },
-      { executor: tx, today: MONDAY },
-    );
-
-    await generateSchedule(fixture.admin, fixture.houseId, NEXT_MONDAY, {
-      executor: tx,
-      today: MONDAY,
-    });
-  }
-
   it('снять исполнителя со двора: двор 2 → 1, назначение уходит вместе с человеком', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '9721');
@@ -857,6 +858,184 @@ describe('правки недели: снять и поставить', () => {
         placeOnOccurrence(
           fixture.resident,
           { occurrenceId: yard?.occurrence.id ?? '', userId: fixture.first },
+          { executor: tx },
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenError);
+    });
+  });
+});
+
+/**
+ * Обмен в один ход (`docs/tasks/PHASE-10.md` §2.8): человек переводится
+ * со своей зоны на дырку, на его зону встаёт кандидат — или никто.
+ */
+describe('обмен в один ход', () => {
+  it('перевод закрывает дырку, освободившаяся зона становится дыркой «некого назначить»', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9741');
+      await yardForTwo(tx, fixture);
+
+      const yard = await occurrenceOn(fixture, tx, MONDAY, fixture.yard);
+      const kitchen = await occurrenceOn(fixture, tx, MONDAY, fixture.kitchen);
+      const mover = yard?.assignments.find((item) => item.userId === fixture.first);
+
+      const result = await swapAssignments(
+        fixture.admin,
+        {
+          holeAssignmentId: kitchen?.assignments[0]?.id ?? '',
+          moverAssignmentId: mover?.id ?? '',
+          replacementUserId: null,
+        },
+        { executor: tx },
+      );
+
+      expect(result.hole.userId).toBe(fixture.first);
+      expect(result.hole.state).toBe('assigned');
+      expect(result.hole.source).toBe('manual');
+      expect(result.freed.userId).toBeNull();
+      expect(result.freed.state).toBe('needs_reassignment');
+      expect(result.freed.emptyReason).toBe('no_one');
+
+      const entries = await tx
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.entityId, kitchen?.occurrence.id ?? ''));
+      expect(entries.map((entry) => entry.action)).toContain('rotation.swapped');
+    });
+  });
+
+  it('на освободившуюся зону встаёт кандидат, галочка списания остаётся у него', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9742');
+      await yardForTwo(tx, fixture);
+
+      const yard = await occurrenceOn(fixture, tx, MONDAY, fixture.yard);
+      const kitchen = await occurrenceOn(fixture, tx, MONDAY, fixture.kitchen);
+      const second = yard?.assignments.find((item) => item.userId === fixture.second);
+      const first = yard?.assignments.find((item) => item.userId === fixture.first);
+
+      // Двор на одного: второй снят, чтобы было кем закрыть двор после перевода.
+      await removeAssignment(fixture.admin, second?.id ?? '', { executor: tx });
+
+      const result = await swapAssignments(
+        fixture.admin,
+        {
+          holeAssignmentId: kitchen?.assignments[0]?.id ?? '',
+          moverAssignmentId: first?.id ?? '',
+          replacementUserId: fixture.second,
+          writeOffDebt: true,
+        },
+        { executor: tx },
+      );
+
+      expect(result.hole.userId).toBe(fixture.first);
+      expect(result.hole.writeOffDebt).toBe(false);
+      expect(result.freed.userId).toBe(fixture.second);
+      expect(result.freed.writeOffDebt).toBe(true);
+      expect(result.freed.source).toBe('debt');
+    });
+  });
+
+  it('переводят только назначенного, в тот же день и не на его же зону', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9743');
+      await yardForTwo(tx, fixture);
+
+      const yard = await occurrenceOn(fixture, tx, MONDAY, fixture.yard);
+      const kitchen = await occurrenceOn(fixture, tx, MONDAY, fixture.kitchen);
+      const nextKitchen = await occurrenceOn(fixture, tx, NEXT_MONDAY, fixture.kitchen);
+      const first = yard?.assignments.find((item) => item.userId === fixture.first);
+      const holeId = kitchen?.assignments[0]?.id ?? '';
+
+      // Другой день — это перенос, а не обмен.
+      await expect(
+        swapAssignments(
+          fixture.admin,
+          {
+            holeAssignmentId: nextKitchen?.assignments[0]?.id ?? '',
+            moverAssignmentId: first?.id ?? '',
+            replacementUserId: null,
+          },
+          { executor: tx },
+        ),
+      ).rejects.toBeInstanceOf(ValidationError);
+
+      // Заполненное назначение — не дырка.
+      await expect(
+        swapAssignments(
+          fixture.admin,
+          {
+            holeAssignmentId: first?.id ?? '',
+            moverAssignmentId: yard?.assignments[1]?.id ?? '',
+            replacementUserId: null,
+          },
+          { executor: tx },
+        ),
+      ).rejects.toBeInstanceOf(ValidationError);
+
+      await tx
+        .update(schema.rotationAssignments)
+        .set({ state: 'confirmed' })
+        .where(eq(schema.rotationAssignments.id, first?.id ?? ''));
+
+      await expect(
+        swapAssignments(
+          fixture.admin,
+          { holeAssignmentId: holeId, moverAssignmentId: first?.id ?? '', replacementUserId: null },
+          { executor: tx },
+        ),
+      ).rejects.toBeInstanceOf(ValidationError);
+    });
+  });
+
+  it('дырку закрывают по имени назначения: чужое или заполненное не подходит', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9744');
+      await yardForTwo(tx, fixture);
+
+      const yard = await occurrenceOn(fixture, tx, MONDAY, fixture.yard);
+      const kitchen = await occurrenceOn(fixture, tx, MONDAY, fixture.kitchen);
+      const holeId = kitchen?.assignments[0]?.id ?? '';
+
+      await expect(
+        placeOnOccurrence(
+          fixture.admin,
+          {
+            occurrenceId: kitchen?.occurrence.id ?? '',
+            assignmentId: yard?.assignments[0]?.id ?? '',
+            userId: fixture.first,
+          },
+          { executor: tx },
+        ),
+      ).rejects.toBeInstanceOf(NotFoundError);
+
+      const placed = await placeOnOccurrence(
+        fixture.admin,
+        { occurrenceId: kitchen?.occurrence.id ?? '', assignmentId: holeId, userId: fixture.first },
+        { executor: tx },
+      );
+
+      expect(placed.id).toBe(holeId);
+      expect(placed.userId).toBe(fixture.first);
+    });
+  });
+
+  it('жилец обменом не распоряжается', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9745');
+      await yardForTwo(tx, fixture);
+
+      const yard = await occurrenceOn(fixture, tx, MONDAY, fixture.yard);
+      const kitchen = await occurrenceOn(fixture, tx, MONDAY, fixture.kitchen);
+
+      await expect(
+        swapAssignments(
+          fixture.resident,
+          {
+            holeAssignmentId: kitchen?.assignments[0]?.id ?? '',
+            moverAssignmentId: yard?.assignments[0]?.id ?? '',
+            replacementUserId: null,
+          },
           { executor: tx },
         ),
       ).rejects.toBeInstanceOf(ForbiddenError);
