@@ -69,6 +69,28 @@ describe('миграции', () => {
     expect(constraint).toBeGreaterThan(backfill);
   });
 
+  /**
+   * Миграция 0024 написана руками: она не меняет схему, а переводит ряды,
+   * заведённые до фазы 10, на версии состава и нормы. Генерация с T10.4 читает
+   * только версии, и ряд без них остался бы без расписания молча. Каждая
+   * вставка защищена `NOT EXISTS`: миграция повторяема и не трогает ряды,
+   * у которых версия уже есть.
+   */
+  it('миграция 0024 заводит версии состава и нормы и повторяется без вреда', () => {
+    const name = migrationFiles().find((file) => file.startsWith('0024_')) ?? '';
+    const sql = readMigration(name);
+    const inserts = sql.match(/INSERT INTO "([a-z_]+)"/g) ?? [];
+
+    expect(inserts).toEqual([
+      'INSERT INTO "rotation_row_rosters"',
+      'INSERT INTO "rotation_row_roster_slots"',
+      'INSERT INTO "rotation_day_norms"',
+      'INSERT INTO "rotation_day_norm_zones"',
+    ]);
+    expect(sql.match(/NOT EXISTS/g)).toHaveLength(inserts.length);
+    expect(sql).not.toMatch(/CREATE TABLE|ALTER TABLE|DROP TABLE/);
+  });
+
   it('журнал drizzle перечисляет все файлы миграций', () => {
     const journal = JSON.parse(
       readFileSync(join(MIGRATIONS_DIR, 'meta', '_journal.json'), 'utf8'),

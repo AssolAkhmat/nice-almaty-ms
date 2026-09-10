@@ -18,6 +18,10 @@ import {
   beds,
   residencies,
   residentProfiles,
+  rotationDayNormZones,
+  rotationDayNorms,
+  rotationRowRosterSlots,
+  rotationRowRosters,
   rotationRows,
   rotationRowSlots,
   rotationRowZones,
@@ -298,6 +302,8 @@ async function ensureRows(
       continue;
     }
 
+    const startDate = firstWeekdayOfMonth(month, weekday);
+
     const [row] = await executor
       .insert(rotationRows)
       .values({
@@ -306,7 +312,7 @@ async function ensureRows(
         name,
         type: 'common',
         weekday,
-        startDate: firstWeekdayOfMonth(month, weekday),
+        startDate,
         sortOrder: index,
         isActive: true,
       })
@@ -329,6 +335,38 @@ async function ensureRows(
         checklistId: zone.checklistId,
         position,
         peopleNeeded: 1,
+      })),
+    );
+
+    /*
+     * Состав и норма первой версией (фаза 10, §2.2, §2.3): генерация читает
+     * только их. Старые слоты и зоны рядом живут до T10.7.
+     */
+    const [roster] = await executor
+      .insert(rotationRowRosters)
+      .values({ rowId, effectiveFrom: startDate })
+      .returning();
+
+    await executor.insert(rotationRowRosterSlots).values(
+      allBeds.map((bedId, position) => ({
+        rosterId: roster?.id ?? '',
+        position,
+        bedId,
+      })),
+    );
+
+    const [norm] = await executor
+      .insert(rotationDayNorms)
+      .values({ rowId, effectiveFrom: startDate })
+      .returning();
+
+    await executor.insert(rotationDayNormZones).values(
+      zones.map((zone, position) => ({
+        normId: norm?.id ?? '',
+        position,
+        areaId: zone.areaId,
+        checklistId: zone.checklistId,
+        people: 1,
       })),
     );
   }

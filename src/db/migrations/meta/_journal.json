@@ -169,6 +169,13 @@
       "when": 1789038829744,
       "tag": "0023_colossal_goliath",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1789041234443,
+      "tag": "0024_backfill_rotation_versions",
+      "breakpoints": true
     }
   ]
 }

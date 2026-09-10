@@ -1395,20 +1395,6 @@
     }
   },
   "rotationDaySetup": {
-    "errors": {
-      "effectiveBeforeStart": "A version cannot start before the row's first rotation",
-      "rosterEmpty": "A roster needs at least one bed",
-      "bedTwice": "The same bed is in the roster twice",
-      "bedOtherHouse": "The bed belongs to another house",
-      "roomRosterBeds": "A room row roster uses beds of that same room",
-      "normEmpty": "A day norm needs at least one zone",
-      "roomNormSingleZone": "A room row has one zone — the room itself",
-      "areaOtherHouse": "The zone belongs to another house",
-      "checklistArea": "The checklist belongs to another zone",
-      "zoneTwice": "The same zone is in the norm twice",
-      "peopleInvalid": "People per zone must be a whole number from one",
-      "effectiveInvalid": "Set the date the version starts"
-    },
     "title": "Rosters and day norms",
     "hint": "The roster says who takes part; the day norm says which zones are cleaned and by how many people. Both take effect from a date: past weeks stay on the previous version.",
     "roster": "Roster",
@@ -1437,6 +1423,22 @@
       "absent": "resident is away",
       "not_eligible": "not allowed for the zone",
       "no_one": "no one to assign"
+    },
+    "rebuilt": "Future occurrences rebuilt: {count}",
+    "kept": "Left as they were (edited by hand): {dates}",
+    "errors": {
+      "effectiveBeforeStart": "A version cannot start before the row's first rotation",
+      "rosterEmpty": "A roster needs at least one bed",
+      "bedTwice": "The same bed is in the roster twice",
+      "bedOtherHouse": "The bed belongs to another house",
+      "roomRosterBeds": "A room row roster uses beds of that same room",
+      "normEmpty": "A day norm needs at least one zone",
+      "roomNormSingleZone": "A room row has one zone — the room itself",
+      "areaOtherHouse": "The zone belongs to another house",
+      "checklistArea": "The checklist belongs to another zone",
+      "zoneTwice": "The same zone is in the norm twice",
+      "peopleInvalid": "People per zone must be a whole number from one",
+      "effectiveInvalid": "Set the date the version starts"
     }
   },
   "rotationSchedule": {

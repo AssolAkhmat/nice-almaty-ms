@@ -78,6 +78,16 @@ function Message({ state }: { state: RotationSetupActionState }) {
         </p>
       )}
       {state.done !== undefined && <p className="text-success text-[13px]">{t(state.done)}</p>}
+      {state.rebuilt !== undefined && state.rebuilt > 0 && (
+        <p className="text-text-muted text-[13px]">
+          {t('rotationDaySetup.rebuilt', { count: state.rebuilt })}
+        </p>
+      )}
+      {state.kept !== undefined && state.kept.length > 0 && (
+        <p className="text-text-muted text-[13px]" data-testid="rebuild-kept">
+          {t('rotationDaySetup.kept', { dates: state.kept.join(', ') })}
+        </p>
+      )}
     </>
   );
 }

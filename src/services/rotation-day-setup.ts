@@ -1,9 +1,12 @@
 import { getDb, type Executor } from '@/db/client';
 import { listAreas, listBeds } from '@/db/repositories/areas';
 import {
+  deleteOccurrence,
+  listAssignmentsFor,
   listBedOccupantsOn,
   listChecklists,
   listDayNorms,
+  listOccurrences,
   listRotationRows,
   listRowRosters,
   replaceDayNorm,
@@ -19,10 +22,12 @@ import {
   parseBusinessDate,
   startOfDayUtc,
   toAlmatyParts,
+  todayInAlmaty,
   type BusinessDate,
 } from '@/lib/time';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
+import { regenerateRow } from './rotation-schedule';
 
 import type { RotationRow } from '@/db/schema';
 import type { UserActor } from './users';
@@ -41,6 +46,8 @@ import type { UserActor } from './users';
 
 export interface RotationDaySetupDeps {
   executor?: Executor;
+  /** «Сегодня» приходит снаружи: прямой `new Date()` в бизнес-логике запрещён. */
+  today?: BusinessDate;
 }
 
 function executorOf(deps: RotationDaySetupDeps): Executor {
@@ -153,6 +160,93 @@ function assertEffectiveFrom(row: RotationRow, value: BusinessDate): BusinessDat
   return effectiveFrom;
 }
 
+/** Занятие, которого пересборка не коснулась, и почему о нём говорят админу. */
+export interface KeptOccurrence {
+  date: BusinessDate;
+  areaId: string;
+}
+
+export interface VersionSaveReport {
+  /** Сколько будущих занятий заведено заново. */
+  rebuilt: number;
+  /** Тронутые руками: они остались как были и перечисляются админу (§2.6). */
+  kept: KeptOccurrence[];
+}
+
+/** Горизонт поиска будущих занятий: дальше года расписание не материализуют. */
+const REBUILD_HORIZON_DAYS = 366;
+
+/**
+ * Пересборка будущих занятий ряда после правки «с даты» (§2.6).
+ *
+ * Нетронутое занятие — то, где всё пришло из очереди: статус «запланировано»,
+ * переноса не было, и каждое назначение автоматическое. Такое занятие снимается
+ * и заводится заново по новой версии. Всё остальное — перенос, отмена, замена
+ * исполнителя, внеплановое — это решение админа, и пересборка его не отменяет,
+ * а перечисляет: человек сам решит, править ли.
+ *
+ * Прошлое не трогается ни при какой дате вступления: его уже видели люди.
+ */
+async function rebuildFuture(
+  actor: UserActor,
+  row: RotationRow,
+  effectiveFrom: BusinessDate,
+  today: BusinessDate,
+  executor: Executor,
+): Promise<VersionSaveReport> {
+  const from = compareBusinessDates(effectiveFrom, today) < 0 ? today : effectiveFrom;
+  const houseId = row.houseId;
+
+  const occurrences = (
+    await listOccurrences(
+      actor.context,
+      houseId,
+      { from, to: addDays(from, REBUILD_HORIZON_DAYS) },
+      executor,
+    )
+  ).filter((occurrence) => occurrence.rowId === row.id);
+
+  if (occurrences.length === 0) {
+    return { rebuilt: 0, kept: [] };
+  }
+
+  const assignments = await listAssignmentsFor(
+    occurrences.map((occurrence) => occurrence.id),
+    executor,
+  );
+
+  const kept: KeptOccurrence[] = [];
+  let last: BusinessDate | null = null;
+  let rebuilt = 0;
+
+  for (const occurrence of occurrences) {
+    const own = assignments.filter((item) => item.occurrenceId === occurrence.id);
+    const untouched =
+      occurrence.status === 'scheduled' &&
+      occurrence.movedFromDate === null &&
+      own.every(
+        (item) =>
+          item.source === 'auto' &&
+          (item.state === 'assigned' || item.state === 'needs_reassignment'),
+      );
+
+    if (!untouched) {
+      kept.push({ date: occurrence.date as BusinessDate, areaId: occurrence.areaId });
+      continue;
+    }
+
+    await deleteOccurrence(actor.context, occurrence.id, executor);
+    rebuilt += 1;
+    last = occurrence.date as BusinessDate;
+  }
+
+  if (last !== null) {
+    await regenerateRow(actor, houseId, row.id, { from, until: last }, { executor });
+  }
+
+  return { rebuilt, kept };
+}
+
 export interface SaveRosterInput {
   rowId: string;
   effectiveFrom: BusinessDate;
@@ -160,11 +254,15 @@ export interface SaveRosterInput {
   bedIds: readonly string[];
 }
 
+export interface RosterSaveResult extends VersionSaveReport {
+  version: RosterVersionView;
+}
+
 export async function saveRoster(
   actor: UserActor,
   input: SaveRosterInput,
   deps: RotationDaySetupDeps = {},
-): Promise<RosterVersionView> {
+): Promise<RosterSaveResult> {
   const executor = executorOf(deps);
 
   const row = await requireRotationRow(actor.context, input.rowId, executor);
@@ -207,6 +305,16 @@ export async function saveRoster(
       tx,
     );
 
+    const report = await rebuildFuture(
+      actor,
+      row,
+      effectiveFrom,
+      deps.today ?? todayInAlmaty(),
+      tx,
+    );
+
+    // Пересборка — часть той же правки: журнал говорит, сколько занятий
+    // заведено заново и сколько осталось за человеком.
     await recordAudit(
       { context: actor.context, ip: actor.ip, requestId: actor.requestId },
       {
@@ -214,12 +322,17 @@ export async function saveRoster(
         entityType: 'rotation_row',
         entityId: row.id,
         before: before === undefined ? undefined : { effectiveFrom, beds: before.bedIds.length },
-        after: { effectiveFrom, beds: saved.bedIds.length },
+        after: {
+          effectiveFrom,
+          beds: saved.bedIds.length,
+          rebuilt: report.rebuilt,
+          kept: report.kept.length,
+        },
       },
       tx,
     );
 
-    return saved;
+    return { version: saved, ...report };
   });
 }
 
@@ -236,11 +349,15 @@ export interface SaveNormInput {
   zones: readonly SaveNormZoneInput[];
 }
 
+export interface NormSaveResult extends VersionSaveReport {
+  version: NormVersionView;
+}
+
 export async function saveNorm(
   actor: UserActor,
   input: SaveNormInput,
   deps: RotationDaySetupDeps = {},
-): Promise<NormVersionView> {
+): Promise<NormSaveResult> {
   const executor = executorOf(deps);
 
   const row = await requireRotationRow(actor.context, input.rowId, executor);
@@ -304,6 +421,14 @@ export async function saveNorm(
 
     const saved = await replaceDayNorm(actor.context, { rowId: row.id, effectiveFrom, zones }, tx);
 
+    const report = await rebuildFuture(
+      actor,
+      row,
+      effectiveFrom,
+      deps.today ?? todayInAlmaty(),
+      tx,
+    );
+
     await recordAudit(
       { context: actor.context, ip: actor.ip, requestId: actor.requestId },
       {
@@ -311,12 +436,17 @@ export async function saveNorm(
         entityType: 'rotation_row',
         entityId: row.id,
         before: before === undefined ? undefined : { effectiveFrom, zones: before.zones.length },
-        after: { effectiveFrom, zones: saved.zones.length },
+        after: {
+          effectiveFrom,
+          zones: saved.zones.length,
+          rebuilt: report.rebuilt,
+          kept: report.kept.length,
+        },
       },
       tx,
     );
 
-    return saved;
+    return { version: saved, ...report };
   });
 }
 

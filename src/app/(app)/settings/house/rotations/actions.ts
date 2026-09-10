@@ -11,6 +11,7 @@ import {
   saveRoster,
   type PreviewDay,
   type SaveNormZoneInput,
+  type VersionSaveReport,
 } from '@/services/rotation-day-setup';
 import { archiveRow, saveRow } from '@/services/rotation-rows';
 import { saveTemplateText } from '@/services/rotation-templates';
@@ -36,6 +37,10 @@ import type { UserActor } from '@/services/users';
 export interface RotationSetupActionState {
   error?: string;
   done?: string;
+  /** Отчёт о пересборке будущих занятий после правки «с даты» (§2.6). */
+  rebuilt?: number;
+  /** Занятия, которых пересборка не коснулась: их правил человек. */
+  kept?: string[];
 }
 
 async function actor(): Promise<UserActor | null> {
@@ -438,6 +443,17 @@ function draftZones(formData: FormData): SaveNormZoneInput[] {
   }).map((item) => item.value);
 }
 
+/**
+ * Отчёт о пересборке для экрана: сколько занятий заведено заново и какие
+ * даты остались как были, потому что их правил человек (§2.6).
+ */
+function report(result: VersionSaveReport): Pick<RotationSetupActionState, 'rebuilt' | 'kept'> {
+  return {
+    rebuilt: result.rebuilt,
+    kept: result.kept.map((item) => item.date),
+  };
+}
+
 export async function saveRosterAction(
   _previous: RotationSetupActionState,
   formData: FormData,
@@ -453,16 +469,16 @@ export async function saveRosterAction(
   }
 
   try {
-    await saveRoster(user, {
+    const result = await saveRoster(user, {
       rowId: text(formData, 'rowId'),
       effectiveFrom,
       bedIds: draftBedIds(formData),
     });
+
+    return { done: 'rotationDaySetup.rosterSaved', ...report(result) };
   } catch (error) {
     return failure(error);
   }
-
-  return { done: 'rotationDaySetup.rosterSaved' };
 }
 
 export async function saveNormAction(
@@ -480,16 +496,16 @@ export async function saveNormAction(
   }
 
   try {
-    await saveNorm(user, {
+    const result = await saveNorm(user, {
       rowId: text(formData, 'rowId'),
       effectiveFrom,
       zones: draftZones(formData),
     });
+
+    return { done: 'rotationDaySetup.normSaved', ...report(result) };
   } catch (error) {
     return failure(error);
   }
-
-  return { done: 'rotationDaySetup.normSaved' };
 }
 
 export interface RotationPreviewState {

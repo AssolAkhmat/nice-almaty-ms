@@ -367,6 +367,10 @@ async function removeLeftoverAreas(db: ReturnType<typeof drizzle>): Promise<void
   }
 
   await db.delete(schema.rotationRowZones).where(inArray(schema.rotationRowZones.areaId, ids));
+  // Модель фазы 10: зона живёт ещё и в нормах дней, а место — в составах рядов.
+  await db
+    .delete(schema.rotationDayNormZones)
+    .where(inArray(schema.rotationDayNormZones.areaId, ids));
 
   const areaBedIds = (
     await db
@@ -379,6 +383,9 @@ async function removeLeftoverAreas(db: ReturnType<typeof drizzle>): Promise<void
     await db
       .delete(schema.rotationRowSlots)
       .where(inArray(schema.rotationRowSlots.bedId, areaBedIds));
+    await db
+      .delete(schema.rotationRowRosterSlots)
+      .where(inArray(schema.rotationRowRosterSlots.bedId, areaBedIds));
   }
 
   await db.delete(schema.areaEligibility).where(inArray(schema.areaEligibility.areaId, ids));
@@ -597,6 +604,38 @@ async function removeAcceptanceHouseData(db: ReturnType<typeof drizzle>): Promis
   if (rowIds.length > 0) {
     await db.delete(schema.rotationRowSlots).where(inArray(schema.rotationRowSlots.rowId, rowIds));
     await db.delete(schema.rotationRowZones).where(inArray(schema.rotationRowZones.rowId, rowIds));
+
+    // Версии состава и нормы держат ряд ссылками: они уходят перед ним.
+    const rosterIds = (
+      await db
+        .select({ id: schema.rotationRowRosters.id })
+        .from(schema.rotationRowRosters)
+        .where(inArray(schema.rotationRowRosters.rowId, rowIds))
+    ).map((row) => row.id);
+
+    if (rosterIds.length > 0) {
+      await db
+        .delete(schema.rotationRowRosterSlots)
+        .where(inArray(schema.rotationRowRosterSlots.rosterId, rosterIds));
+      await db
+        .delete(schema.rotationRowRosters)
+        .where(inArray(schema.rotationRowRosters.id, rosterIds));
+    }
+
+    const normIds = (
+      await db
+        .select({ id: schema.rotationDayNorms.id })
+        .from(schema.rotationDayNorms)
+        .where(inArray(schema.rotationDayNorms.rowId, rowIds))
+    ).map((row) => row.id);
+
+    if (normIds.length > 0) {
+      await db
+        .delete(schema.rotationDayNormZones)
+        .where(inArray(schema.rotationDayNormZones.normId, normIds));
+      await db.delete(schema.rotationDayNorms).where(inArray(schema.rotationDayNorms.id, normIds));
+    }
+
     await db.delete(schema.rotationRows).where(inArray(schema.rotationRows.id, rowIds));
   }
 

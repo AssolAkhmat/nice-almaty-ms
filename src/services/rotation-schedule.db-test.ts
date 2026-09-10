@@ -9,6 +9,7 @@ import { ForbiddenError } from '@/lib/errors';
 import { parseBusinessDate, type BusinessDate } from '@/lib/time';
 
 import { assignBedToResidency, releaseBedOfResidency } from './beds';
+import { saveNorm, saveRoster } from './rotation-day-setup';
 import { saveRow } from './rotation-rows';
 import { generateSchedule, readSchedule, refreshFutureAssignments } from './rotation-schedule';
 
@@ -159,26 +160,71 @@ async function seed(tx: Transaction, suffix: string) {
   };
 }
 
+/**
+ * Ряд с составом и нормой: сам ряд заводится прежним сервисом, а кто участвует
+ * и какие зоны убираются, лежит в версиях с датой вступления (фаза 10, §2.2, §2.3).
+ */
+async function rowWith(
+  tx: Transaction,
+  fixture: Awaited<ReturnType<typeof seed>>,
+  input: {
+    name: string;
+    beds: readonly string[];
+    zones: readonly { areaId: string; checklistId: string; people?: number }[];
+    startDate?: BusinessDate;
+  },
+): Promise<string> {
+  const startDate = input.startDate ?? MONDAY;
+
+  /*
+   * Сам ряд пока заводится прежним сервисом, и ему нужны слоты и зоны старой
+   * модели: они уходят в T10.7 и на генерацию уже не влияют. Даётся заведомо
+   * допустимая пара — все места дома и одна зона, — чтобы инвариант 9 старой
+   * модели не мешал новому случаю «зон больше, чем людей».
+   */
+  const row = await saveRow(
+    fixture.admin,
+    {
+      houseId: fixture.houseId,
+      name: input.name,
+      type: 'common',
+      weekday: 1,
+      startDate,
+      slots: fixture.beds.map((bedId) => ({ bedId })),
+      zones: [
+        {
+          areaId: input.zones[0]?.areaId ?? '',
+          checklistId: input.zones[0]?.checklistId ?? '',
+        },
+      ],
+    },
+    { executor: tx },
+  );
+
+  await saveRoster(
+    fixture.admin,
+    { rowId: row.id, effectiveFrom: startDate, bedIds: input.beds },
+    { executor: tx },
+  );
+  await saveNorm(
+    fixture.admin,
+    { rowId: row.id, effectiveFrom: startDate, zones: input.zones },
+    { executor: tx },
+  );
+
+  return row.id;
+}
+
 /** Ряд примера 6.1: шесть мест, пять зон, понедельник. */
 async function exampleRow(
   tx: Transaction,
   fixture: Awaited<ReturnType<typeof seed>>,
 ): Promise<string> {
-  const row = await saveRow(
-    fixture.admin,
-    {
-      houseId: fixture.houseId,
-      name: 'Общие зоны',
-      type: 'common',
-      weekday: 1,
-      startDate: MONDAY,
-      slots: fixture.beds.map((bedId) => ({ bedId })),
-      zones: fixture.zones,
-    },
-    { executor: tx },
-  );
-
-  return row.id;
+  return rowWith(tx, fixture, {
+    name: 'Общие зоны',
+    beds: fixture.beds,
+    zones: fixture.zones,
+  });
 }
 
 describe('генерация расписания', () => {
@@ -293,19 +339,11 @@ describe('генерация расписания', () => {
         })
         .returning();
 
-      await saveRow(
-        fixture.admin,
-        {
-          houseId: fixture.houseId,
-          name: 'Двор вдвоём',
-          type: 'common',
-          weekday: 1,
-          startDate: MONDAY,
-          slots: fixture.beds.slice(0, 3).map((bedId) => ({ bedId })),
-          zones: [{ areaId: yard?.id ?? '', checklistId: yardChecklist?.id ?? '' }],
-        },
-        { executor: tx },
-      );
+      await rowWith(tx, fixture, {
+        name: 'Двор вдвоём',
+        beds: fixture.beds.slice(0, 3),
+        zones: [{ areaId: yard?.id ?? '', checklistId: yardChecklist?.id ?? '' }],
+      });
 
       await generateSchedule(fixture.admin, fixture.houseId, MONDAY, {
         executor: tx,
@@ -717,6 +755,204 @@ describe('исполнители', () => {
 
       expect(kept?.userId).toBe(userId);
       expect(kept?.source).toBe('manual');
+    });
+  });
+});
+
+/**
+ * Генерация фазы 10 идёт по составу ряда и норме дня на дату
+ * (`docs/tasks/PHASE-10.md` §2.4), а не по слотам и зонам ряда.
+ */
+describe('генерация по составу и норме', () => {
+  it('состав и норма решают, кто убирает: старые слоты и зоны уже не при чём', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9581');
+      const rowId = await rowWith(tx, fixture, {
+        name: 'Общие зоны',
+        beds: fixture.beds,
+        zones: fixture.zones,
+      });
+
+      // Состав и норма правятся с той же даты: в ряду двое и одна зона.
+      await saveRoster(
+        fixture.admin,
+        { rowId, effectiveFrom: MONDAY, bedIds: fixture.beds.slice(0, 2) },
+        { executor: tx },
+      );
+      await saveNorm(
+        fixture.admin,
+        {
+          rowId,
+          effectiveFrom: MONDAY,
+          zones: [fixture.zones[0] ?? { areaId: '', checklistId: '' }],
+        },
+        { executor: tx },
+      );
+      await fixture.moveIn(fixture.beds[0] ?? '', MONDAY);
+
+      await generateSchedule(fixture.admin, fixture.houseId, MONDAY, {
+        executor: tx,
+        today: MONDAY,
+      });
+
+      const day = await readSchedule(
+        fixture.admin,
+        fixture.houseId,
+        { from: MONDAY, to: MONDAY },
+        { executor: tx },
+      );
+
+      expect(day).toHaveLength(1);
+      expect(day[0]?.occurrence.areaId).toBe(fixture.zones[0]?.areaId);
+      expect(day[0]?.assignments).toHaveLength(1);
+    });
+  });
+
+  it('число людей занятия берётся из нормы, а не из чек-листа', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9582');
+      await rowWith(tx, fixture, {
+        name: 'Двор на двоих',
+        beds: fixture.beds.slice(0, 3),
+        zones: [{ ...(fixture.zones[0] ?? { areaId: '', checklistId: '' }), people: 2 }],
+      });
+
+      await generateSchedule(fixture.admin, fixture.houseId, MONDAY, {
+        executor: tx,
+        today: MONDAY,
+      });
+
+      const [day] = await readSchedule(
+        fixture.admin,
+        fixture.houseId,
+        { from: MONDAY, to: MONDAY },
+        { executor: tx },
+      );
+
+      expect(day?.occurrence.peopleNeeded).toBe(2);
+      expect(day?.assignments).toHaveLength(2);
+    });
+  });
+
+  it('зон больше, чем людей: у лишней зоны назначение без исполнителя', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9583');
+      await rowWith(tx, fixture, {
+        name: 'Зон больше',
+        beds: fixture.beds.slice(0, 2),
+        zones: fixture.zones.slice(0, 3),
+      });
+      await fixture.moveIn(fixture.beds[0] ?? '', MONDAY);
+      await fixture.moveIn(fixture.beds[1] ?? '', MONDAY);
+
+      await generateSchedule(fixture.admin, fixture.houseId, MONDAY, {
+        executor: tx,
+        today: MONDAY,
+      });
+
+      const day = await readSchedule(
+        fixture.admin,
+        fixture.houseId,
+        { from: MONDAY, to: MONDAY },
+        { executor: tx },
+      );
+
+      expect(day).toHaveLength(3);
+
+      const empty = day.flatMap((item) =>
+        item.assignments.filter((assignment) => assignment.userId === null),
+      );
+
+      expect(empty).toHaveLength(1);
+      expect(empty[0]?.emptyReason).toBe('no_one');
+      expect(empty[0]?.slotPosition).toBeNull();
+    });
+  });
+
+  it('недопуск ловится при материализации: дырка помнит, кто стоял в очереди', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9584');
+      const first = await fixture.moveIn(fixture.beds[0] ?? '', MONDAY);
+      await fixture.moveIn(fixture.beds[1] ?? '', MONDAY);
+
+      const zone = fixture.zones[0] ?? { areaId: '', checklistId: '' };
+
+      // «Все, кроме первого жильца» — та самая группа из §6.1.
+      const [group] = await tx
+        .insert(schema.eligibilityGroups)
+        .values({
+          orgId: fixture.orgId,
+          houseId: fixture.houseId,
+          name: 'Все, кроме одного',
+          rule: { base: 'all', excludeUserIds: [first] },
+        })
+        .returning();
+
+      await tx.insert(schema.areaEligibility).values({
+        areaId: zone.areaId,
+        checklistType: 'regular',
+        groupId: group?.id ?? '',
+      });
+
+      await rowWith(tx, fixture, {
+        name: 'С допуском',
+        beds: fixture.beds.slice(0, 2),
+        zones: [zone],
+      });
+
+      await generateSchedule(fixture.admin, fixture.houseId, MONDAY, {
+        executor: tx,
+        today: MONDAY,
+      });
+
+      const [day] = await readSchedule(
+        fixture.admin,
+        fixture.houseId,
+        { from: MONDAY, to: MONDAY },
+        { executor: tx },
+      );
+
+      expect(day?.assignments).toHaveLength(1);
+      expect(day?.assignments[0]?.userId).toBeNull();
+      expect(day?.assignments[0]?.emptyReason).toBe('not_eligible');
+      expect(day?.assignments[0]?.queuedUserId).toBe(first);
+    });
+  });
+
+  it('версия состава с даты меняет исполнителей начиная с неё', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9585');
+      const rowId = await rowWith(tx, fixture, {
+        name: 'Смена состава',
+        beds: [fixture.beds[0] ?? ''],
+        zones: [fixture.zones[0] ?? { areaId: '', checklistId: '' }],
+      });
+
+      const first = await fixture.moveIn(fixture.beds[0] ?? '', MONDAY);
+      const second = await fixture.moveIn(fixture.beds[1] ?? '', MONDAY);
+
+      await saveRoster(
+        fixture.admin,
+        { rowId, effectiveFrom: NEXT_MONDAY, bedIds: [fixture.beds[1] ?? ''] },
+        { executor: tx },
+      );
+
+      await generateSchedule(fixture.admin, fixture.houseId, NEXT_MONDAY, {
+        executor: tx,
+        today: MONDAY,
+      });
+
+      const days = await readSchedule(
+        fixture.admin,
+        fixture.houseId,
+        { from: MONDAY, to: NEXT_MONDAY },
+        { executor: tx },
+      );
+
+      const byDate = new Map(days.map((day) => [day.occurrence.date, day.assignments[0]?.userId]));
+
+      expect(byDate.get(MONDAY)).toBe(first);
+      expect(byDate.get(NEXT_MONDAY)).toBe(second);
     });
   });
 });

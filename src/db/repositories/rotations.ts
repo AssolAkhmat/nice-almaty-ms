@@ -925,6 +925,8 @@ export interface CreateOccurrenceInput {
   date: BusinessDate;
   type: 'regular' | 'room' | 'general' | 'extra';
   cycleIndex?: number | null;
+  /** Сколько человек убирает зону в этот день; по умолчанию один. */
+  peopleNeeded?: number;
   movedFromDate?: BusinessDate | null;
   createdBy?: string | null;
 }
@@ -947,6 +949,7 @@ export async function createOccurrence(
       date: input.date,
       type: input.type,
       cycleIndex: input.cycleIndex ?? null,
+      peopleNeeded: input.peopleNeeded ?? 1,
       movedFromDate: input.movedFromDate ?? null,
       createdBy: input.createdBy ?? null,
     })
@@ -957,6 +960,27 @@ export async function createOccurrence(
   }
 
   return occurrence;
+}
+
+/**
+ * Снятие занятия вместе с его назначениями (план фазы 10, §2.6).
+ *
+ * Пересборка после правки «с даты» именно удаляет нетронутое занятие,
+ * а не правит его на месте: у нового расклада может быть другое число
+ * людей и другой набор зон, и подгонять старую строку под него значило бы
+ * хранить занятие, которого никто не назначал.
+ */
+export async function deleteOccurrence(
+  context: AccessContext,
+  occurrenceId: string,
+  executor: Executor = getDb(),
+): Promise<void> {
+  await requireOccurrence(context, occurrenceId, executor);
+
+  await executor
+    .delete(rotationAssignments)
+    .where(eq(rotationAssignments.occurrenceId, occurrenceId));
+  await executor.delete(rotationOccurrences).where(eq(rotationOccurrences.id, occurrenceId));
 }
 
 export async function listOccurrences(

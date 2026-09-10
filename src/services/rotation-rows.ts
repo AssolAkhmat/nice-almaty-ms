@@ -6,6 +6,8 @@ import {
   listRotationRows,
   listRowSlots,
   listRowZones,
+  replaceDayNorm,
+  replaceRowRoster,
   replaceRowSlots,
   replaceRowZones,
   requireRotationRow,
@@ -328,6 +330,35 @@ export async function saveRow(
 
     await replaceRowSlots(actor.context, row.id, slots, tx);
     await replaceRowZones(actor.context, row.id, zones, tx);
+
+    /*
+     * Мост в модель фазы 10: пока ряды заводятся этой формой, состав и норма
+     * первой версией повторяют её содержимое. Генерация читает уже только
+     * версии, и без моста ряд, заведённый здесь, остался бы без расписания.
+     * Мост уходит вместе со старыми таблицами в T10.7.
+     */
+    await replaceRowRoster(
+      actor.context,
+      {
+        rowId: row.id,
+        effectiveFrom: startDate,
+        bedIds: slots.map((slot) => slot.bedId),
+      },
+      tx,
+    );
+    await replaceDayNorm(
+      actor.context,
+      {
+        rowId: row.id,
+        effectiveFrom: startDate,
+        zones: zones.map((zone) => ({
+          areaId: zone.areaId,
+          checklistId: zone.checklistId,
+          people: zone.peopleNeeded,
+        })),
+      },
+      tx,
+    );
 
     await recordAudit(
       { context: actor.context, ip: actor.ip, requestId: actor.requestId },

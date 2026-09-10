@@ -3,15 +3,20 @@ import { listApprovedAbsences } from '@/db/repositories/rating';
 import {
   createAssignment,
   createOccurrence,
+  listAreaEligibility,
   listAssignmentsFor,
   listBedOccupantsOn,
+  listDayNorms,
+  listEligibilityGroups,
+  listEligibilityMembers,
   listOccurrences,
   listRotationRows,
-  listRowSlots,
-  listRowZones,
+  listRowRosters,
+  requireRotationRow,
   updateAssignment,
 } from '@/db/repositories/rotations';
-import { assignmentAt, rotationVector, weekIndex } from '@/domain/rotation-grid';
+import { parseEligibilityRule, resolveEligibility } from '@/domain/eligibility';
+import { dayPlan, effectiveVersion, type PlannedAssignment } from '@/domain/rotation-day';
 import { assertCan } from '@/lib/authz';
 import {
   addDays,
@@ -21,16 +26,17 @@ import {
   type BusinessDate,
 } from '@/lib/time';
 
-import type { RotationAssignment, RotationOccurrence } from '@/db/schema';
+import type { RotationAssignment, RotationOccurrence, RotationRow } from '@/db/schema';
 import type { UserActor } from './users';
 
 /**
- * Материализация расписания ротаций (docs/03-BUSINESS-RULES.md §6.2, §6.3, §6.6).
+ * Материализация расписания ротаций (docs/03-BUSINESS-RULES.md §6.3, §6.6,
+ * `docs/tasks/PHASE-10.md` §2.4).
  *
  * Расписание живёт в базе занятиями, а не считается на лету: занятие можно
- * перенести, отменить и переназначить. Сетка при этом остаётся формулой —
- * `src/domain/rotation-grid.ts`, — и генерация только раскладывает её
- * по календарю и по нынешним жильцам мест.
+ * перенести, отменить и переназначить. Раскладка при этом остаётся формулой —
+ * `src/domain/rotation-day.ts`, — и генерация только приносит ей состав ряда,
+ * норму дня и нынешних жильцов мест, а потом кладёт результат в календарь.
  */
 export interface ScheduleDeps {
   executor?: Executor;
@@ -125,6 +131,52 @@ function rowDates(
   return dates;
 }
 
+/**
+ * Кого группы допуска пускают к каждой зоне дома (§6.1).
+ *
+ * Зона без групп в ответе не участвует вовсе: ядро считает такую зону
+ * открытой для всех. Групп у зоны может быть несколько — они складываются,
+ * потому что каждая говорит «эти вправе», а не «только эти».
+ */
+async function eligibilityOfHouse(
+  actor: UserActor,
+  houseId: string,
+  executor: Executor,
+): Promise<Record<string, string[]>> {
+  const [groups, links, members] = await Promise.all([
+    listEligibilityGroups(actor.context, houseId, executor),
+    listAreaEligibility(actor.context, houseId, executor),
+    listEligibilityMembers(actor.context, houseId, executor),
+  ]);
+
+  const groupById = new Map(groups.map((group) => [group.id, group]));
+  const people = members.map((member) => ({
+    userId: member.userId,
+    sex: member.sex,
+    areaId: member.areaId,
+  }));
+
+  const byArea: Record<string, string[]> = {};
+
+  for (const link of links) {
+    if (link.checklistType !== 'regular') {
+      continue;
+    }
+
+    const group = groupById.get(link.groupId);
+
+    if (group === undefined) {
+      continue;
+    }
+
+    const allowed = resolveEligibility(parseEligibilityRule(group.rule), people);
+
+    byArea[link.areaId] = [...new Set([...(byArea[link.areaId] ?? []), ...allowed])];
+  }
+
+  return byArea;
+}
+
 export interface GenerateResult {
   /** Сколько занятий заведено этим вызовом. */
   created: number;
@@ -154,50 +206,96 @@ export async function generateSchedule(
   let created = 0;
 
   for (const row of rows) {
-    const [slots, zones] = await Promise.all([
-      listRowSlots(actor.context, row.id, executor),
-      listRowZones(actor.context, row.id, executor),
-    ]);
+    created += await generateRow(actor, houseId, row, today, until, executor);
+  }
 
-    if (slots.length === 0 || zones.length === 0) {
-      continue;
-    }
+  return { created };
+}
 
-    const vector = rotationVector(zones, slots.length);
-    const dates = rowDates(row.startDate as BusinessDate, today, until);
+/**
+ * Занятия одного ряда в промежутке дат — общая часть генерации и пересборки
+ * после правки «с даты» (§2.6). Занятия, которые уже есть, не трогаются.
+ */
+export async function regenerateRow(
+  actor: UserActor,
+  houseId: string,
+  rowId: string,
+  range: { from: BusinessDate; until: BusinessDate },
+  deps: ScheduleDeps = {},
+): Promise<number> {
+  const executor = executorOf(deps);
+  const row = await requireRotationRow(actor.context, rowId, executor);
 
-    for (const date of dates) {
-      const week = weekIndex(row.startDate as BusinessDate, date);
+  return generateRow(actor, houseId, row, range.from, range.until, executor);
+}
+
+async function generateRow(
+  actor: UserActor,
+  houseId: string,
+  row: RotationRow,
+  today: BusinessDate,
+  until: BusinessDate,
+  executor: Executor,
+): Promise<number> {
+  const eligibleByArea = await eligibilityOfHouse(actor, houseId, executor);
+
+  let created = 0;
+
+  const [rosters, norms] = await Promise.all([
+    listRowRosters(actor.context, row.id, executor),
+    listDayNorms(actor.context, row.id, executor),
+  ]);
+
+  // Ряд без состава или без нормы не расписывается: догадываться, кого
+  // и на какие зоны поставить, система не вправе.
+  if (rosters.length === 0 || norms.length === 0) {
+    return 0;
+  }
+
+  {
+    const rowStartDate = row.startDate as BusinessDate;
+    const occurrenceType = row.type === 'room' ? 'room' : 'regular';
+
+    for (const date of rowDates(rowStartDate, today, until)) {
+      if (effectiveVersion(rosters, date) === null || effectiveVersion(norms, date) === null) {
+        continue;
+      }
 
       // Кто где живёт — на дату занятия, а не на день генерации: место может
       // освободиться между ними, и тогда назначение сразу ждёт решения админа.
-      const occupants = new Map(
-        (await listBedOccupantsOn(actor.context, houseId, date, executor)).map((row) => [
-          row.bedId,
-          row.userId,
+      const occupants = Object.fromEntries(
+        (await listBedOccupantsOn(actor.context, houseId, date, executor)).map((occupant) => [
+          occupant.bedId,
+          occupant.userId,
         ]),
       );
 
-      const absent = await absentOn(actor, houseId, date, executor);
+      /*
+       * Отсутствующий не убирает только общую зону (§9): комнатную и генеральную
+       * админ переносит руками, и снимать их автоматически значило бы решать
+       * за него.
+       */
+      const absent = freedByAbsence(occurrenceType)
+        ? await absentOn(actor, houseId, date, executor)
+        : new Set<string>();
 
-      /** Слоты, которым на этой неделе выпала зона: ключ — зона с чек-листом. */
-      const byZone = new Map<string, { areaId: string; checklistId: string; slots: number[] }>();
-
-      slots.forEach((slot, index) => {
-        const duty = assignmentAt(vector, index, week);
-        if (duty.kind === 'rest') {
-          return;
-        }
-
-        const key = `${duty.areaId}|${duty.checklistId}`;
-        const group = byZone.get(key) ?? {
-          areaId: duty.areaId,
-          checklistId: duty.checklistId,
-          slots: [],
-        };
-        group.slots.push(slot.position);
-        byZone.set(key, group);
+      const plan = dayPlan({
+        rowStartDate,
+        date,
+        rosters,
+        norms,
+        occupants,
+        absentUserIds: [...absent],
+        eligibleByArea,
       });
+
+      /** Назначения одного занятия: зона с чек-листом — это и есть занятие. */
+      const byZone = new Map<string, PlannedAssignment[]>();
+
+      for (const assignment of plan.assignments) {
+        const key = `${assignment.areaId}|${assignment.checklistId}`;
+        byZone.set(key, [...(byZone.get(key) ?? []), assignment]);
+      }
 
       const existing = await listOccurrences(
         actor.context,
@@ -207,8 +305,14 @@ export async function generateSchedule(
       );
 
       for (const group of byZone.values()) {
+        const first = group[0];
+
+        if (first === undefined) {
+          continue;
+        }
+
         const already = existing.find(
-          (occurrence) => occurrence.rowId === row.id && occurrence.areaId === group.areaId,
+          (occurrence) => occurrence.rowId === row.id && occurrence.areaId === first.areaId,
         );
 
         // Занятие этого дня уже есть — вместе с отменённым и перенесённым:
@@ -222,41 +326,33 @@ export async function generateSchedule(
           {
             houseId,
             rowId: row.id,
-            areaId: group.areaId,
-            checklistId: group.checklistId,
+            areaId: first.areaId,
+            checklistId: first.checklistId,
             date,
-            type: row.type === 'room' ? 'room' : 'regular',
-            cycleIndex: week,
+            type: occurrenceType,
+            cycleIndex: plan.week,
+            // Число людей занятия — из нормы дня, а не из чек-листа (§2.3):
+            // по нему считается инвариант 8 и правится неделя.
+            peopleNeeded: group.length,
           },
           executor,
         );
 
         created += 1;
 
-        for (const position of group.slots) {
-          const bedId = slots.find((slot) => slot.position === position)?.bedId ?? '';
-          const living = occupants.get(bedId) ?? null;
-          /*
-           * Отсутствующий на эту дату общую зону не убирает: назначение
-           * достаётся не ему, а задаче админа «отмени или назначь вручную».
-           */
-          const occurrenceType = row.type === 'room' ? 'room' : 'regular';
-          const userId =
-            living !== null && freedByAbsence(occurrenceType) && absent.has(living) ? null : living;
-
+        for (const assignment of group) {
           await createAssignment(
             actor.context,
             {
               occurrenceId: occurrence.id,
-              userId,
-              slotPosition: position,
+              userId: assignment.userId,
+              slotPosition: assignment.position,
               source: 'auto',
-              // Пустующее место не исчезает из расписания: админ видит задачу
+              // Дырка не исчезает из расписания: админ видит задачу
               // «отмени или назначь вручную» (§6.3), а не молчаливую дыру.
-              state: userId === null ? 'needs_reassignment' : 'assigned',
-              // Причина известна прямо здесь и уходит в задачу админу вместе
-              // с дыркой: место пустует или жилец отсутствует (§2.5).
-              emptyReason: living === null ? 'empty_bed' : 'absent',
+              state: assignment.userId === null ? 'needs_reassignment' : 'assigned',
+              emptyReason: assignment.emptyReason,
+              queuedUserId: assignment.queuedUserId,
             },
             executor,
           );
@@ -265,7 +361,7 @@ export async function generateSchedule(
     }
   }
 
-  return { created };
+  return created;
 }
 
 /**
@@ -322,7 +418,7 @@ export async function syncFutureAssignments(
     executor,
   );
 
-  const slotsByRow = new Map<string, Map<number, string>>();
+  const rostersByRow = new Map<string, Awaited<ReturnType<typeof listRowRosters>>>();
   const occupantsByDate = new Map<string, Map<string, string>>();
   const absentByDate = new Map<string, Set<string>>();
   let changed = 0;
@@ -330,9 +426,8 @@ export async function syncFutureAssignments(
   for (const occurrence of scheduled) {
     const rowId = occurrence.rowId ?? '';
 
-    if (!slotsByRow.has(rowId)) {
-      const slots = await listRowSlots(actor.context, rowId, executor);
-      slotsByRow.set(rowId, new Map(slots.map((slot) => [slot.position, slot.bedId])));
+    if (!rostersByRow.has(rowId)) {
+      rostersByRow.set(rowId, await listRowRosters(actor.context, rowId, executor));
     }
 
     if (!occupantsByDate.has(occurrence.date)) {
@@ -348,7 +443,11 @@ export async function syncFutureAssignments(
       );
     }
 
-    const slots = slotsByRow.get(rowId);
+    /*
+     * Место позиции берётся из версии состава, действующей на дату занятия:
+     * состав мог смениться позже, и прошлую неделю это не касается (§2.2).
+     */
+    const roster = effectiveVersion(rostersByRow.get(rowId) ?? [], occurrence.date as BusinessDate);
     const occupants = occupantsByDate.get(occurrence.date);
 
     for (const assignment of assignments.filter((item) => item.occurrenceId === occurrence.id)) {
@@ -360,7 +459,7 @@ export async function syncFutureAssignments(
         continue;
       }
 
-      const bedId = slots?.get(assignment.slotPosition ?? -1) ?? '';
+      const bedId = roster?.bedIds[assignment.slotPosition ?? -1] ?? '';
       const living = occupants?.get(bedId) ?? null;
       const absent = absentByDate.get(occurrence.date);
       const userId =

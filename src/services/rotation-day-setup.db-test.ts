@@ -7,9 +7,11 @@ import { eq } from 'drizzle-orm';
 import * as schema from '@/db/schema';
 import { testDatabaseUrl } from '@/db/testing/database-url';
 import { NotFoundError, ValidationError } from '@/lib/errors';
+
 import { parseBusinessDate } from '@/lib/time';
 
 import { previewRotationDays, readDaySetup, saveNorm, saveRoster } from './rotation-day-setup';
+import { generateSchedule, readSchedule } from './rotation-schedule';
 
 import type { AccessContext } from '@/db/access';
 import type { Database, Transaction } from '@/db/client';
@@ -229,8 +231,8 @@ describe('состав ряда', () => {
         { executor: tx },
       );
 
-      expect(version.effectiveFrom).toBe(WEDNESDAY);
-      expect(version.bedIds).toEqual([fixture.bed1, fixture.bed2, fixture.bed3]);
+      expect(version.version.effectiveFrom).toBe(WEDNESDAY);
+      expect(version.version.bedIds).toEqual([fixture.bed1, fixture.bed2, fixture.bed3]);
     });
   });
 
@@ -371,8 +373,11 @@ describe('норма дня', () => {
         { executor: tx },
       );
 
-      expect(norm.zones.map((zone) => zone.areaId)).toEqual([fixture.yard, fixture.kitchen]);
-      expect(norm.zones.map((zone) => zone.people)).toEqual([2, 1]);
+      expect(norm.version.zones.map((zone) => zone.areaId)).toEqual([
+        fixture.yard,
+        fixture.kitchen,
+      ]);
+      expect(norm.version.zones.map((zone) => zone.people)).toEqual([2, 1]);
     });
   });
 
@@ -390,7 +395,7 @@ describe('норма дня', () => {
         { executor: tx },
       );
 
-      expect(norm.zones[0]?.people).toBe(1);
+      expect(norm.version.zones[0]?.people).toBe(1);
     });
   });
 
@@ -632,6 +637,206 @@ describe('предпросмотр', () => {
       );
 
       expect(days).toEqual([]);
+    });
+  });
+});
+
+/**
+ * Правка «с даты» пересобирает будущие занятия ряда (§2.6): нетронутые
+ * заводятся заново по новой версии, тронутые руками остаются и перечисляются.
+ */
+describe('пересборка будущих занятий', () => {
+  const FIRST = parseBusinessDate('2026-09-16');
+  const SECOND = parseBusinessDate('2026-09-23');
+  const THIRD = parseBusinessDate('2026-09-30');
+  /** «Сегодня» прогона: 16 сентября уже впереди, прошлого в горизонте нет. */
+  const TODAY = parseBusinessDate('2026-09-14');
+
+  async function scheduled(tx: Transaction, fixture: Fixture) {
+    await saveRoster(
+      fixture.admin,
+      { rowId: fixture.commonRow, effectiveFrom: WEDNESDAY, bedIds: [fixture.bed1] },
+      { executor: tx },
+    );
+    await saveNorm(
+      fixture.admin,
+      {
+        rowId: fixture.commonRow,
+        effectiveFrom: WEDNESDAY,
+        zones: [{ areaId: fixture.kitchen, checklistId: fixture.kitchenChecklist }],
+      },
+      { executor: tx },
+    );
+
+    await generateSchedule(fixture.admin, fixture.houseId, THIRD, {
+      executor: tx,
+      today: TODAY,
+    });
+
+    return readSchedule(
+      fixture.admin,
+      fixture.houseId,
+      { from: FIRST, to: THIRD },
+      { executor: tx },
+    );
+  }
+
+  it('нетронутые занятия с даты правки заводятся заново по новому составу', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9681');
+      const first = await fixture.live(fixture.bed1, 1);
+      const second = await fixture.live(fixture.bed2, 2);
+
+      expect((await scheduled(tx, fixture)).map((day) => day.assignments[0]?.userId)).toEqual([
+        first,
+        first,
+        first,
+      ]);
+
+      const result = await saveRoster(
+        fixture.admin,
+        { rowId: fixture.commonRow, effectiveFrom: SECOND, bedIds: [fixture.bed2] },
+        { executor: tx, today: TODAY },
+      );
+
+      expect(result.rebuilt).toBe(2);
+      expect(result.kept).toEqual([]);
+
+      const days = await readSchedule(
+        fixture.admin,
+        fixture.houseId,
+        { from: FIRST, to: THIRD },
+        { executor: tx },
+      );
+
+      expect(days.map((day) => day.assignments[0]?.userId)).toEqual([first, second, second]);
+    });
+  });
+
+  it('занятие с ручной правкой остаётся и попадает в отчёт', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9682');
+      const first = await fixture.live(fixture.bed1, 1);
+      await fixture.live(fixture.bed2, 2);
+
+      const days = await scheduled(tx, fixture);
+      const third = days.find((day) => day.occurrence.date === THIRD);
+
+      // Админ поменял исполнителя руками: такое занятие пересборка не трогает.
+      await tx
+        .update(schema.rotationAssignments)
+        .set({ source: 'manual' })
+        .where(eq(schema.rotationAssignments.id, third?.assignments[0]?.id ?? ''));
+
+      const result = await saveRoster(
+        fixture.admin,
+        { rowId: fixture.commonRow, effectiveFrom: SECOND, bedIds: [fixture.bed2] },
+        { executor: tx, today: TODAY },
+      );
+
+      expect(result.rebuilt).toBe(1);
+      expect(result.kept).toEqual([{ date: THIRD, areaId: fixture.kitchen }]);
+
+      const after = await readSchedule(
+        fixture.admin,
+        fixture.houseId,
+        { from: THIRD, to: THIRD },
+        { executor: tx },
+      );
+
+      expect(after[0]?.assignments[0]?.userId).toBe(first);
+    });
+  });
+
+  it('отменённое занятие пересборка не воскрешает', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9683');
+      await fixture.live(fixture.bed1, 1);
+      await fixture.live(fixture.bed2, 2);
+
+      const days = await scheduled(tx, fixture);
+      const second = days.find((day) => day.occurrence.date === SECOND);
+
+      await tx
+        .update(schema.rotationOccurrences)
+        .set({ status: 'cancelled' })
+        .where(eq(schema.rotationOccurrences.id, second?.occurrence.id ?? ''));
+
+      const result = await saveRoster(
+        fixture.admin,
+        { rowId: fixture.commonRow, effectiveFrom: SECOND, bedIds: [fixture.bed2] },
+        { executor: tx, today: TODAY },
+      );
+
+      expect(result.kept.map((item) => item.date)).toContain(SECOND);
+
+      const after = await readSchedule(
+        fixture.admin,
+        fixture.houseId,
+        { from: SECOND, to: SECOND },
+        { executor: tx },
+      );
+
+      expect(after).toHaveLength(1);
+      expect(after[0]?.occurrence.status).toBe('cancelled');
+    });
+  });
+
+  it('прошлое не пересобирается: правка с прошлой даты трогает только будущее', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9684');
+      const first = await fixture.live(fixture.bed1, 1);
+      await fixture.live(fixture.bed2, 2);
+
+      await scheduled(tx, fixture);
+
+      const result = await saveRoster(
+        fixture.admin,
+        { rowId: fixture.commonRow, effectiveFrom: WEDNESDAY, bedIds: [fixture.bed2] },
+        // «Сегодня» прогона — после первого занятия: оно уже прошло.
+        { executor: tx, today: parseBusinessDate('2026-09-17') },
+      );
+
+      expect(result.rebuilt).toBe(2);
+
+      const days = await readSchedule(
+        fixture.admin,
+        fixture.houseId,
+        { from: FIRST, to: FIRST },
+        { executor: tx },
+      );
+
+      expect(days[0]?.assignments[0]?.userId).toBe(first);
+    });
+  });
+
+  it('правка нормы пересобирает занятия так же, как правка состава', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9685');
+      await fixture.live(fixture.bed1, 1);
+
+      await scheduled(tx, fixture);
+
+      const result = await saveNorm(
+        fixture.admin,
+        {
+          rowId: fixture.commonRow,
+          effectiveFrom: SECOND,
+          zones: [{ areaId: fixture.yard, checklistId: fixture.yardChecklist, people: 1 }],
+        },
+        { executor: tx, today: TODAY },
+      );
+
+      expect(result.rebuilt).toBe(2);
+
+      const days = await readSchedule(
+        fixture.admin,
+        fixture.houseId,
+        { from: SECOND, to: SECOND },
+        { executor: tx },
+      );
+
+      expect(days[0]?.occurrence.areaId).toBe(fixture.yard);
     });
   });
 });
