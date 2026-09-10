@@ -5,6 +5,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import * as schema from '@/db/schema';
 import { putRatingRule } from '@/db/repositories/rating';
+import { seedRow } from '@/db/testing/rotation-row';
 import { testDatabaseUrl } from '@/db/testing/database-url';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { parseBusinessDate, parseInstant } from '@/lib/time';
@@ -12,7 +13,6 @@ import { parseBusinessDate, parseInstant } from '@/lib/time';
 import { readCalendar } from './rotation-calendar';
 import { closeRotationDay } from './rotation-close-day';
 import { markAssignment, setOccurrenceStatus } from './rotation-confirmation';
-import { saveRow } from './rotation-rows';
 import { generateSchedule } from './rotation-schedule';
 import { addRatingEvent, readRating, readRatingHistory } from './rating';
 
@@ -156,7 +156,7 @@ async function scheduledAssignment(
   tx: Transaction,
   fixture: Awaited<ReturnType<typeof seed>>,
 ): Promise<string> {
-  await saveRow(
+  await seedRow(
     fixture.admin,
     {
       houseId: fixture.houseId,
@@ -164,7 +164,7 @@ async function scheduledAssignment(
       type: 'common',
       weekday: 1,
       startDate: MONDAY,
-      slots: [{ bedId: fixture.first.bedId }],
+      bedIds: [fixture.first.bedId],
       zones: [{ areaId: fixture.yard, checklistId: fixture.checklist }],
     },
     { executor: tx },

@@ -19,6 +19,7 @@ import { readRotationSetup } from '@/services/rotation-setup';
 import {
   RotationRowsManager,
   type BedOption,
+  type RoomOption,
   type RowBlock,
   type ZoneOption,
 } from './rotation-rows-manager';
@@ -142,19 +143,18 @@ export default async function RotationSetupPage({
     })),
   );
 
-  const rowBlocks: RowBlock[] = rows.map((view) => ({
-    rowId: view.row.id,
-    name: view.row.name,
-    type: view.row.type,
-    weekday: view.row.weekday,
-    startDate: view.row.startDate,
-    slots: view.slots.map((slot) => ({ bedId: slot.bedId, position: slot.position })),
-    zones: view.zones.map((zone) => ({
-      areaId: zone.areaId,
-      checklistId: zone.checklistId,
-      position: zone.position,
-    })),
+  const rowBlocks: RowBlock[] = rows.map((row) => ({
+    rowId: row.id,
+    name: row.name,
+    type: row.type,
+    weekday: row.weekday,
+    startDate: row.startDate,
+    roomAreaId: row.roomAreaId,
   }));
+
+  const rooms: RoomOption[] = setup.areas
+    .filter((area) => area.area.type === 'living')
+    .map((area) => ({ areaId: area.area.id, areaName: area.area.name }));
 
   /*
    * Предпросмотр считается на сервере сразу: человек открывает экран и видит,
@@ -216,7 +216,7 @@ export default async function RotationSetupPage({
         members={setup.members.map((member) => ({ userId: member.userId, name: member.name }))}
       />
 
-      <RotationRowsManager beds={beds} houseId={houseId} rows={rowBlocks} zones={zoneOptions} />
+      <RotationRowsManager houseId={houseId} rooms={rooms} rows={rowBlocks} />
 
       <RotationDayManager
         beds={beds}

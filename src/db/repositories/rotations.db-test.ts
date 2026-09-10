@@ -16,12 +16,8 @@ import {
   listEligibilityGroups,
   listOccurrences,
   listRotationRows,
-  listRowSlots,
-  listRowZones,
   putTemplateSettings,
   readTemplateSettings,
-  replaceRowSlots,
-  replaceRowZones,
   requireRotationRow,
 } from './rotations';
 
@@ -285,140 +281,6 @@ describe('группы допуска', () => {
 });
 
 describe('ряды ротаций', () => {
-  it('ряд заводится вместе со слотами и зонами', async () => {
-    await inRollback(async (tx) => {
-      const fixture = await seed(tx, '4206');
-      const checklist = await createChecklist(
-        fixture.adminA,
-        { areaId: fixture.yardA, type: 'regular', title: 'Двор', peopleNeeded: 1 },
-        tx,
-      );
-
-      const row = await createRotationRow(
-        fixture.adminA,
-        {
-          houseId: fixture.houseA,
-          name: 'Общие зоны',
-          type: 'common',
-          weekday: 1,
-          startDate: MONDAY,
-        },
-        tx,
-      );
-
-      await replaceRowSlots(
-        fixture.adminA,
-        row.id,
-        [
-          { position: 0, bedId: fixture.bedsA[0] ?? '' },
-          { position: 1, bedId: fixture.bedsA[1] ?? '' },
-        ],
-        tx,
-      );
-      await replaceRowZones(
-        fixture.adminA,
-        row.id,
-        [{ position: 0, areaId: fixture.yardA, checklistId: checklist.id, peopleNeeded: 1 }],
-        tx,
-      );
-
-      expect((await listRowSlots(fixture.adminA, row.id, tx)).map((slot) => slot.position)).toEqual(
-        [0, 1],
-      );
-      expect(await listRowZones(fixture.adminA, row.id, tx)).toHaveLength(1);
-      expect((await requireRotationRow(fixture.adminA, row.id, tx)).orgId).toBe(fixture.orgId);
-    });
-  });
-
-  it('повторная сборка ряда заменяет слоты, а не добавляет вторые', async () => {
-    await inRollback(async (tx) => {
-      const fixture = await seed(tx, '4207');
-      const row = await createRotationRow(
-        fixture.adminA,
-        {
-          houseId: fixture.houseA,
-          name: 'Общие зоны',
-          type: 'common',
-          weekday: 1,
-          startDate: MONDAY,
-        },
-        tx,
-      );
-
-      await replaceRowSlots(
-        fixture.adminA,
-        row.id,
-        [
-          { position: 0, bedId: fixture.bedsA[0] ?? '' },
-          { position: 1, bedId: fixture.bedsA[1] ?? '' },
-        ],
-        tx,
-      );
-      await replaceRowSlots(
-        fixture.adminA,
-        row.id,
-        [{ position: 0, bedId: fixture.bedsA[1] ?? '' }],
-        tx,
-      );
-
-      const slots = await listRowSlots(fixture.adminA, row.id, tx);
-      expect(slots).toHaveLength(1);
-      expect(slots[0]?.bedId).toBe(fixture.bedsA[1]);
-    });
-  });
-
-  it('две позиции с одним номером в базу не проходят', async () => {
-    await inRollback(async (tx) => {
-      const fixture = await seed(tx, '4208');
-      const row = await createRotationRow(
-        fixture.adminA,
-        {
-          houseId: fixture.houseA,
-          name: 'Общие зоны',
-          type: 'common',
-          weekday: 1,
-          startDate: MONDAY,
-        },
-        tx,
-      );
-
-      const text = await failureText(tx, (inner) =>
-        inner.insert(schema.rotationRowSlots).values([
-          { rowId: row.id, position: 0, bedId: fixture.bedsA[0] ?? '' },
-          { rowId: row.id, position: 0, bedId: fixture.bedsA[1] ?? '' },
-        ]),
-      );
-
-      expect(text).toContain('rotation_row_slots_position_unique');
-    });
-  });
-
-  it('одно место дважды в ряду не стоит: иначе жилец получил бы две зоны за неделю', async () => {
-    await inRollback(async (tx) => {
-      const fixture = await seed(tx, '4209');
-      const row = await createRotationRow(
-        fixture.adminA,
-        {
-          houseId: fixture.houseA,
-          name: 'Общие зоны',
-          type: 'common',
-          weekday: 1,
-          startDate: MONDAY,
-        },
-        tx,
-      );
-
-      const text = await failureText(tx, (inner) =>
-        inner.insert(schema.rotationRowSlots).values([
-          { rowId: row.id, position: 0, bedId: fixture.bedsA[0] ?? '' },
-          { rowId: row.id, position: 1, bedId: fixture.bedsA[0] ?? '' },
-        ]),
-      );
-
-      expect(text).toContain('rotation_row_slots_bed_unique');
-    });
-  });
-
   it('ряды чужого дома не перечисляются и не открываются', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '4210');

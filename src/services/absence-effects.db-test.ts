@@ -4,12 +4,12 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import * as schema from '@/db/schema';
 import { seedChartOfAccounts } from '@/db/testing/chart-of-accounts';
+import { seedRow } from '@/db/testing/rotation-row';
 import { testDatabaseUrl } from '@/db/testing/database-url';
 import { parseBusinessDate, parseInstant } from '@/lib/time';
 
 import { approveAbsence, rejectAbsence, submitAbsence } from './absences';
 import { readCalendar } from './rotation-calendar';
-import { saveRow } from './rotation-rows';
 import { generateSchedule, refreshFutureAssignments } from './rotation-schedule';
 import { closeUtilityPeriod, openUtilityPeriod, readUtilityPeriod } from './utilities';
 
@@ -288,7 +288,7 @@ describe('ротации и отсутствия (§6.3, §9)', () => {
     tx: Transaction,
     fixture: Awaited<ReturnType<typeof seed>>,
   ): Promise<void> {
-    await saveRow(
+    await seedRow(
       fixture.admin,
       {
         houseId: fixture.houseId,
@@ -296,7 +296,7 @@ describe('ротации и отсутствия (§6.3, §9)', () => {
         type: 'common',
         weekday: 1,
         startDate: MONDAY,
-        slots: [{ bedId: fixture.first.bedId }, { bedId: fixture.second.bedId }],
+        bedIds: [fixture.first.bedId, fixture.second.bedId],
         zones: [{ areaId: fixture.yard, checklistId: fixture.yardChecklist }],
       },
       { executor: tx },
@@ -349,7 +349,7 @@ describe('ротации и отсутствия (§6.3, §9)', () => {
       const fixture = await seed(tx, '5412');
       await approvedTrip(tx, fixture);
 
-      await saveRow(
+      await seedRow(
         fixture.admin,
         {
           houseId: fixture.houseId,
@@ -357,7 +357,7 @@ describe('ротации и отсутствия (§6.3, §9)', () => {
           type: 'room',
           weekday: 0,
           startDate: parseBusinessDate('2026-09-13'),
-          slots: [{ bedId: fixture.first.bedId }, { bedId: fixture.second.bedId }],
+          bedIds: [fixture.first.bedId, fixture.second.bedId],
           zones: [{ areaId: fixture.room, checklistId: fixture.roomChecklist }],
         },
         { executor: tx },

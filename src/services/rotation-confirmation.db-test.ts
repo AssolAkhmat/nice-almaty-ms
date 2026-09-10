@@ -5,6 +5,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import { createRotationDebt } from '@/db/repositories/rotations';
 import * as schema from '@/db/schema';
+import { seedRow } from '@/db/testing/rotation-row';
 import { testDatabaseUrl } from '@/db/testing/database-url';
 import { debtBalance } from '@/domain/rotation-debt';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
@@ -12,7 +13,6 @@ import { parseBusinessDate, parseInstant } from '@/lib/time';
 
 import { confirmAssignment, markAssignment, setOccurrenceStatus } from './rotation-confirmation';
 import { readCalendar } from './rotation-calendar';
-import { saveRow } from './rotation-rows';
 import { generateSchedule } from './rotation-schedule';
 
 import type { AccessContext } from '@/db/access';
@@ -130,7 +130,7 @@ async function seed(tx: Transaction, suffix: string) {
 
   const admin = actor(context('admin', adminUser?.id ?? '', houseId));
 
-  await saveRow(
+  await seedRow(
     admin,
     {
       houseId,
@@ -138,7 +138,7 @@ async function seed(tx: Transaction, suffix: string) {
       type: 'common',
       weekday: 1,
       startDate: MONDAY,
-      slots: [{ bedId: bed?.id ?? '' }, { bedId: otherBed?.id ?? '' }],
+      bedIds: [bed?.id ?? '', otherBed?.id ?? ''],
       zones: [{ areaId: yard?.id ?? '', checklistId: checklist?.id ?? '' }],
     },
     { executor: tx },

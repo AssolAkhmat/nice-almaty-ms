@@ -4,13 +4,13 @@ import postgres from 'postgres';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import * as schema from '@/db/schema';
+import { seedRow } from '@/db/testing/rotation-row';
 import { testDatabaseUrl } from '@/db/testing/database-url';
 import { ForbiddenError } from '@/lib/errors';
 import { parseBusinessDate, type BusinessDate } from '@/lib/time';
 
 import { assignBedToResidency, releaseBedOfResidency } from './beds';
 import { saveNorm, saveRoster } from './rotation-day-setup';
-import { saveRow } from './rotation-rows';
 import { generateSchedule, readSchedule, refreshFutureAssignments } from './rotation-schedule';
 
 import type { AccessContext } from '@/db/access';
@@ -176,13 +176,7 @@ async function rowWith(
 ): Promise<string> {
   const startDate = input.startDate ?? MONDAY;
 
-  /*
-   * Сам ряд пока заводится прежним сервисом, и ему нужны слоты и зоны старой
-   * модели: они уходят в T10.7 и на генерацию уже не влияют. Даётся заведомо
-   * допустимая пара — все места дома и одна зона, — чтобы инвариант 9 старой
-   * модели не мешал новому случаю «зон больше, чем людей».
-   */
-  const row = await saveRow(
+  const row = await seedRow(
     fixture.admin,
     {
       houseId: fixture.houseId,
@@ -190,25 +184,9 @@ async function rowWith(
       type: 'common',
       weekday: 1,
       startDate,
-      slots: fixture.beds.map((bedId) => ({ bedId })),
-      zones: [
-        {
-          areaId: input.zones[0]?.areaId ?? '',
-          checklistId: input.zones[0]?.checklistId ?? '',
-        },
-      ],
+      bedIds: input.beds,
+      zones: input.zones,
     },
-    { executor: tx },
-  );
-
-  await saveRoster(
-    fixture.admin,
-    { rowId: row.id, effectiveFrom: startDate, bedIds: input.beds },
-    { executor: tx },
-  );
-  await saveNorm(
-    fixture.admin,
-    { rowId: row.id, effectiveFrom: startDate, zones: input.zones },
     { executor: tx },
   );
 

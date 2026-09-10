@@ -366,8 +366,7 @@ async function removeLeftoverAreas(db: ReturnType<typeof drizzle>): Promise<void
       .where(inArray(schema.rotationOccurrences.id, occurrenceIds));
   }
 
-  await db.delete(schema.rotationRowZones).where(inArray(schema.rotationRowZones.areaId, ids));
-  // Модель фазы 10: зона живёт ещё и в нормах дней, а место — в составах рядов.
+  // Зона живёт в нормах дней, место — в составах рядов (фаза 10).
   await db
     .delete(schema.rotationDayNormZones)
     .where(inArray(schema.rotationDayNormZones.areaId, ids));
@@ -380,9 +379,6 @@ async function removeLeftoverAreas(db: ReturnType<typeof drizzle>): Promise<void
   ).map((row) => row.id);
 
   if (areaBedIds.length > 0) {
-    await db
-      .delete(schema.rotationRowSlots)
-      .where(inArray(schema.rotationRowSlots.bedId, areaBedIds));
     await db
       .delete(schema.rotationRowRosterSlots)
       .where(inArray(schema.rotationRowRosterSlots.bedId, areaBedIds));
@@ -602,9 +598,6 @@ async function removeAcceptanceHouseData(db: ReturnType<typeof drizzle>): Promis
   }
 
   if (rowIds.length > 0) {
-    await db.delete(schema.rotationRowSlots).where(inArray(schema.rotationRowSlots.rowId, rowIds));
-    await db.delete(schema.rotationRowZones).where(inArray(schema.rotationRowZones.rowId, rowIds));
-
     // Версии состава и нормы держат ряд ссылками: они уходят перед ним.
     const rosterIds = (
       await db

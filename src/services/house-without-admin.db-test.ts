@@ -3,13 +3,13 @@ import postgres from 'postgres';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import * as schema from '@/db/schema';
+import { seedRow } from '@/db/testing/rotation-row';
 import { testDatabaseUrl } from '@/db/testing/database-url';
 import { parseBusinessDate, parseInstant } from '@/lib/time';
 
 import { createInvoice } from './invoices';
 import { readCalendar } from './rotation-calendar';
 import { markAssignment } from './rotation-confirmation';
-import { saveRow } from './rotation-rows';
 import { generateSchedule } from './rotation-schedule';
 import { addPeriodLine, closeUtilityPeriod, openUtilityPeriod } from './utilities';
 
@@ -135,7 +135,7 @@ describe('дом без админа', () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '6501');
 
-      await saveRow(
+      await seedRow(
         fixture.network,
         {
           houseId: fixture.houseId,
@@ -143,7 +143,7 @@ describe('дом без админа', () => {
           type: 'common',
           weekday: 1,
           startDate: MONDAY,
-          slots: [{ bedId: fixture.bedId }],
+          bedIds: [fixture.bedId],
           zones: [{ areaId: fixture.yardId, checklistId: fixture.checklistId }],
         },
         { executor: tx },

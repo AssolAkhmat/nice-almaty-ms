@@ -262,7 +262,11 @@ function DayRowCard({
               const key = `${zone.areaId}|${zone.checklistId}`;
 
               return (
-                <div className="flex items-center justify-between gap-3 text-[13px]" key={key}>
+                <div
+                  className="flex items-center justify-between gap-3 text-[13px]"
+                  data-testid={`norm-row-${id}-${zone.areaId}`}
+                  key={key}
+                >
                   <span className="min-w-0 flex-1 truncate">
                     {zone.areaName} · {zone.checklistTitle}
                   </span>

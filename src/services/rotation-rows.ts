@@ -1,44 +1,28 @@
 import { getDb, type Executor } from '@/db/client';
-import { listAreas, listBeds } from '@/db/repositories/areas';
+import { listAreas } from '@/db/repositories/areas';
 import {
   createRotationRow,
-  listChecklists,
   listRotationRows,
-  listRowSlots,
-  listRowZones,
-  replaceDayNorm,
-  replaceRowRoster,
-  replaceRowSlots,
-  replaceRowZones,
   requireRotationRow,
   updateRotationRow,
 } from '@/db/repositories/rotations';
-import { rotationVector } from '@/domain/rotation-grid';
 import { assertCan } from '@/lib/authz';
 import { NotFoundError, ValidationError } from '@/lib/errors';
 import { parseBusinessDate, toAlmatyParts, startOfDayUtc, type BusinessDate } from '@/lib/time';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
 
-import type {
-  Area,
-  AreaChecklist,
-  Bed,
-  RotationRow,
-  RotationRowSlot,
-  RotationRowZone,
-} from '@/db/schema';
+import type { RotationRow } from '@/db/schema';
 import type { UserActor } from './users';
 
 /**
- * Ряды ротаций (docs/03-BUSINESS-RULES.md §6.1, §6.4).
+ * Ряды ротаций (docs/03-BUSINESS-RULES.md §6.4, `docs/tasks/PHASE-10.md` §2.2, §2.3).
  *
- * Ряд — это дом, день недели, дата первой ротации, упорядоченные места
- * и упорядоченные зоны. Инвариант 9 (`D <= S`) проверяется той же формулой,
- * по которой потом считается сетка: расходиться им нельзя.
- *
- * Слот держится места, а не человека: сменился жилец — позиция в цикле
- * осталась, и ряд не пересобирается (§6.1).
+ * Ряд — это дом, тип, день недели и дата первой ротации; у комнатного ряда
+ * ещё и его комната. Кто участвует и какие зоны убираются, живёт отдельно —
+ * версиями состава и нормы с датой вступления (`rotation-day-setup`):
+ * состав меняется реже списка зон, и правятся они порознь (P10-5, P10-17).
+ * Прежний ряд «места и зоны одним махом» вместе с инвариантом 9 снят.
  */
 export interface RotationRowsDeps {
   executor?: Executor;
@@ -47,15 +31,6 @@ export interface RotationRowsDeps {
 
 function executorOf(deps: RotationRowsDeps): Executor {
   return deps.executor ?? getDb();
-}
-
-export interface RowSlotInput {
-  bedId: string;
-}
-
-export interface RowZoneInput {
-  areaId: string;
-  checklistId: string;
 }
 
 export interface RowInput {
@@ -67,45 +42,26 @@ export interface RowInput {
   /** 0 — воскресенье, 6 — суббота. */
   weekday: number;
   startDate: BusinessDate;
-  /** Порядок в списке и есть порядок в цикле. */
-  slots: readonly RowSlotInput[];
-  zones: readonly RowZoneInput[];
+  /** Комната комнатного ряда (§6.4); у ряда общих зон её нет. */
+  roomAreaId?: string | null;
   sortOrder?: number;
-}
-
-export interface RotationRowView {
-  row: RotationRow;
-  slots: RotationRowSlot[];
-  zones: RotationRowZone[];
 }
 
 export async function readRows(
   actor: UserActor,
   houseId: string,
   deps: RotationRowsDeps = {},
-): Promise<RotationRowView[]> {
+): Promise<RotationRow[]> {
   const executor = executorOf(deps);
 
   assertCan(actor.context, 'settings.house.read', { houseId });
 
-  const rows = await listRotationRows(
+  return listRotationRows(
     actor.context,
     houseId,
     deps.includeInactive === true ? { includeInactive: true } : {},
     executor,
   );
-
-  const views: RotationRowView[] = [];
-
-  for (const row of rows) {
-    views.push({
-      row,
-      slots: await listRowSlots(actor.context, row.id, executor),
-      zones: await listRowZones(actor.context, row.id, executor),
-    });
-  }
-
-  return views;
 }
 
 function assertName(name: string): string {
@@ -135,7 +91,7 @@ function assertSchedule(input: RowInput): BusinessDate {
 
   const startDate = parseBusinessDate(input.startDate);
 
-  // Дата первой ротации — от неё считается номер недели `k` (§6.2).
+  // Дата первой ротации — от неё считается номер недели `k` (§2.4).
   // Не совпав с днём недели ряда, она сдвинула бы всю сетку на день.
   if (weekdayOf(startDate) !== input.weekday) {
     throw new ValidationError('rotationRows.errors.startDateWeekday');
@@ -144,132 +100,38 @@ function assertSchedule(input: RowInput): BusinessDate {
   return startDate;
 }
 
-interface HouseParts {
-  areas: Map<string, Area>;
-  beds: Map<string, Bed>;
-  checklists: Map<string, AreaChecklist>;
-}
-
-async function readHouseParts(
+/**
+ * Комната комнатного ряда: жилая зона своего дома. Ряд общих зон комнаты
+ * не имеет — какие зоны он убирает, говорит норма дня, а не сам ряд.
+ */
+async function resolveRoom(
   actor: UserActor,
-  houseId: string,
+  input: RowInput,
   executor: Executor,
-): Promise<HouseParts> {
-  const [areas, beds, checklists] = await Promise.all([
-    listAreas(actor.context, houseId, {}, executor),
-    listBeds(actor.context, houseId, {}, executor),
-    listChecklists(actor.context, houseId, {}, executor),
-  ]);
-
-  return {
-    areas: new Map(areas.map((area) => [area.id, area])),
-    beds: new Map(beds.map((bed) => [bed.id, bed])),
-    checklists: new Map(checklists.map((checklist) => [checklist.id, checklist])),
-  };
-}
-
-/** Слоты ряда: места своего дома, каждое по разу, в заданном порядке. */
-function resolveSlots(input: RowInput, parts: HouseParts): { position: number; bedId: string }[] {
-  if (input.slots.length === 0) {
-    throw new ValidationError('rotationRows.errors.slotsRequired');
-  }
-
-  const seen = new Set<string>();
-
-  return input.slots.map((slot, position) => {
-    if (!parts.beds.has(slot.bedId)) {
-      // Чужое место неотличимо от несуществующего (P1-1).
-      throw new NotFoundError('Место не найдено');
-    }
-
-    if (seen.has(slot.bedId)) {
-      throw new ValidationError('rotationRows.errors.bedTwice');
-    }
-
-    seen.add(slot.bedId);
-
-    return { position, bedId: slot.bedId };
-  });
-}
-
-/** Зоны ряда вместе с числом людей, переписанным из чек-листа. */
-function resolveZones(
-  input: RowInput,
-  parts: HouseParts,
-): { position: number; areaId: string; checklistId: string; peopleNeeded: number }[] {
-  if (input.zones.length === 0) {
-    throw new ValidationError('rotationRows.errors.zonesRequired');
-  }
-
-  if (input.type === 'room' && input.zones.length !== 1) {
-    throw new ValidationError('rotationRows.errors.roomRowSingleZone');
-  }
-
-  return input.zones.map((zone, position) => {
-    const area = parts.areas.get(zone.areaId);
-    if (area === undefined) {
-      throw new NotFoundError('Зона не найдена');
-    }
-
-    const checklist = parts.checklists.get(zone.checklistId);
-    if (checklist === undefined) {
-      throw new NotFoundError('Чек-лист не найден');
-    }
-
-    // Чек-лист чужой зоны означал бы, что убирают одно, а спрашивают другое.
-    if (checklist.areaId !== zone.areaId) {
-      throw new ValidationError('rotationRows.errors.checklistArea');
-    }
-
-    if (input.type === 'room' && area.type !== 'living') {
-      throw new ValidationError('rotationRows.errors.roomRowLivingArea');
-    }
-
-    return {
-      position,
-      areaId: zone.areaId,
-      checklistId: zone.checklistId,
-      peopleNeeded: checklist.peopleNeeded,
-    };
-  });
-}
-
-/**
- * Комнатный ряд ходит по кругу внутри своей комнаты, поэтому его слоты —
- * места этой же комнаты. Место из другой комнаты дало бы жильцу чужую
- * уборку, а комнате — исполнителя, который в ней не живёт.
- */
-function assertRoomSlots(
-  input: RowInput,
-  parts: HouseParts,
-  zones: readonly { areaId: string }[],
-): void {
+): Promise<string | null> {
   if (input.type !== 'room') {
-    return;
+    return null;
   }
 
-  const roomId = zones[0]?.areaId;
+  const roomAreaId = input.roomAreaId ?? '';
 
-  for (const slot of input.slots) {
-    if (parts.beds.get(slot.bedId)?.areaId !== roomId) {
-      throw new ValidationError('rotationRows.errors.roomRowSlots');
-    }
+  if (roomAreaId === '') {
+    throw new ValidationError('rotationRows.errors.roomRequired');
   }
-}
 
-/**
- * Инвариант 9 проверяется той самой формулой, по которой считается сетка:
- * вектор обязанностей длиннее числа слотов собран быть не может.
- */
-function assertInvariantNine(
-  slots: readonly unknown[],
-  zones: readonly { areaId: string; checklistId: string; peopleNeeded: number }[],
-): void {
-  try {
-    rotationVector(zones, slots.length);
-  } catch {
-    throw new ValidationError('rotationRows.errors.tooManyDuties');
+  const areas = await listAreas(actor.context, input.houseId, {}, executor);
+  const area = areas.find((item) => item.id === roomAreaId);
+
+  if (area === undefined) {
+    // Чужая комната неотличима от несуществующей (P1-1).
+    throw new NotFoundError('Зона не найдена');
   }
+
+  if (area.type !== 'living') {
+    throw new ValidationError('rotationRows.errors.roomRowLivingArea');
+  }
+
+  return area.id;
 }
 
 export async function saveRow(
@@ -283,13 +145,7 @@ export async function saveRow(
 
   const name = assertName(input.name);
   const startDate = assertSchedule(input);
-
-  const parts = await readHouseParts(actor, input.houseId, executor);
-  const zones = resolveZones(input, parts);
-  const slots = resolveSlots(input, parts);
-
-  assertRoomSlots(input, parts, zones);
-  assertInvariantNine(slots, zones);
+  const roomAreaId = await resolveRoom(actor, input, executor);
 
   const existing =
     input.rowId === undefined
@@ -307,8 +163,7 @@ export async function saveRow(
               type: input.type,
               weekday: input.weekday,
               startDate,
-              // Комната ряда — та самая единственная зона комнатного ряда (§6.4).
-              roomAreaId: input.type === 'room' ? (zones[0]?.areaId ?? null) : null,
+              roomAreaId,
               ...(input.sortOrder === undefined ? {} : { sortOrder: input.sortOrder }),
             },
             tx,
@@ -321,44 +176,12 @@ export async function saveRow(
               type: input.type,
               weekday: input.weekday,
               startDate,
-              roomAreaId: input.type === 'room' ? (zones[0]?.areaId ?? null) : null,
+              roomAreaId,
               isActive: true,
               ...(input.sortOrder === undefined ? {} : { sortOrder: input.sortOrder }),
             },
             tx,
           );
-
-    await replaceRowSlots(actor.context, row.id, slots, tx);
-    await replaceRowZones(actor.context, row.id, zones, tx);
-
-    /*
-     * Мост в модель фазы 10: пока ряды заводятся этой формой, состав и норма
-     * первой версией повторяют её содержимое. Генерация читает уже только
-     * версии, и без моста ряд, заведённый здесь, остался бы без расписания.
-     * Мост уходит вместе со старыми таблицами в T10.7.
-     */
-    await replaceRowRoster(
-      actor.context,
-      {
-        rowId: row.id,
-        effectiveFrom: startDate,
-        bedIds: slots.map((slot) => slot.bedId),
-      },
-      tx,
-    );
-    await replaceDayNorm(
-      actor.context,
-      {
-        rowId: row.id,
-        effectiveFrom: startDate,
-        zones: zones.map((zone) => ({
-          areaId: zone.areaId,
-          checklistId: zone.checklistId,
-          people: zone.peopleNeeded,
-        })),
-      },
-      tx,
-    );
 
     await recordAudit(
       { context: actor.context, ip: actor.ip, requestId: actor.requestId },
@@ -376,8 +199,7 @@ export async function saveRow(
           type: input.type,
           weekday: input.weekday,
           startDate,
-          slots: slots.length,
-          zones: zones.length,
+          roomAreaId,
         },
       },
       tx,

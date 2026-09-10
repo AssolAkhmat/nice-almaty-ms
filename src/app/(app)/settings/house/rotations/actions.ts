@@ -268,12 +268,7 @@ export async function saveRowAction(
     return { error: 'rotationRows.errors.startDateInvalid' };
   }
 
-  const slots = ordered(formData, 'slot-', (bedId) => ({ bedId })).map((item) => item.value);
-  const zones = ordered(formData, 'zone-', (key) => {
-    const [areaId = '', checklistId = ''] = key.split('|');
-
-    return { areaId, checklistId };
-  }).map((item) => item.value);
+  const roomAreaId = text(formData, 'roomAreaId');
 
   try {
     await saveRow(user, {
@@ -283,8 +278,7 @@ export async function saveRowAction(
       type: type === 'room' ? 'room' : 'common',
       weekday: Number(text(formData, 'weekday')),
       startDate,
-      slots,
-      zones,
+      roomAreaId: roomAreaId === '' ? null : roomAreaId,
     });
   } catch (error) {
     return failure(error);

@@ -167,59 +167,6 @@ export const rotationRows = pgTable(
 );
 
 /**
- * Слот ряда — позиция в цикле, привязанная к месту, а не к человеку (§6.1).
- * Сменился жилец — позиция сохранилась, и сетка не пересобирается.
- */
-export const rotationRowSlots = pgTable(
-  'rotation_row_slots',
-  {
-    id: uuid('id')
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    rowId: uuid('row_id')
-      .notNull()
-      .references(() => rotationRows.id),
-    position: integer('position').notNull(),
-    bedId: uuid('bed_id')
-      .notNull()
-      .references(() => beds.id),
-  },
-  (table) => [
-    uniqueIndex('rotation_row_slots_position_unique').on(table.rowId, table.position),
-    // Место входит в ряд один раз: иначе один жилец получил бы две зоны за неделю.
-    uniqueIndex('rotation_row_slots_bed_unique').on(table.rowId, table.bedId),
-  ],
-);
-
-/**
- * Зона ряда. `people_needed` копируется сюда из чек-листа в момент сборки ряда:
- * ряд обязан оставаться проверяемым на инвариант 9 без обращения к чек-листу.
- */
-export const rotationRowZones = pgTable(
-  'rotation_row_zones',
-  {
-    id: uuid('id')
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    rowId: uuid('row_id')
-      .notNull()
-      .references(() => rotationRows.id),
-    position: integer('position').notNull(),
-    areaId: uuid('area_id')
-      .notNull()
-      .references(() => areas.id),
-    checklistId: uuid('checklist_id')
-      .notNull()
-      .references(() => areaChecklists.id),
-    peopleNeeded: integer('people_needed').notNull().default(1),
-  },
-  (table) => [
-    uniqueIndex('rotation_row_zones_position_unique').on(table.rowId, table.position),
-    uniqueIndex('rotation_row_zones_area_unique').on(table.rowId, table.areaId, table.checklistId),
-  ],
-);
-
-/**
  * Версия состава ряда (план фазы 10, §2.2): кто участвует, начиная с даты.
  *
  * Правка «с 15 октября» заводит новую версию, прошлые недели остаются
@@ -540,10 +487,6 @@ export type AreaEligibility = typeof areaEligibility.$inferSelect;
 export type NewAreaEligibility = typeof areaEligibility.$inferInsert;
 export type RotationRow = typeof rotationRows.$inferSelect;
 export type NewRotationRow = typeof rotationRows.$inferInsert;
-export type RotationRowSlot = typeof rotationRowSlots.$inferSelect;
-export type NewRotationRowSlot = typeof rotationRowSlots.$inferInsert;
-export type RotationRowZone = typeof rotationRowZones.$inferSelect;
-export type NewRotationRowZone = typeof rotationRowZones.$inferInsert;
 export type RotationRowRoster = typeof rotationRowRosters.$inferSelect;
 export type NewRotationRowRoster = typeof rotationRowRosters.$inferInsert;
 export type RotationRowRosterSlot = typeof rotationRowRosterSlots.$inferSelect;

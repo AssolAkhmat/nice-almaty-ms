@@ -1383,8 +1383,6 @@
     "weekday": "Weekday",
     "startDate": "First rotation date",
     "startDateHint": "Week number is counted from it",
-    "slots": "Beds and cycle order",
-    "zones": "Zones and order",
     "types": {
       "common": "Common zones",
       "room": "Room"
@@ -1404,15 +1402,12 @@
       "roomRowSunday": "A room row runs on Sundays",
       "startDateWeekday": "The first rotation date must fall on the row weekday",
       "startDateInvalid": "Set the first rotation date",
-      "slotsRequired": "A row needs at least one bed",
-      "zonesRequired": "A row needs at least one zone",
-      "bedTwice": "The same bed is in the row twice",
-      "checklistArea": "The checklist belongs to another zone",
-      "roomRowSingleZone": "A room row has one zone — the room itself",
       "roomRowLivingArea": "A room row zone must be a living room",
-      "roomRowSlots": "A room row uses beds of that same room",
-      "tooManyDuties": "Zones need more people than the row has beds"
-    }
+      "roomRequired": "Choose the room for the room row"
+    },
+    "hint": "A row is a weekday and the date of its first rotation. Who takes part and which zones are cleaned is set below, in the rosters and day norms.",
+    "room": "Room",
+    "roomHint": "A room row cleans its own room in turns"
   },
   "rotationDaySetup": {
     "title": "Rosters and day norms",

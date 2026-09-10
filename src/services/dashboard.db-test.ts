@@ -5,12 +5,12 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import { createRotationDebt } from '@/db/repositories/rotations';
 import * as schema from '@/db/schema';
+import { seedRow } from '@/db/testing/rotation-row';
 import { testDatabaseUrl } from '@/db/testing/database-url';
 import { addDays, parseBusinessDate, parseInstant, type BusinessDate } from '@/lib/time';
 
 import { readHouseDashboard, readNetworkDashboard, readResidentDashboard } from './dashboard';
 import { createInvoice } from './invoices';
-import { saveRow } from './rotation-rows';
 import { generateSchedule } from './rotation-schedule';
 
 import type { AccessContext } from '@/db/access';
@@ -139,7 +139,7 @@ async function withRotationOn(
   fixture: Awaited<ReturnType<typeof seed>>,
   date: BusinessDate,
 ): Promise<void> {
-  await saveRow(
+  await seedRow(
     fixture.network,
     {
       houseId: fixture.houseId,
@@ -147,7 +147,7 @@ async function withRotationOn(
       type: 'common',
       weekday: 1,
       startDate: date,
-      slots: [{ bedId: fixture.bedId }],
+      bedIds: [fixture.bedId],
       zones: [{ areaId: fixture.yardId, checklistId: fixture.checklistId }],
     },
     { executor: tx },
@@ -466,7 +466,7 @@ describe('дырки с причиной и вариантами', () => {
       .values({ areaId: kitchen?.id ?? '', type: 'regular', title: 'Кухня', peopleNeeded: 1 })
       .returning();
 
-    await saveRow(
+    await seedRow(
       fixture.network,
       {
         houseId: fixture.houseId,
@@ -474,7 +474,7 @@ describe('дырки с причиной и вариантами', () => {
         type: 'common',
         weekday: 1,
         startDate: MONDAY,
-        slots: [{ bedId: fixture.bedId }, { bedId: emptyBed?.id ?? '' }],
+        bedIds: [fixture.bedId, emptyBed?.id ?? ''],
         zones: [
           { areaId: fixture.yardId, checklistId: fixture.checklistId },
           { areaId: kitchen?.id ?? '', checklistId: kitchenChecklist?.id ?? '' },

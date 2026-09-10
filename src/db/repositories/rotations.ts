@@ -21,8 +21,6 @@ import {
   rotationDebts,
   rotationRowRosterSlots,
   rotationRowRosters,
-  rotationRowSlots,
-  rotationRowZones,
   rotationRows,
   rotationTemplatesSettings,
   users,
@@ -32,9 +30,7 @@ import {
   type EligibilityGroup,
   type RotationOccurrence,
   type RotationRow,
-  type RotationRowSlot,
   type RotationDebt,
-  type RotationRowZone,
   type RotationTemplateSettings,
 } from '../schema';
 
@@ -685,49 +681,6 @@ export async function updateRotationRow(
   return row;
 }
 
-export interface RowSlotInput {
-  position: number;
-  bedId: string;
-}
-
-/**
- * Слоты ряда переписываются целиком: порядок позиций и есть состав ряда,
- * и правка по одной строке оставила бы дыру в середине цикла.
- */
-export async function replaceRowSlots(
-  context: AccessContext,
-  rowId: string,
-  slots: readonly RowSlotInput[],
-  executor: Executor = getDb(),
-): Promise<RotationRowSlot[]> {
-  await requireRotationRow(context, rowId, executor);
-
-  await executor.delete(rotationRowSlots).where(eq(rotationRowSlots.rowId, rowId));
-
-  if (slots.length === 0) {
-    return [];
-  }
-
-  return executor
-    .insert(rotationRowSlots)
-    .values(slots.map((slot) => ({ rowId, position: slot.position, bedId: slot.bedId })))
-    .returning();
-}
-
-export async function listRowSlots(
-  context: AccessContext,
-  rowId: string,
-  executor: Executor = getDb(),
-): Promise<RotationRowSlot[]> {
-  await requireRotationRow(context, rowId, executor);
-
-  return executor
-    .select()
-    .from(rotationRowSlots)
-    .where(eq(rotationRowSlots.rowId, rowId))
-    .orderBy(asc(rotationRowSlots.position), asc(rotationRowSlots.id));
-}
-
 /**
  * Версии состава ряда и нормы дня (план фазы 10, §2.2, §2.3).
  *
@@ -927,55 +880,6 @@ export async function replaceDayNorm(
   }
 
   return { id: normId, effectiveFrom: input.effectiveFrom, zones: [...input.zones] };
-}
-
-export interface RowZoneInput {
-  position: number;
-  areaId: string;
-  checklistId: string;
-  peopleNeeded: number;
-}
-
-export async function replaceRowZones(
-  context: AccessContext,
-  rowId: string,
-  zones: readonly RowZoneInput[],
-  executor: Executor = getDb(),
-): Promise<RotationRowZone[]> {
-  await requireRotationRow(context, rowId, executor);
-
-  await executor.delete(rotationRowZones).where(eq(rotationRowZones.rowId, rowId));
-
-  if (zones.length === 0) {
-    return [];
-  }
-
-  return executor
-    .insert(rotationRowZones)
-    .values(
-      zones.map((zone) => ({
-        rowId,
-        position: zone.position,
-        areaId: zone.areaId,
-        checklistId: zone.checklistId,
-        peopleNeeded: zone.peopleNeeded,
-      })),
-    )
-    .returning();
-}
-
-export async function listRowZones(
-  context: AccessContext,
-  rowId: string,
-  executor: Executor = getDb(),
-): Promise<RotationRowZone[]> {
-  await requireRotationRow(context, rowId, executor);
-
-  return executor
-    .select()
-    .from(rotationRowZones)
-    .where(eq(rotationRowZones.rowId, rowId))
-    .orderBy(asc(rotationRowZones.position), asc(rotationRowZones.id));
 }
 
 export interface CreateOccurrenceInput {

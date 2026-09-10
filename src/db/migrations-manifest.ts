@@ -33,6 +33,7 @@ export const MIGRATIONS = [
   '0022_loud_vance_astro.sql',
   '0023_colossal_goliath.sql',
   '0024_backfill_rotation_versions.sql',
+  '0025_wealthy_catseye.sql',
 ] as const;
 
 export const EXPECTED_MIGRATIONS = MIGRATIONS.length;

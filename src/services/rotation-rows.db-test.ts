@@ -14,10 +14,11 @@ import type { Database, Transaction } from '@/db/client';
 import type { UserActor } from './users';
 
 /**
- * Ряды ротаций (docs/03-BUSINESS-RULES.md §6.1, §6.4).
+ * Ряды ротаций (docs/03-BUSINESS-RULES.md §6.4, `docs/tasks/PHASE-10.md` §2.2).
  *
- * Ряд собирается из мест и зон своего дома, а инвариант 9 (`D <= S`)
- * проверяется той же формулой, по которой потом считается сетка.
+ * Ряд — имя, тип, день недели и дата первой ротации; у комнатного ещё
+ * и комната. Состав и норма живут своими версиями и проверяются
+ * в `rotation-day-setup.db-test` (P10-17).
  */
 const url = testDatabaseUrl();
 const client = postgres(url, { max: 1, connect_timeout: 5, onnotice: () => undefined });
@@ -73,42 +74,8 @@ async function seed(tx: Transaction, suffix: string) {
   }
 
   const room1 = await area(houseAId, 'Комната 1', 'living');
-  const room2 = await area(houseAId, 'Комната 2', 'living');
   const yard = await area(houseAId, 'Двор', 'common');
-  const kitchen = await area(houseAId, 'Кухня', 'common');
   const roomB = await area(houseBId, 'Комната соседа', 'living');
-
-  async function bed(houseId: string, areaId: string, number: number): Promise<string> {
-    const [row] = await tx
-      .insert(schema.beds)
-      .values({ houseId, areaId, label: `М${number}`, tier: 'lower', number })
-      .returning();
-
-    return row?.id ?? '';
-  }
-
-  const bed1 = await bed(houseAId, room1, 1);
-  const bed2 = await bed(houseAId, room1, 2);
-  const bed3 = await bed(houseAId, room2, 3);
-  const bedB = await bed(houseBId, roomB, 4);
-
-  async function checklist(
-    areaId: string,
-    peopleNeeded: number,
-    type: 'regular' | 'general' = 'regular',
-  ): Promise<string> {
-    const [row] = await tx
-      .insert(schema.areaChecklists)
-      .values({ areaId, type, title: 'Уборка', peopleNeeded })
-      .returning();
-
-    return row?.id ?? '';
-  }
-
-  const yardChecklist = await checklist(yard, 2);
-  const kitchenChecklist = await checklist(kitchen, 1);
-  const room1Checklist = await checklist(room1, 1);
-  const roomBChecklist = await checklist(roomB, 1);
 
   const [adminUser] = await tx
     .insert(schema.users)
@@ -132,383 +99,135 @@ async function seed(tx: Transaction, suffix: string) {
     houseA: houseAId,
     houseB: houseBId,
     room1,
-    room2,
     yard,
-    kitchen,
     roomB,
-    bed1,
-    bed2,
-    bed3,
-    bedB,
-    yardChecklist,
-    kitchenChecklist,
-    room1Checklist,
-    roomBChecklist,
     admin: actor(context('admin', adminUser?.id ?? '', houseAId)),
     resident: actor(context('resident', residentUser?.id ?? '', null)),
   };
 }
 
+function commonRow(fixture: Awaited<ReturnType<typeof seed>>, name = 'Общие зоны') {
+  return {
+    houseId: fixture.houseA,
+    name,
+    type: 'common' as const,
+    weekday: 1,
+    startDate: MONDAY,
+  };
+}
+
 describe('ряд общих зон', () => {
-  it('заводится со слотами и зонами и читается целиком', async () => {
+  it('заводится и читается: имя, день недели, дата старта, без комнаты', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '9401');
 
-      const row = await saveRow(
-        fixture.admin,
-        {
-          houseId: fixture.houseA,
-          name: 'Общие зоны',
-          type: 'common',
-          weekday: 1,
-          startDate: MONDAY,
-          slots: [{ bedId: fixture.bed1 }, { bedId: fixture.bed2 }, { bedId: fixture.bed3 }],
-          zones: [
-            { areaId: fixture.yard, checklistId: fixture.yardChecklist },
-            { areaId: fixture.kitchen, checklistId: fixture.kitchenChecklist },
-          ],
-        },
-        { executor: tx },
-      );
+      const row = await saveRow(fixture.admin, commonRow(fixture), { executor: tx });
 
-      const [view] = await readRows(fixture.admin, fixture.houseA, { executor: tx });
+      expect(row.name).toBe('Общие зоны');
+      expect(row.weekday).toBe(1);
+      expect(row.startDate).toBe(MONDAY);
+      expect(row.roomAreaId).toBeNull();
+      expect(row.isActive).toBe(true);
 
-      expect(view?.row.id).toBe(row.id);
-      expect(view?.slots.map((slot) => slot.position)).toEqual([0, 1, 2]);
-      expect(view?.slots.map((slot) => slot.bedId)).toEqual([
-        fixture.bed1,
-        fixture.bed2,
-        fixture.bed3,
-      ]);
-      // people_needed переезжает из чек-листа: ряд проверяется без обращения к нему.
-      expect(view?.zones.map((zone) => zone.peopleNeeded)).toEqual([2, 1]);
+      const rows = await readRows(fixture.admin, fixture.houseA, { executor: tx });
+      expect(rows.map((item) => item.id)).toEqual([row.id]);
     });
   });
 
-  it('сумма people_needed больше числа слотов — отказ (инвариант 9)', async () => {
+  it('правка меняет ряд на месте, а не заводит второй', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '9402');
 
-      await expect(
-        saveRow(
-          fixture.admin,
-          {
-            houseId: fixture.houseA,
-            name: 'Тесный ряд',
-            type: 'common',
-            weekday: 1,
-            startDate: MONDAY,
-            // Двор требует двоих, кухня одного: троих обязанностей на два места.
-            slots: [{ bedId: fixture.bed1 }, { bedId: fixture.bed2 }],
-            zones: [
-              { areaId: fixture.yard, checklistId: fixture.yardChecklist },
-              { areaId: fixture.kitchen, checklistId: fixture.kitchenChecklist },
-            ],
-          },
-          { executor: tx },
-        ),
-      ).rejects.toBeInstanceOf(ValidationError);
-
-      expect(await readRows(fixture.admin, fixture.houseA, { executor: tx })).toHaveLength(0);
-    });
-  });
-
-  it('ровно по числу слотов — ряд без отдыха допустим', async () => {
-    await inRollback(async (tx) => {
-      const fixture = await seed(tx, '9403');
-
-      const row = await saveRow(
+      const row = await saveRow(fixture.admin, commonRow(fixture), { executor: tx });
+      const edited = await saveRow(
         fixture.admin,
         {
-          houseId: fixture.houseA,
-          name: 'Без отдыха',
-          type: 'common',
-          weekday: 1,
-          startDate: MONDAY,
-          slots: [{ bedId: fixture.bed1 }, { bedId: fixture.bed2 }, { bedId: fixture.bed3 }],
-          zones: [
-            { areaId: fixture.yard, checklistId: fixture.yardChecklist },
-            { areaId: fixture.kitchen, checklistId: fixture.kitchenChecklist },
-          ],
+          ...commonRow(fixture, 'Будни'),
+          rowId: row.id,
+          weekday: 3,
+          startDate: parseBusinessDate('2026-09-09'),
         },
         { executor: tx },
       );
 
-      expect(row.isActive).toBe(true);
+      expect(edited.id).toBe(row.id);
+      expect(edited.name).toBe('Будни');
+      expect(edited.weekday).toBe(3);
+
+      expect(await readRows(fixture.admin, fixture.houseA, { executor: tx })).toHaveLength(1);
     });
   });
 
-  it('ряд без слотов и ряд без зон не сохраняются', async () => {
+  it('пустое имя и день недели вне недели не принимаются', async () => {
     await inRollback(async (tx) => {
-      const fixture = await seed(tx, '9404');
+      const fixture = await seed(tx, '9403');
 
       await expect(
-        saveRow(
-          fixture.admin,
-          {
-            houseId: fixture.houseA,
-            name: 'Пустой',
-            type: 'common',
-            weekday: 1,
-            startDate: MONDAY,
-            slots: [],
-            zones: [{ areaId: fixture.kitchen, checklistId: fixture.kitchenChecklist }],
-          },
-          { executor: tx },
-        ),
+        saveRow(fixture.admin, { ...commonRow(fixture), name: '   ' }, { executor: tx }),
       ).rejects.toBeInstanceOf(ValidationError);
-
       await expect(
-        saveRow(
-          fixture.admin,
-          {
-            houseId: fixture.houseA,
-            name: 'Без зон',
-            type: 'common',
-            weekday: 1,
-            startDate: MONDAY,
-            slots: [{ bedId: fixture.bed1 }],
-            zones: [],
-          },
-          { executor: tx },
-        ),
-      ).rejects.toBeInstanceOf(ValidationError);
-    });
-  });
-
-  it('день недели вне недели не принимается', async () => {
-    await inRollback(async (tx) => {
-      const fixture = await seed(tx, '9405');
-
-      await expect(
-        saveRow(
-          fixture.admin,
-          {
-            houseId: fixture.houseA,
-            name: 'Восьмой день',
-            type: 'common',
-            weekday: 7,
-            startDate: MONDAY,
-            slots: [{ bedId: fixture.bed1 }],
-            zones: [{ areaId: fixture.kitchen, checklistId: fixture.kitchenChecklist }],
-          },
-          { executor: tx },
-        ),
+        saveRow(fixture.admin, { ...commonRow(fixture), weekday: 7 }, { executor: tx }),
       ).rejects.toBeInstanceOf(ValidationError);
     });
   });
 
   it('дата старта обязана попадать на день недели ряда', async () => {
     await inRollback(async (tx) => {
-      const fixture = await seed(tx, '9406');
+      const fixture = await seed(tx, '9404');
 
       await expect(
-        saveRow(
-          fixture.admin,
-          {
-            houseId: fixture.houseA,
-            name: 'Понедельник в воскресенье',
-            type: 'common',
-            weekday: 1,
-            startDate: SUNDAY,
-            slots: [{ bedId: fixture.bed1 }],
-            zones: [{ areaId: fixture.kitchen, checklistId: fixture.kitchenChecklist }],
-          },
-          { executor: tx },
-        ),
+        saveRow(fixture.admin, { ...commonRow(fixture), startDate: SUNDAY }, { executor: tx }),
       ).rejects.toBeInstanceOf(ValidationError);
-    });
-  });
-
-  it('место и зона чужого дома в ряд не попадают', async () => {
-    await inRollback(async (tx) => {
-      const fixture = await seed(tx, '9407');
-
-      await expect(
-        saveRow(
-          fixture.admin,
-          {
-            houseId: fixture.houseA,
-            name: 'Чужое место',
-            type: 'common',
-            weekday: 1,
-            startDate: MONDAY,
-            slots: [{ bedId: fixture.bedB }],
-            zones: [{ areaId: fixture.kitchen, checklistId: fixture.kitchenChecklist }],
-          },
-          { executor: tx },
-        ),
-      ).rejects.toBeInstanceOf(NotFoundError);
-
-      await expect(
-        saveRow(
-          fixture.admin,
-          {
-            houseId: fixture.houseA,
-            name: 'Чужая зона',
-            type: 'common',
-            weekday: 1,
-            startDate: MONDAY,
-            slots: [{ bedId: fixture.bed1 }],
-            zones: [{ areaId: fixture.roomB, checklistId: fixture.roomBChecklist }],
-          },
-          { executor: tx },
-        ),
-      ).rejects.toBeInstanceOf(NotFoundError);
-    });
-  });
-
-  it('одно место дважды в ряду не стоит', async () => {
-    await inRollback(async (tx) => {
-      const fixture = await seed(tx, '9408');
-
-      await expect(
-        saveRow(
-          fixture.admin,
-          {
-            houseId: fixture.houseA,
-            name: 'Дубль',
-            type: 'common',
-            weekday: 1,
-            startDate: MONDAY,
-            slots: [{ bedId: fixture.bed1 }, { bedId: fixture.bed1 }],
-            zones: [{ areaId: fixture.kitchen, checklistId: fixture.kitchenChecklist }],
-          },
-          { executor: tx },
-        ),
-      ).rejects.toBeInstanceOf(ValidationError);
-    });
-  });
-
-  it('чек-лист чужой зоны к зоне ряда не привязывается', async () => {
-    await inRollback(async (tx) => {
-      const fixture = await seed(tx, '9409');
-
-      await expect(
-        saveRow(
-          fixture.admin,
-          {
-            houseId: fixture.houseA,
-            name: 'Чужой чек-лист',
-            type: 'common',
-            weekday: 1,
-            startDate: MONDAY,
-            slots: [{ bedId: fixture.bed1 }],
-            zones: [{ areaId: fixture.kitchen, checklistId: fixture.yardChecklist }],
-          },
-          { executor: tx },
-        ),
-      ).rejects.toBeInstanceOf(ValidationError);
-    });
-  });
-
-  it('правка ряда заменяет слоты и зоны целиком', async () => {
-    await inRollback(async (tx) => {
-      const fixture = await seed(tx, '9410');
-
-      const row = await saveRow(
-        fixture.admin,
-        {
-          houseId: fixture.houseA,
-          name: 'Общие зоны',
-          type: 'common',
-          weekday: 1,
-          startDate: MONDAY,
-          slots: [{ bedId: fixture.bed1 }, { bedId: fixture.bed2 }, { bedId: fixture.bed3 }],
-          zones: [
-            { areaId: fixture.yard, checklistId: fixture.yardChecklist },
-            { areaId: fixture.kitchen, checklistId: fixture.kitchenChecklist },
-          ],
-        },
-        { executor: tx },
-      );
-
-      await saveRow(
-        fixture.admin,
-        {
-          rowId: row.id,
-          houseId: fixture.houseA,
-          name: 'Только кухня',
-          type: 'common',
-          weekday: 2,
-          startDate: parseBusinessDate('2026-09-08'),
-          slots: [{ bedId: fixture.bed3 }, { bedId: fixture.bed1 }],
-          zones: [{ areaId: fixture.kitchen, checklistId: fixture.kitchenChecklist }],
-        },
-        { executor: tx },
-      );
-
-      const rows = await readRows(fixture.admin, fixture.houseA, { executor: tx });
-
-      expect(rows).toHaveLength(1);
-      expect(rows[0]?.row.name).toBe('Только кухня');
-      expect(rows[0]?.row.weekday).toBe(2);
-      expect(rows[0]?.slots.map((slot) => slot.bedId)).toEqual([fixture.bed3, fixture.bed1]);
-      expect(rows[0]?.zones).toHaveLength(1);
     });
   });
 
   it('жилец рядов не ведёт и не видит', async () => {
     await inRollback(async (tx) => {
-      const fixture = await seed(tx, '9411');
+      const fixture = await seed(tx, '9405');
 
       await expect(
-        saveRow(
-          fixture.resident,
-          {
-            houseId: fixture.houseA,
-            name: 'Свой ряд',
-            type: 'common',
-            weekday: 1,
-            startDate: MONDAY,
-            slots: [{ bedId: fixture.bed1 }],
-            zones: [{ areaId: fixture.kitchen, checklistId: fixture.kitchenChecklist }],
-          },
-          { executor: tx },
-        ),
+        saveRow(fixture.resident, commonRow(fixture), { executor: tx }),
       ).rejects.toBeInstanceOf(ForbiddenError);
-
       await expect(
         readRows(fixture.resident, fixture.houseA, { executor: tx }),
       ).rejects.toBeInstanceOf(ForbiddenError);
     });
   });
 
-  it('архивированный ряд из списка уходит, а его слоты остаются нетронутыми', async () => {
+  it('чужой дом неотличим от несуществующего: ряд в нём не заводится (P1-1)', async () => {
     await inRollback(async (tx) => {
-      const fixture = await seed(tx, '9412');
+      const fixture = await seed(tx, '9406');
 
-      const row = await saveRow(
-        fixture.admin,
-        {
-          houseId: fixture.houseA,
-          name: 'Общие зоны',
-          type: 'common',
-          weekday: 1,
-          startDate: MONDAY,
-          slots: [{ bedId: fixture.bed1 }],
-          zones: [{ areaId: fixture.kitchen, checklistId: fixture.kitchenChecklist }],
-        },
-        { executor: tx },
-      );
+      await expect(
+        saveRow(
+          fixture.admin,
+          { ...commonRow(fixture), houseId: fixture.houseB },
+          { executor: tx },
+        ),
+      ).rejects.toBeInstanceOf(NotFoundError);
+    });
+  });
 
-      await archiveRow(fixture.admin, row.id, { executor: tx });
+  it('архивированный ряд из списка уходит, но остаётся в базе', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9407');
 
-      expect(await readRows(fixture.admin, fixture.houseA, { executor: tx })).toHaveLength(0);
+      const row = await saveRow(fixture.admin, commonRow(fixture), { executor: tx });
+      const archived = await archiveRow(fixture.admin, row.id, { executor: tx });
 
-      const all = await readRows(fixture.admin, fixture.houseA, {
-        executor: tx,
-        includeInactive: true,
-      });
-      expect(all[0]?.slots).toHaveLength(1);
+      expect(archived.isActive).toBe(false);
+      expect(await readRows(fixture.admin, fixture.houseA, { executor: tx })).toEqual([]);
+      expect(
+        await readRows(fixture.admin, fixture.houseA, { executor: tx, includeInactive: true }),
+      ).toHaveLength(1);
     });
   });
 });
 
 describe('комнатный ряд (§6.4)', () => {
-  it('воскресенье, места комнаты и одна зона — сама комната', async () => {
+  it('воскресенье и своя комната', async () => {
     await inRollback(async (tx) => {
-      const fixture = await seed(tx, '9420');
+      const fixture = await seed(tx, '9421');
 
       const row = await saveRow(
         fixture.admin,
@@ -518,40 +237,17 @@ describe('комнатный ряд (§6.4)', () => {
           type: 'room',
           weekday: 0,
           startDate: SUNDAY,
-          slots: [{ bedId: fixture.bed1 }, { bedId: fixture.bed2 }],
-          zones: [{ areaId: fixture.room1, checklistId: fixture.room1Checklist }],
+          roomAreaId: fixture.room1,
         },
         { executor: tx },
       );
 
       expect(row.type).toBe('room');
-      expect(row.weekday).toBe(0);
+      expect(row.roomAreaId).toBe(fixture.room1);
     });
   });
 
   it('комнатный ряд не бывает в другой день недели', async () => {
-    await inRollback(async (tx) => {
-      const fixture = await seed(tx, '9421');
-
-      await expect(
-        saveRow(
-          fixture.admin,
-          {
-            houseId: fixture.houseA,
-            name: 'Комната по вторникам',
-            type: 'room',
-            weekday: 2,
-            startDate: parseBusinessDate('2026-09-08'),
-            slots: [{ bedId: fixture.bed1 }],
-            zones: [{ areaId: fixture.room1, checklistId: fixture.room1Checklist }],
-          },
-          { executor: tx },
-        ),
-      ).rejects.toBeInstanceOf(ValidationError);
-    });
-  });
-
-  it('у комнатного ряда ровно одна зона', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '9422');
 
@@ -560,38 +256,11 @@ describe('комнатный ряд (§6.4)', () => {
           fixture.admin,
           {
             houseId: fixture.houseA,
-            name: 'Комната и двор',
-            type: 'room',
-            weekday: 0,
-            startDate: SUNDAY,
-            slots: [{ bedId: fixture.bed1 }, { bedId: fixture.bed2 }],
-            zones: [
-              { areaId: fixture.room1, checklistId: fixture.room1Checklist },
-              { areaId: fixture.kitchen, checklistId: fixture.kitchenChecklist },
-            ],
-          },
-          { executor: tx },
-        ),
-      ).rejects.toBeInstanceOf(ValidationError);
-    });
-  });
-
-  it('слоты комнатного ряда — места этой же комнаты', async () => {
-    await inRollback(async (tx) => {
-      const fixture = await seed(tx, '9423');
-
-      await expect(
-        saveRow(
-          fixture.admin,
-          {
-            houseId: fixture.houseA,
             name: 'Комната 1',
             type: 'room',
-            weekday: 0,
-            startDate: SUNDAY,
-            // bed3 стоит в комнате 2, а зона ряда — комната 1.
-            slots: [{ bedId: fixture.bed1 }, { bedId: fixture.bed3 }],
-            zones: [{ areaId: fixture.room1, checklistId: fixture.room1Checklist }],
+            weekday: 1,
+            startDate: MONDAY,
+            roomAreaId: fixture.room1,
           },
           { executor: tx },
         ),
@@ -599,83 +268,29 @@ describe('комнатный ряд (§6.4)', () => {
     });
   });
 
-  it('зона комнатного ряда — жилая комната, а не общая зона', async () => {
+  it('комнате ряда положено быть жилой комнатой своего дома', async () => {
     await inRollback(async (tx) => {
-      const fixture = await seed(tx, '9424');
+      const fixture = await seed(tx, '9423');
+      const base = {
+        houseId: fixture.houseA,
+        name: 'Комната',
+        type: 'room' as const,
+        weekday: 0,
+        startDate: SUNDAY,
+      };
 
+      // Без комнаты комнатный ряд не описан.
+      await expect(saveRow(fixture.admin, base, { executor: tx })).rejects.toBeInstanceOf(
+        ValidationError,
+      );
+      // Двор — не комната.
       await expect(
-        saveRow(
-          fixture.admin,
-          {
-            houseId: fixture.houseA,
-            name: 'Кухня как комната',
-            type: 'room',
-            weekday: 0,
-            startDate: SUNDAY,
-            slots: [{ bedId: fixture.bed1 }],
-            zones: [{ areaId: fixture.kitchen, checklistId: fixture.kitchenChecklist }],
-          },
-          { executor: tx },
-        ),
+        saveRow(fixture.admin, { ...base, roomAreaId: fixture.yard }, { executor: tx }),
       ).rejects.toBeInstanceOf(ValidationError);
-    });
-  });
-});
-
-describe('слот держится места, а не человека', () => {
-  it('смена жильца места не двигает позицию в цикле', async () => {
-    await inRollback(async (tx) => {
-      const fixture = await seed(tx, '9430');
-
-      const row = await saveRow(
-        fixture.admin,
-        {
-          houseId: fixture.houseA,
-          name: 'Общие зоны',
-          type: 'common',
-          weekday: 1,
-          startDate: MONDAY,
-          slots: [{ bedId: fixture.bed1 }, { bedId: fixture.bed2 }],
-          zones: [{ areaId: fixture.kitchen, checklistId: fixture.kitchenChecklist }],
-        },
-        { executor: tx },
-      );
-
-      const before = await readRows(fixture.admin, fixture.houseA, { executor: tx });
-
-      // Жилец въезжает на первое место ряда — состав ряда от этого не меняется.
-      const [user] = await tx
-        .insert(schema.users)
-        .values({
-          orgId: fixture.orgId,
-          phone: '+77099430001',
-          passwordHash: 'x',
-          role: 'resident',
-        })
-        .returning();
-      const [residency] = await tx
-        .insert(schema.residencies)
-        .values({
-          orgId: fixture.orgId,
-          userId: user?.id ?? '',
-          houseId: fixture.houseA,
-          status: 'active',
-          moveInDate: '2026-09-01',
-        })
-        .returning();
-      await tx.insert(schema.bedAssignments).values({
-        residencyId: residency?.id ?? '',
-        bedId: fixture.bed1,
-        price: 100_000,
-        period: '[2026-09-01,)',
-      });
-
-      const after = await readRows(fixture.admin, fixture.houseA, { executor: tx });
-
-      expect(after[0]?.row.id).toBe(row.id);
-      expect(after[0]?.slots.map((slot) => `${String(slot.position)}:${slot.bedId}`)).toEqual(
-        before[0]?.slots.map((slot) => `${String(slot.position)}:${slot.bedId}`),
-      );
+      // Комната соседнего дома неотличима от несуществующей (P1-1).
+      await expect(
+        saveRow(fixture.admin, { ...base, roomAreaId: fixture.roomB }, { executor: tx }),
+      ).rejects.toBeInstanceOf(NotFoundError);
     });
   });
 });

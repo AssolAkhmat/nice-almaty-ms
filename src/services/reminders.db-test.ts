@@ -4,6 +4,7 @@ import postgres from 'postgres';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import * as schema from '@/db/schema';
+import { seedRow } from '@/db/testing/rotation-row';
 import { testDatabaseUrl } from '@/db/testing/database-url';
 import {
   addDays,
@@ -18,7 +19,6 @@ import { checkCurfew } from './curfew';
 import { watchDepositRefunds, watchDocumentExpiry } from './expiry-reminders';
 import { remindSchedule, remindUtilities } from './monthly-reminders';
 import { remindRotations } from './rotation-reminders';
-import { saveRow } from './rotation-rows';
 import { generateSchedule } from './rotation-schedule';
 
 import type { AccessContext } from '@/db/access';
@@ -172,7 +172,7 @@ async function withRotation(
   fixture: Awaited<ReturnType<typeof seed>>,
   date: BusinessDate,
 ): Promise<void> {
-  await saveRow(
+  await seedRow(
     fixture.network,
     {
       houseId: fixture.houseId,
@@ -180,7 +180,7 @@ async function withRotation(
       type: 'common',
       weekday: weekdayOf(date),
       startDate: date,
-      slots: [{ bedId: fixture.bedId }],
+      bedIds: [fixture.bedId],
       zones: [{ areaId: fixture.yardId, checklistId: fixture.checklistId }],
     },
     { executor: tx },

@@ -23,8 +23,6 @@ import {
   rotationRowRosterSlots,
   rotationRowRosters,
   rotationRows,
-  rotationRowSlots,
-  rotationRowZones,
   users,
 } from './schema';
 
@@ -320,28 +318,7 @@ async function ensureRows(
 
     const rowId = row?.id ?? '';
 
-    await executor.insert(rotationRowSlots).values(
-      allBeds.map((bedId, position) => ({
-        rowId,
-        bedId,
-        position,
-      })),
-    );
-
-    await executor.insert(rotationRowZones).values(
-      zones.map((zone, position) => ({
-        rowId,
-        areaId: zone.areaId,
-        checklistId: zone.checklistId,
-        position,
-        peopleNeeded: 1,
-      })),
-    );
-
-    /*
-     * Состав и норма первой версией (фаза 10, §2.2, §2.3): генерация читает
-     * только их. Старые слоты и зоны рядом живут до T10.7.
-     */
+    // Состав и норма первой версией (фаза 10, §2.2, §2.3): генерация читает их.
     const [roster] = await executor
       .insert(rotationRowRosters)
       .values({ rowId, effectiveFrom: startDate })

@@ -4,7 +4,6 @@ import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useState } from 'react';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, Input, Select } from '@/components/ui/input';
@@ -31,22 +30,25 @@ export interface ZoneOption {
   peopleNeeded: number;
 }
 
+/** Жилая комната дома: её выбирает комнатный ряд (§6.4). */
+export interface RoomOption {
+  areaId: string;
+  areaName: string;
+}
+
 export interface RowBlock {
   rowId: string;
   name: string;
   type: 'common' | 'room';
   weekday: number;
   startDate: string;
-  /** Место ряда и его позиция в цикле. */
-  slots: { bedId: string; position: number }[];
-  zones: { areaId: string; checklistId: string; position: number }[];
+  roomAreaId: string | null;
 }
 
 export interface RotationRowsProps {
   houseId: string;
   rows: readonly RowBlock[];
-  beds: readonly BedOption[];
-  zones: readonly ZoneOption[];
+  rooms: readonly RoomOption[];
 }
 
 function Message({ state }: { state: RotationSetupActionState }) {
@@ -76,22 +78,18 @@ function useRefreshOnDone(state: RotationSetupActionState): void {
 }
 
 /**
- * Ряд ротаций: расписание и состав.
- *
- * Порядок мест и зон задаётся числом в поле рядом с каждым: это и есть
- * позиция в цикле §6.2. Пустое поле означает, что место или зона в ряд
- * не входят.
+ * Ряд ротаций: имя, тип, день недели и дата первой ротации; у комнатного —
+ * комната. Кто участвует и какие зоны убираются, задаётся ниже, в блоке
+ * составов и норм дней (план фазы 10 §2.2, §2.3).
  */
 function RowForm({
-  beds,
   houseId,
+  rooms,
   row,
-  zones,
 }: {
-  beds: readonly BedOption[];
   houseId: string;
+  rooms: readonly RoomOption[];
   row: RowBlock | null;
-  zones: readonly ZoneOption[];
 }) {
   const t = useTranslations('rotationRows');
   const [saveState, save, isSaving] = useActionState(saveRowAction, INITIAL);
@@ -102,13 +100,6 @@ function RowForm({
   useRefreshOnDone(archiveState);
 
   const id = row?.rowId ?? 'new';
-  const slotPosition = new Map(row?.slots.map((slot) => [slot.bedId, slot.position]));
-  const zonePosition = new Map(
-    row?.zones.map((zone) => [`${zone.areaId}|${zone.checklistId}`, zone.position]),
-  );
-
-  // Комнатный ряд убирает жилую комнату, обычный — что угодно, кроме неё.
-  const zoneOptions = zones.filter((zone) => (type === 'room' ? zone.areaType === 'living' : true));
 
   return (
     <div className="flex flex-col gap-2">
@@ -175,55 +166,27 @@ function RowForm({
               />
             </Field>
           </div>
-        </div>
 
-        <div className="flex flex-col gap-3 md:flex-row md:gap-6">
-          <fieldset className="flex min-w-0 flex-1 flex-col gap-2">
-            <legend className="text-text-muted text-[13px]">{t('slots')}</legend>
-            {beds.map((bed) => (
-              <label
-                className="flex items-center justify-between gap-3 text-[13px]"
-                key={bed.bedId}
-              >
-                <span className="truncate">
-                  {bed.areaName} · {bed.label}
-                </span>
-                <Input
-                  className="w-20"
-                  data-testid={`row-slot-${id}-${bed.bedId}`}
-                  defaultValue={slotPosition.get(bed.bedId) ?? ''}
-                  min={0}
-                  name={`slot-${bed.bedId}`}
-                  step={1}
-                  type="number"
-                />
-              </label>
-            ))}
-          </fieldset>
-
-          <fieldset className="flex min-w-0 flex-1 flex-col gap-2">
-            <legend className="text-text-muted text-[13px]">{t('zones')}</legend>
-            {zoneOptions.map((zone) => (
-              <label
-                className="flex items-center justify-between gap-3 text-[13px]"
-                key={`${zone.areaId}|${zone.checklistId}`}
-              >
-                <span className="truncate">
-                  {zone.areaName} · {zone.checklistTitle}
-                  <Badge tone="neutral">{zone.peopleNeeded}</Badge>
-                </span>
-                <Input
-                  className="w-20"
-                  data-testid={`row-zone-${id}-${zone.areaId}`}
-                  defaultValue={zonePosition.get(`${zone.areaId}|${zone.checklistId}`) ?? ''}
-                  min={0}
-                  name={`zone-${zone.areaId}|${zone.checklistId}`}
-                  step={1}
-                  type="number"
-                />
-              </label>
-            ))}
-          </fieldset>
+          {type === 'room' && (
+            <div className="w-56">
+              <Field hint={t('roomHint')} htmlFor={`row-room-${id}`} label={t('room')}>
+                <Select
+                  data-testid={`row-room-${id}`}
+                  defaultValue={row?.roomAreaId ?? ''}
+                  id={`row-room-${id}`}
+                  name="roomAreaId"
+                  required
+                >
+                  <option value="">{t('room')}</option>
+                  {rooms.map((room) => (
+                    <option key={room.areaId} value={room.areaId}>
+                      {room.areaName}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -262,7 +225,7 @@ function RowForm({
   );
 }
 
-export function RotationRowsManager({ beds, houseId, rows, zones }: RotationRowsProps) {
+export function RotationRowsManager({ houseId, rooms, rows }: RotationRowsProps) {
   const t = useTranslations('rotationRows');
 
   return (
@@ -271,14 +234,16 @@ export function RotationRowsManager({ beds, houseId, rows, zones }: RotationRows
         <CardTitle>{t('title')}</CardTitle>
       </CardHeader>
 
+      <p className="text-text-muted mb-4 text-[13px]">{t('hint')}</p>
+
       <div className="flex flex-col gap-6">
         {rows.map((row) => (
-          <RowForm beds={beds} houseId={houseId} key={row.rowId} row={row} zones={zones} />
+          <RowForm houseId={houseId} key={row.rowId} rooms={rooms} row={row} />
         ))}
 
         <div className="border-border border-t pt-4">
           <p className="text-text-muted mb-2 text-[13px]">{t('addRowTitle')}</p>
-          <RowForm beds={beds} houseId={houseId} row={null} zones={zones} />
+          <RowForm houseId={houseId} rooms={rooms} row={null} />
         </div>
       </div>
     </Card>

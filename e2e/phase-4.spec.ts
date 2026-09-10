@@ -110,6 +110,45 @@ async function createFiveZones(page: Page): Promise<string[]> {
   return zones;
 }
 
+/**
+ * Состав и норма дня — своими версиями с даты старта ряда (фаза 10 §2.2, §2.3).
+ * Каждое сохранение перерисовывает раздел, поэтому норма правится на свежей
+ * странице. Порядок мест и зон — их порядок в списке.
+ */
+async function setRosterAndNorm(
+  page: Page,
+  rowName: string,
+  beds: readonly string[],
+  zones: readonly string[],
+): Promise<void> {
+  const card = page.locator('.rounded-card').filter({ hasText: rowName });
+  await expect(card.locator('[data-testid^="day-form-"]')).toBeVisible();
+
+  for (const [index, bed] of beds.entries()) {
+    await card
+      .locator('label')
+      .filter({ hasText: bed })
+      .locator('input[type="number"]')
+      .fill(String(index));
+  }
+  await card.locator('[data-testid^="roster-save-"]').click();
+  await expect(card.getByText('Состав сохранён')).toBeVisible();
+  await page.reload();
+
+  const fresh = page.locator('.rounded-card').filter({ hasText: rowName });
+
+  for (const [index, zone] of zones.entries()) {
+    await fresh
+      .locator('[data-testid^="norm-row-"]')
+      .filter({ hasText: zone })
+      .locator('[data-testid^="norm-zone-"]')
+      .fill(String(index));
+  }
+  await fresh.locator('[data-testid^="norm-save-"]').click();
+  await expect(fresh.getByText('Норма сохранена')).toBeVisible();
+  await page.reload();
+}
+
 test.describe('приёмка фазы 4', () => {
   /*
    * Последовательно: ряд у дома один, а дом у ширины тоже один. Параллельно
@@ -140,33 +179,19 @@ test.describe('приёмка фазы 4', () => {
     await page.goto('/settings/house/rotations');
 
     const form = page.getByTestId('row-form-new');
-    await form.getByTestId('row-name-new').fill(unique('Ряд приёмки'));
+    const rowName = unique('Ряд приёмки');
+    await form.getByTestId('row-name-new').fill(rowName);
     await form.getByTestId('row-weekday-new').selectOption('1');
     await form.getByTestId('row-start-new').fill(start);
-
-    for (const [index, bed] of beds.entries()) {
-      await form
-        .locator('label')
-        .filter({ hasText: bed })
-        .locator('input[type="number"]')
-        .fill(String(index));
-    }
-
-    for (const [index, zone] of zones.entries()) {
-      await form
-        .locator('label')
-        .filter({ hasText: zone })
-        .locator('input[type="number"]')
-        .fill(String(index));
-    }
-
-    const rowName = await form.getByTestId('row-name-new').inputValue();
     await form.getByTestId('row-save-new').click();
 
     // Ряд сохранён: его имя появилось в форме правки. Перезагрузка до этого
-    // показала бы страницу без ряда, и генерация не нашла бы что материализовать.
+    // показала бы страницу без ряда, и состав было бы некуда записать.
     await expect(page.locator(`input[value="${rowName}"]`)).toBeVisible();
     await page.reload();
+
+    // Шесть мест в составе и пять зон в норме — с даты старта ряда.
+    await setRosterAndNorm(page, rowName, beds, zones);
 
     // Расписание на четыре недели вперёд.
     await page.getByTestId('schedule-until').fill(plusDays(start, 21));
@@ -278,16 +303,15 @@ test.describe('приёмка фазы 4', () => {
     await page.reload();
 
     const form = page.getByTestId('row-form-new');
-    await form.getByTestId('row-name-new').fill(unique('Ряд приёмки'));
+    const rowName = unique('Ряд приёмки');
+    await form.getByTestId('row-name-new').fill(rowName);
     await form.getByTestId('row-weekday-new').selectOption('1');
     await form.getByTestId('row-start-new').fill(start);
-    await form.locator('label').filter({ hasText: bed }).locator('input[type="number"]').fill('0');
-    await form.locator('label').filter({ hasText: zone }).locator('input[type="number"]').fill('0');
-    const rowName = await form.getByTestId('row-name-new').inputValue();
     await form.getByTestId('row-save-new').click();
     await expect(page.locator(`input[value="${rowName}"]`)).toBeVisible();
 
     await page.reload();
+    await setRosterAndNorm(page, rowName, [bed], [zone]);
     await page.getByTestId('schedule-until').fill(start);
     await page.getByTestId('schedule-generate').click();
     await expect(page.getByTestId('schedule-done')).toBeVisible();

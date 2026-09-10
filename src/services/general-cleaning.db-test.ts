@@ -4,6 +4,7 @@ import postgres from 'postgres';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import * as schema from '@/db/schema';
+import { seedRow } from '@/db/testing/rotation-row';
 import { testDatabaseUrl } from '@/db/testing/database-url';
 import { ForbiddenError } from '@/lib/errors';
 import { parseBusinessDate } from '@/lib/time';
@@ -14,7 +15,6 @@ import {
   setCancelRegularOnGeneral,
 } from './general-cleaning';
 import { readCalendar } from './rotation-calendar';
-import { saveRow } from './rotation-rows';
 import { generateSchedule } from './rotation-schedule';
 
 import type { AccessContext } from '@/db/access';
@@ -310,7 +310,7 @@ describe('генеральная уборка', () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '9705');
 
-      await saveRow(
+      await seedRow(
         fixture.admin,
         {
           houseId: fixture.houseId,
@@ -318,7 +318,7 @@ describe('генеральная уборка', () => {
           type: 'common',
           weekday: 0,
           startDate: SEPTEMBER,
-          slots: fixture.beds.map((bedId) => ({ bedId })),
+          bedIds: fixture.beds,
           zones: [{ areaId: fixture.kitchen, checklistId: fixture.kitchenRegular }],
         },
         { executor: tx },
@@ -348,7 +348,7 @@ describe('генеральная уборка', () => {
 
       await setCancelRegularOnGeneral(fixture.admin, fixture.houseId, false, { executor: tx });
 
-      await saveRow(
+      await seedRow(
         fixture.admin,
         {
           houseId: fixture.houseId,
@@ -356,7 +356,7 @@ describe('генеральная уборка', () => {
           type: 'common',
           weekday: 0,
           startDate: SEPTEMBER,
-          slots: fixture.beds.map((bedId) => ({ bedId })),
+          bedIds: fixture.beds,
           zones: [{ areaId: fixture.kitchen, checklistId: fixture.kitchenRegular }],
         },
         { executor: tx },

@@ -4,13 +4,13 @@ import postgres from 'postgres';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import * as schema from '@/db/schema';
+import { seedRow } from '@/db/testing/rotation-row';
 import { testDatabaseUrl } from '@/db/testing/database-url';
 import { parseBusinessDate, parseInstant } from '@/lib/time';
 
 import { closeRotationDay, ROTATIONS_CLOSE_DAY_JOB } from './rotation-close-day';
 import { readCalendar } from './rotation-calendar';
 import { confirmAssignment, setOccurrenceStatus } from './rotation-confirmation';
-import { saveRow } from './rotation-rows';
 import { generateSchedule } from './rotation-schedule';
 
 import type { AccessContext } from '@/db/access';
@@ -126,7 +126,7 @@ async function seed(tx: Transaction, suffix: string) {
   const actor = (ctx: AccessContext): UserActor => ({ context: ctx, requestId: `req-${suffix}` });
   const admin = actor(context('admin', adminUser?.id ?? '', houseId));
 
-  await saveRow(
+  await seedRow(
     admin,
     {
       houseId,
@@ -134,7 +134,7 @@ async function seed(tx: Transaction, suffix: string) {
       type: 'common',
       weekday: 1,
       startDate: MONDAY,
-      slots: [{ bedId: bed?.id ?? '' }],
+      bedIds: [bed?.id ?? ''],
       zones: [{ areaId: yard?.id ?? '', checklistId: checklist?.id ?? '' }],
     },
     { executor: tx },

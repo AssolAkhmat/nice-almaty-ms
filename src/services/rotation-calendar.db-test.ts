@@ -4,6 +4,7 @@ import postgres from 'postgres';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import * as schema from '@/db/schema';
+import { seedRow } from '@/db/testing/rotation-row';
 import { testDatabaseUrl } from '@/db/testing/database-url';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { parseBusinessDate, type BusinessDate } from '@/lib/time';
@@ -19,8 +20,6 @@ import {
   removeAssignment,
   swapAssignments,
 } from './rotation-calendar';
-import { saveNorm } from './rotation-day-setup';
-import { saveRow } from './rotation-rows';
 import { generateSchedule } from './rotation-schedule';
 
 import type { AccessContext } from '@/db/access';
@@ -198,7 +197,7 @@ async function scheduled(
   tx: Transaction,
   fixture: Awaited<ReturnType<typeof seed>>,
 ): Promise<void> {
-  await saveRow(
+  await seedRow(
     fixture.admin,
     {
       houseId: fixture.houseId,
@@ -206,7 +205,7 @@ async function scheduled(
       type: 'common',
       weekday: 1,
       startDate: MONDAY,
-      slots: fixture.beds.map((bedId) => ({ bedId })),
+      bedIds: fixture.beds,
       zones: [
         { areaId: fixture.yard, checklistId: fixture.yardChecklist },
         { areaId: fixture.kitchen, checklistId: fixture.kitchenChecklist },
@@ -582,7 +581,7 @@ async function yardForTwo(
   tx: Transaction,
   fixture: Awaited<ReturnType<typeof seed>>,
 ): Promise<void> {
-  const row = await saveRow(
+  await seedRow(
     fixture.admin,
     {
       houseId: fixture.houseId,
@@ -590,26 +589,13 @@ async function yardForTwo(
       type: 'common',
       weekday: 1,
       startDate: MONDAY,
-      slots: fixture.beds.map((bedId) => ({ bedId })),
-      zones: [
-        { areaId: fixture.yard, checklistId: fixture.yardChecklist },
-        { areaId: fixture.kitchen, checklistId: fixture.kitchenChecklist },
-      ],
-    },
-    { executor: tx },
-  );
-
-  await saveNorm(
-    fixture.admin,
-    {
-      rowId: row.id,
-      effectiveFrom: MONDAY,
+      bedIds: fixture.beds,
       zones: [
         { areaId: fixture.yard, checklistId: fixture.yardChecklist, people: 2 },
         { areaId: fixture.kitchen, checklistId: fixture.kitchenChecklist },
       ],
     },
-    { executor: tx, today: MONDAY },
+    { executor: tx },
   );
 
   await generateSchedule(fixture.admin, fixture.houseId, NEXT_MONDAY, {
