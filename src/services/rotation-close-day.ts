@@ -3,19 +3,18 @@ import { and, asc, eq } from 'drizzle-orm';
 import { getDb, type Executor } from '@/db/client';
 import { claimJobRun, finishJobRun } from '@/db/repositories/job-runs';
 import {
-  createRotationDebt,
   listAssignmentsFor,
   listOccurrencesOfDate,
   updateAssignment,
   updateOccurrence,
 } from '@/db/repositories/rotations';
 import { organizations, users } from '@/db/schema';
-import { contractEndDate } from '@/domain/contract';
 import { logger } from '@/lib/logger';
 import { addDays, now, todayInAlmaty, type BusinessDate } from '@/lib/time';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
 import { syncScoreEvent } from './rating';
+import { syncDebtOf } from './rotation-debt';
 
 import type { AccessContext } from '@/db/access';
 import type { UserActor } from './users';
@@ -123,7 +122,7 @@ export async function closeRotationDay(deps: CloseDayDeps = {}): Promise<CloseDa
         }
 
         for (const assignment of pending) {
-          await updateAssignment(
+          const marked = await updateAssignment(
             assignment.id,
             { state: 'missed', score: 1, scoredAt: instant },
             executor,
@@ -145,17 +144,9 @@ export async function closeRotationDay(deps: CloseDayDeps = {}): Promise<CloseDa
               { executor, instant },
             );
 
-            await createRotationDebt(
-              {
-                userId: assignment.userId,
-                reason: 'rotation.missed',
-                sourceAssignmentId: assignment.id,
-                // Долг не сгорает и живёт до 1 июля — той же границы, что
-                // и год рейтинга (§7).
-                expiresAt: contractEndDate(date),
-              },
-              executor,
-            );
+            // Долг не сгорает и живёт до 1 июля — той же границы, что
+            // и год рейтинга (§7); строку ведёт книга долга (P10-13).
+            await syncDebtOf(marked, occurrence, executor);
 
             debts += 1;
           }

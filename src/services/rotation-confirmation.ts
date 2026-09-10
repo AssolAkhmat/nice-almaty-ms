@@ -12,6 +12,7 @@ import { now, type BusinessDate } from '@/lib/time';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
 import { syncScoreEvent } from './rating';
+import { syncDebtOf } from './rotation-debt';
 
 import type { RotationAssignment, RotationOccurrence } from '@/db/schema';
 import type { UserActor } from './users';
@@ -99,6 +100,9 @@ export async function confirmAssignment(
       tx,
     );
 
+    // Списание — при подтверждении выполнения, не при постановке (P10-3).
+    await syncDebtOf(confirmed, occurrence, tx);
+
     await recordAudit(
       { context: actor.context, ip: actor.ip, requestId: actor.requestId },
       {
@@ -159,6 +163,10 @@ export async function markAssignment(
       },
       tx,
     );
+
+    // Книга долга следует за отметкой: «не выполнена» +1, подтверждённое
+    // с галочкой −1, возврат в расписание забирает строку (§7).
+    await syncDebtOf(marked, occurrence, tx);
 
     await recordAudit(
       { context: actor.context, ip: actor.ip, requestId: actor.requestId },
@@ -229,10 +237,13 @@ export async function setOccurrenceStatus(
     );
 
     /*
-     * «Отменена» снимает влияние на рейтинг (§7), возврат в расписание —
-     * возвращает: дельта пересчитывается по той же оценке, что стоит сейчас.
+     * «Отменена» снимает влияние на рейтинг и долг (§7), возврат в расписание —
+     * возвращает: дельта пересчитывается по той же оценке, что стоит сейчас,
+     * строка книги долга — по тому же состоянию назначения.
      */
     for (const assignment of await listAssignmentsFor([occurrenceId], tx)) {
+      await syncDebtOf(assignment, updated, tx);
+
       if (assignment.userId === null) {
         continue;
       }

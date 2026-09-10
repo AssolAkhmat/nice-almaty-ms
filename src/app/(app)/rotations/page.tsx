@@ -146,6 +146,7 @@ export default async function RotationsPage({
       isMine: assignment.userId === context.userId,
       score: assignment.score,
       note: assignment.note,
+      writeOffDebt: assignment.writeOffDebt,
     })),
   }));
 

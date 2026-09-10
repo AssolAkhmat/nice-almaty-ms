@@ -1500,12 +1500,6 @@
     "reassigned": "Assignee changed",
     "extraCreated": "Extra rotation added",
     "rangeCancelled": "Rotations in the period cancelled",
-    "errors": {
-      "dateInvalid": "Set the date",
-      "dateTaken": "This rotation already exists on that date",
-      "checklistArea": "The checklist belongs to another zone",
-      "unknown": "Could not complete"
-    },
     "confirm": "Confirm",
     "confirmed": "Rotation confirmed",
     "confirmedShort": "Confirmed",
@@ -1521,7 +1515,26 @@
     "scorePlaceholder": "1–10",
     "setStatus": "Change status",
     "statusChanged": "Status changed",
-    "toStats": "Statistics"
+    "toStats": "Statistics",
+    "remove": "Remove",
+    "removed": "Assignee removed: one person fewer on this zone that day",
+    "placeTitle": "Put on the zone",
+    "placeWho": "Who to put",
+    "place": "Put",
+    "placed": "Put on the zone",
+    "writeOffDebt": "Write off an extra rotation",
+    "writeOffBadge": "write-off",
+    "errors": {
+      "dateInvalid": "Set the date",
+      "dateTaken": "This rotation already exists on that date",
+      "checklistArea": "The checklist belongs to another zone",
+      "unknown": "Could not complete",
+      "lastAssignment": "The last assignee cannot be removed: cancel the zone for this date instead",
+      "notScheduled": "The rotation is no longer scheduled",
+      "alreadyAssigned": "This resident is already on this zone that day",
+      "assignmentSettled": "The assignment is already confirmed or closed: change the mark instead",
+      "whoRequired": "Choose who to put"
+    }
   },
   "generalCleaning": {
     "title": "Deep cleaning",
@@ -1719,7 +1732,8 @@
       "warning": "Warning",
       "reprimand": "Reprimand",
       "severe_reprimand": "Severe reprimand"
-    }
+    },
+    "debtsReserve": "Extra rotation reserve: {count}"
   },
   "notifications": {
     "title": "Notifications",

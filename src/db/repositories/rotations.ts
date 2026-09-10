@@ -127,6 +127,8 @@ export async function createRotationDebt(
   input: {
     userId: string;
     reason: string;
+    /** Шаг книги: `+1` — начисление, `−1` — списание; по умолчанию начисление. */
+    delta?: 1 | -1;
     sourceAssignmentId?: string | null;
     expiresAt: BusinessDate;
   },
@@ -135,9 +137,69 @@ export async function createRotationDebt(
   await executor.insert(rotationDebts).values({
     userId: input.userId,
     reason: input.reason,
+    delta: input.delta ?? 1,
     sourceAssignmentId: input.sourceAssignmentId ?? null,
     expiresAt: input.expiresAt,
   });
+}
+
+export interface AssignmentDebtSync {
+  assignmentId: string;
+  userId: string | null;
+  /** Строка, которую должно давать назначение сейчас; `0` — никакой. */
+  step: -1 | 0 | 1;
+  reason: string;
+  expiresAt: BusinessDate;
+}
+
+/**
+ * Книга долга следует за назначением (§7, план фазы 10 §2.7).
+ *
+ * У назначения не больше одной строки, и она отражает его нынешнее
+ * состояние: отмена, возврат в расписание и отметка задним числом правят
+ * ту же строку, а не начисляют вторую — так же, как событие рейтинга
+ * держится за назначение (`putRefRatingEvent`). Строка, которая и так
+ * верна, не переписывается: её дата и порядок остаются историей.
+ */
+export async function syncAssignmentDebt(
+  input: AssignmentDebtSync,
+  executor: Executor = getDb(),
+): Promise<void> {
+  const existing = await executor
+    .select()
+    .from(rotationDebts)
+    .where(eq(rotationDebts.sourceAssignmentId, input.assignmentId));
+
+  const wanted =
+    input.step === 0 || input.userId === null ? null : { userId: input.userId, delta: input.step };
+
+  const [current] = existing;
+
+  if (
+    wanted !== null &&
+    existing.length === 1 &&
+    current !== undefined &&
+    current.delta === wanted.delta &&
+    current.userId === wanted.userId
+  ) {
+    return;
+  }
+
+  if (existing.length > 0) {
+    await executor
+      .delete(rotationDebts)
+      .where(eq(rotationDebts.sourceAssignmentId, input.assignmentId));
+  }
+
+  if (wanted !== null) {
+    await executor.insert(rotationDebts).values({
+      userId: wanted.userId,
+      reason: input.reason,
+      delta: wanted.delta,
+      sourceAssignmentId: input.assignmentId,
+      expiresAt: input.expiresAt,
+    });
+  }
 }
 
 /**
@@ -1172,6 +1234,21 @@ export async function updateAssignment(
   return assignment;
 }
 
+/**
+ * Снятие назначения с занятия (план фазы 10 §2.6, «двор 2 → 1»).
+ *
+ * Строка книги долга, если она была, уходит вместе с ним: долг держится
+ * ссылкой на назначение, а снимают только незакрытое — сервис не пускает
+ * сюда подтверждённое и невыполненное.
+ */
+export async function deleteAssignment(
+  assignmentId: string,
+  executor: Executor = getDb(),
+): Promise<void> {
+  await executor.delete(rotationDebts).where(eq(rotationDebts.sourceAssignmentId, assignmentId));
+  await executor.delete(rotationAssignments).where(eq(rotationAssignments.id, assignmentId));
+}
+
 /** Назначения перечисленных занятий: календарь читает их одним запросом. */
 export async function listAssignmentsFor(
   occurrenceIds: readonly string[],
@@ -1196,6 +1273,8 @@ export interface UpdateOccurrenceInput {
   date?: BusinessDate;
   movedFromDate?: BusinessDate | null;
   status?: 'scheduled' | 'done' | 'missed' | 'cancelled';
+  /** Число людей этого занятия; правка недели меняет его (§2.6). */
+  peopleNeeded?: number;
 }
 
 export async function updateOccurrence(

@@ -3,6 +3,7 @@ import { listResidencies } from '@/db/repositories/residencies';
 import {
   createAssignment,
   createOccurrence,
+  deleteAssignment,
   listAssignmentsById,
   listCalendarDictionaries,
   listAssignmentsFor,
@@ -17,6 +18,7 @@ import { NotFoundError, ValidationError } from '@/lib/errors';
 import { parseBusinessDate, type BusinessDate } from '@/lib/time';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
+import { syncDebtOf } from './rotation-debt';
 
 import type { CalendarDictionaries } from '@/db/repositories/rotations';
 import type { RotationAssignment, RotationOccurrence } from '@/db/schema';
@@ -224,7 +226,9 @@ export async function cancelOccurrence(
         continue;
       }
 
-      await updateAssignment(assignment.id, { state: 'cancelled' }, tx);
+      const off = await updateAssignment(assignment.id, { state: 'cancelled' }, tx);
+      // Отменённое не влияет на долг (§7): строка книги уходит вместе с ним.
+      await syncDebtOf(off, cancelled, tx);
     }
 
     await recordAudit(
@@ -340,6 +344,9 @@ export async function reassignAssignment(
         userId,
         source: 'manual',
         state: userId === null ? 'needs_reassignment' : 'assigned',
+        // Списание принадлежит тому, кого ставили с галочкой (§2.7): другому
+        // человеку оно не переходит, его ставят заново, если нужно.
+        writeOffDebt: false,
       },
       tx,
     );
@@ -367,6 +374,8 @@ export interface ExtraOccurrenceInput {
   date: BusinessDate;
   /** Кого ставят убирать. Пусто — занятие ждёт решения админа. */
   userIds: readonly string[];
+  /** Галочка «списать доп. ротацию» у каждого поставленного (§7, §2.7). */
+  writeOffDebt?: boolean;
 }
 
 /**
@@ -408,6 +417,7 @@ export async function createExtraOccurrence(
     );
 
     const targets = input.userIds.length === 0 ? [null] : [...input.userIds];
+    const writeOffDebt = input.writeOffDebt === true;
 
     for (const userId of targets) {
       await createAssignment(
@@ -415,8 +425,9 @@ export async function createExtraOccurrence(
         {
           occurrenceId: occurrence.id,
           userId,
-          source: 'manual',
+          source: writeOffDebt && userId !== null ? 'debt' : 'manual',
           state: userId === null ? 'needs_reassignment' : 'assigned',
+          writeOffDebt: writeOffDebt && userId !== null,
         },
         tx,
       );
@@ -428,11 +439,172 @@ export async function createExtraOccurrence(
         action: AUDIT_ACTIONS.rotationExtraCreated,
         entityType: 'rotation_occurrence',
         entityId: occurrence.id,
-        after: { areaId: input.areaId, date: input.date, userIds: [...input.userIds] },
+        after: {
+          areaId: input.areaId,
+          date: input.date,
+          userIds: [...input.userIds],
+          writeOffDebt,
+        },
       },
       tx,
     );
 
     return occurrence;
+  });
+}
+
+/**
+ * Снять одного исполнителя с зоны на дату (план фазы 10 §2.6, «двор 2 → 1»).
+ *
+ * Правка одной недели: назначение уходит, у занятия становится на человека
+ * меньше, базовый цикл не трогается — следующая неделя идёт по норме.
+ * Инвариант 8 держится: число назначений остаётся равным числу людей
+ * занятия. Последнего исполнителя не снимают: зону на дату отменяют
+ * (`cancelOccurrence`), а занятие без людей ничего бы не значило.
+ */
+export async function removeAssignment(
+  actor: UserActor,
+  assignmentId: string,
+  deps: CalendarDeps = {},
+): Promise<RotationOccurrence> {
+  const executor = executorOf(deps);
+
+  assertCan(actor.context, 'rotation.manage', { houseId: actor.context.houseId });
+
+  const [assignment] = await listAssignmentsById([assignmentId], executor);
+  if (assignment === undefined) {
+    throw new NotFoundError('Назначение не найдено');
+  }
+
+  const occurrence = await requireOccurrence(actor.context, assignment.occurrenceId, executor);
+
+  if (occurrence.status !== 'scheduled') {
+    throw new ValidationError('rotationCalendar.errors.notScheduled');
+  }
+
+  // Подтверждённое и невыполненное — уже история с оценкой и долгом;
+  // её правят отметкой (§7), а не снятием.
+  if (assignment.state !== 'assigned' && assignment.state !== 'needs_reassignment') {
+    throw new ValidationError('rotationCalendar.errors.assignmentSettled');
+  }
+
+  const siblings = await listAssignmentsFor([occurrence.id], executor);
+  if (siblings.length <= 1) {
+    throw new ValidationError('rotationCalendar.errors.lastAssignment');
+  }
+
+  return executor.transaction(async (tx) => {
+    await deleteAssignment(assignmentId, tx);
+
+    const updated = await updateOccurrence(
+      actor.context,
+      occurrence.id,
+      { peopleNeeded: Math.max(occurrence.peopleNeeded - 1, 1) },
+      tx,
+    );
+
+    await recordAudit(
+      { context: actor.context, ip: actor.ip, requestId: actor.requestId },
+      {
+        action: AUDIT_ACTIONS.rotationAssignmentRemoved,
+        entityType: 'rotation_occurrence',
+        entityId: occurrence.id,
+        before: { userId: assignment.userId, peopleNeeded: occurrence.peopleNeeded },
+        after: { peopleNeeded: updated.peopleNeeded },
+      },
+      tx,
+    );
+
+    return updated;
+  });
+}
+
+export interface PlaceInput {
+  occurrenceId: string;
+  userId: string;
+  /** «Списать доп. ротацию»: при подтверждении выполнения долг −1 (§7, P10-3). */
+  writeOffDebt?: boolean;
+}
+
+/**
+ * Поставить человека на зону дня (план фазы 10 §2.7): в дырку или сверх нормы.
+ *
+ * Одно действие на два случая. Есть назначение без исполнителя — человек
+ * встаёт в него, число людей не меняется. Дырки нет — заводится назначение
+ * сверх нормы, и у занятия становится на человека больше (инвариант 8).
+ * Галочка помечает назначение; сама книга долга правится при подтверждении,
+ * а не здесь (P10-3). Допуск к зоне не проверяется: система предлагает,
+ * админ решает (§2.8).
+ */
+export async function placeOnOccurrence(
+  actor: UserActor,
+  input: PlaceInput,
+  deps: CalendarDeps = {},
+): Promise<RotationAssignment> {
+  const executor = executorOf(deps);
+
+  const occurrence = await requireManagedOccurrence(actor, input.occurrenceId, executor);
+
+  if (occurrence.status !== 'scheduled') {
+    throw new ValidationError('rotationCalendar.errors.notScheduled');
+  }
+
+  await assertHouseResident(actor, occurrence.houseId, input.userId, executor);
+
+  const assignments = await listAssignmentsFor([occurrence.id], executor);
+
+  if (assignments.some((item) => item.userId === input.userId && item.state !== 'cancelled')) {
+    throw new ValidationError('rotationCalendar.errors.alreadyAssigned');
+  }
+
+  const hole = assignments.find(
+    (item) => item.userId === null && item.state === 'needs_reassignment',
+  );
+  const writeOffDebt = input.writeOffDebt === true;
+  const source = writeOffDebt ? 'debt' : 'manual';
+
+  return executor.transaction(async (tx) => {
+    const placed =
+      hole === undefined
+        ? await createAssignment(
+            actor.context,
+            {
+              occurrenceId: occurrence.id,
+              userId: input.userId,
+              source,
+              state: 'assigned',
+              writeOffDebt,
+            },
+            tx,
+          )
+        : await updateAssignment(
+            hole.id,
+            { userId: input.userId, source, state: 'assigned', writeOffDebt },
+            tx,
+          );
+
+    const peopleNeeded = hole === undefined ? occurrence.peopleNeeded + 1 : occurrence.peopleNeeded;
+
+    if (hole === undefined) {
+      await updateOccurrence(actor.context, occurrence.id, { peopleNeeded }, tx);
+    }
+
+    await recordAudit(
+      { context: actor.context, ip: actor.ip, requestId: actor.requestId },
+      {
+        action: AUDIT_ACTIONS.rotationPlaced,
+        entityType: 'rotation_occurrence',
+        entityId: occurrence.id,
+        after: {
+          userId: input.userId,
+          writeOffDebt,
+          filledHole: hole !== undefined,
+          peopleNeeded,
+        },
+      },
+      tx,
+    );
+
+    return placed;
   });
 }

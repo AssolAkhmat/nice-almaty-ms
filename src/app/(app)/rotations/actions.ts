@@ -10,7 +10,9 @@ import {
   cancelRange,
   createExtraOccurrence,
   moveOccurrence,
+  placeOnOccurrence,
   reassignAssignment,
+  removeAssignment,
 } from '@/services/rotation-calendar';
 import {
   confirmAssignment,
@@ -147,12 +149,60 @@ export async function createExtraAction(
       checklistId,
       date,
       userIds: list(formData, 'userIds'),
+      writeOffDebt: text(formData, 'writeOffDebt') === 'on',
     });
   } catch (error) {
     return failure(error);
   }
 
   return { done: 'rotationCalendar.extraCreated' };
+}
+
+/** Снять одного исполнителя с зоны на дату: двор 2 → 1 (план фазы 10 §2.6). */
+export async function removeAssignmentAction(
+  _previous: CalendarActionState,
+  formData: FormData,
+): Promise<CalendarActionState> {
+  const user = await actor();
+  if (user === null) {
+    return { error: 'rotationCalendar.errors.unknown' };
+  }
+
+  try {
+    await removeAssignment(user, text(formData, 'assignmentId'));
+  } catch (error) {
+    return failure(error);
+  }
+
+  return { done: 'rotationCalendar.removed' };
+}
+
+/** Поставить человека на зону дня — в дырку или сверх нормы, с галочкой (§2.7). */
+export async function placeAction(
+  _previous: CalendarActionState,
+  formData: FormData,
+): Promise<CalendarActionState> {
+  const user = await actor();
+  if (user === null) {
+    return { error: 'rotationCalendar.errors.unknown' };
+  }
+
+  const userId = text(formData, 'userId');
+  if (userId === '') {
+    return { error: 'rotationCalendar.errors.whoRequired' };
+  }
+
+  try {
+    await placeOnOccurrence(user, {
+      occurrenceId: text(formData, 'occurrenceId'),
+      userId,
+      writeOffDebt: text(formData, 'writeOffDebt') === 'on',
+    });
+  } catch (error) {
+    return failure(error);
+  }
+
+  return { done: 'rotationCalendar.placed' };
 }
 
 export async function cancelRangeAction(

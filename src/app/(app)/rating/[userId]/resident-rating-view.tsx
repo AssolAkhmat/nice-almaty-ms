@@ -94,7 +94,9 @@ export function ResidentRatingView({
         <p className="mt-2 text-[32px] leading-none" data-testid="resident-rating">
           {rating}
         </p>
-        <p className="text-text-muted mt-2 text-[13px]">{t('debtsCount', { count: debts })}</p>
+        <p className="text-text-muted mt-2 text-[13px]" data-testid="resident-debts">
+          {debts < 0 ? t('debtsReserve', { count: -debts }) : t('debtsCount', { count: debts })}
+        </p>
       </Card>
 
       <Card>

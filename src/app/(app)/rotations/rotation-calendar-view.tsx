@@ -18,7 +18,9 @@ import {
   createExtraAction,
   markAction,
   moveOccurrenceAction,
+  placeAction,
   reassignAction,
+  removeAssignmentAction,
   setStatusAction,
   type CalendarActionState,
 } from './actions';
@@ -37,6 +39,8 @@ export interface AssignmentView {
   /** Оценка 1–10; жильцу не приходит вовсе (§7). */
   score: number | null;
   note: string | null;
+  /** Галочка «списать доп. ротацию»: долг −1 при подтверждении (§2.7). */
+  writeOffDebt: boolean;
 }
 
 export interface OccurrenceCard {
@@ -115,6 +119,8 @@ function OccurrenceBlock({
   const [confirmState, confirm, isConfirming] = useActionState(confirmAction, INITIAL);
   const [markState, mark, isMarking] = useActionState(markAction, INITIAL);
   const [statusState, setStatus, isSettingStatus] = useActionState(setStatusAction, INITIAL);
+  const [removeState, remove, isRemoving] = useActionState(removeAssignmentAction, INITIAL);
+  const [placeState, place, isPlacing] = useActionState(placeAction, INITIAL);
 
   useRefreshOnDone(moveState);
   useRefreshOnDone(cancelState);
@@ -122,6 +128,18 @@ function OccurrenceBlock({
   useRefreshOnDone(confirmState);
   useRefreshOnDone(markState);
   useRefreshOnDone(statusState);
+  useRefreshOnDone(removeState);
+  useRefreshOnDone(placeState);
+
+  /*
+   * Снять можно только незакрытое назначение и только не последнее: зону
+   * без людей на дату отменяют, а не обнуляют (план фазы 10 §2.6).
+   */
+  const removable = (assignment: AssignmentView): boolean =>
+    canManage &&
+    card.status === 'scheduled' &&
+    card.assignments.length > 1 &&
+    (assignment.state === 'assigned' || assignment.state === 'needs_reassignment');
 
   return (
     <li
@@ -164,6 +182,7 @@ function OccurrenceBlock({
             {assignment.score !== null && (
               <Badge tone="neutral">{t('score', { score: assignment.score })}</Badge>
             )}
+            {assignment.writeOffDebt && <Badge tone="info">{t('writeOffBadge')}</Badge>}
 
             {assignment.isMine && card.status === 'scheduled' && !canManage && (
               <form action={confirm} className="flex flex-wrap items-end gap-2">
@@ -263,6 +282,21 @@ function OccurrenceBlock({
                 </Button>
               </form>
             )}
+
+            {removable(assignment) && (
+              <form action={remove}>
+                <input name="assignmentId" type="hidden" value={assignment.assignmentId} />
+                <Button
+                  data-testid={`remove-${assignment.assignmentId}`}
+                  disabled={isRemoving}
+                  size="sm"
+                  type="submit"
+                  variant="ghost"
+                >
+                  {t('remove')}
+                </Button>
+              </form>
+            )}
           </li>
         ))}
       </ul>
@@ -270,6 +304,53 @@ function OccurrenceBlock({
       <Message state={assignState} />
       <Message state={confirmState} />
       <Message state={markState} />
+      <Message state={removeState} />
+
+      {canManage && card.status === 'scheduled' && (
+        <form
+          action={place}
+          className="flex flex-wrap items-end gap-2"
+          data-testid={`place-form-${card.occurrenceId}`}
+        >
+          <input name="occurrenceId" type="hidden" value={card.occurrenceId} />
+          <Field htmlFor={`place-${card.occurrenceId}`} label={t('placeTitle')}>
+            <Select
+              className="h-9 w-44"
+              data-testid={`place-select-${card.occurrenceId}`}
+              id={`place-${card.occurrenceId}`}
+              name="userId"
+              required
+            >
+              <option value="">{t('placeWho')}</option>
+              {members.map((member) => (
+                <option key={member.userId} value={member.userId}>
+                  {member.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <label className="flex items-center gap-2 pb-2 text-[13px]">
+            <input
+              className="accent-primary size-4"
+              data-testid={`place-writeoff-${card.occurrenceId}`}
+              name="writeOffDebt"
+              type="checkbox"
+            />
+            {t('writeOffDebt')}
+          </label>
+          <Button
+            data-testid={`place-save-${card.occurrenceId}`}
+            disabled={isPlacing}
+            size="sm"
+            type="submit"
+            variant="secondary"
+          >
+            {t('place')}
+          </Button>
+        </form>
+      )}
+
+      <Message state={placeState} />
 
       {canManage && (
         <form action={setStatus} className="flex flex-wrap items-end gap-2">
@@ -417,6 +498,16 @@ function PeriodActions({
               </Select>
             </Field>
           </div>
+
+          <label className="flex items-center gap-2 pb-2 text-[13px]">
+            <input
+              className="accent-primary size-4"
+              data-testid="extra-writeoff"
+              name="writeOffDebt"
+              type="checkbox"
+            />
+            {t('writeOffDebt')}
+          </label>
 
           <Button data-testid="extra-save" disabled={isCreating} size="sm" type="submit">
             {t('extraCreate')}

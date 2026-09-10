@@ -78,8 +78,34 @@ test.describe('календарь ротаций', () => {
     const hasPeriodActions = await page.getByTestId('extra-form').count();
     if (hasPeriodActions > 0) {
       await expect(page.getByTestId('holidays-form')).toBeVisible();
+      // Галочка «списать доп. ротацию» у внеплановой (§7, фаза 10 §2.7).
+      await expect(page.getByTestId('extra-writeoff')).toBeVisible();
     } else {
       await expect(main).toContainText('Ротаций на этот период нет');
+    }
+  });
+
+  test('у запланированной ротации есть «поставить на зону» с галочкой списания', async ({
+    page,
+  }) => {
+    await login(page, E2E_ACCOUNTS.adminHouse1);
+    await page.goto('/rotations?mode=week');
+
+    // Форма стоит у каждого запланированного занятия (фаза 10 §2.7); что она
+    // делает, проверяет `rotation-calendar.db-test`. Нет запланированных —
+    // нет и формы: иначе админ ставил бы людей в историю.
+    const forms = page.locator('[data-testid^="place-form-"]');
+    const scheduled = page
+      .locator('[data-testid^="occurrence-"]')
+      .filter({ hasText: 'Запланирована' });
+
+    if ((await forms.count()) > 0) {
+      const form = forms.first();
+      await expect(form.locator('[data-testid^="place-select-"]')).toBeVisible();
+      await expect(form.locator('[data-testid^="place-writeoff-"]')).toBeVisible();
+      await expect(form.locator('[data-testid^="place-save-"]')).toBeVisible();
+    } else {
+      await expect(scheduled).toHaveCount(0);
     }
   });
 });

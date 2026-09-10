@@ -1,9 +1,12 @@
+import { asc, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { afterAll, describe, expect, it } from 'vitest';
 
+import { createRotationDebt } from '@/db/repositories/rotations';
 import * as schema from '@/db/schema';
 import { testDatabaseUrl } from '@/db/testing/database-url';
+import { debtBalance } from '@/domain/rotation-debt';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { parseBusinessDate, parseInstant } from '@/lib/time';
 
@@ -369,6 +372,167 @@ describe('видимость оценки (§7)', () => {
       expect(assignments.every((item) => item.score === null)).toBe(true);
       // Кто поставил оценку и когда — тоже не его дело.
       expect(assignments.every((item) => item.scoredBy === null)).toBe(true);
+    });
+  });
+});
+
+/**
+ * Долг со знаком (docs/03-BUSINESS-RULES.md §7, `docs/tasks/PHASE-10.md` §2.7, P10-3):
+ * списание — при подтверждении выполнения ротации с галочкой, строка `−1`;
+ * «не выполнена» — строка `+1`; отмена снимает и то, и другое.
+ */
+describe('книга долга при подтверждении и отметке', () => {
+  async function debtsOf(tx: Transaction, userId: string) {
+    return tx
+      .select()
+      .from(schema.rotationDebts)
+      .where(eq(schema.rotationDebts.userId, userId))
+      .orderBy(asc(schema.rotationDebts.createdAt));
+  }
+
+  async function withWriteOff(tx: Transaction, assignmentId: string): Promise<void> {
+    await tx
+      .update(schema.rotationAssignments)
+      .set({ writeOffDebt: true, source: 'debt' })
+      .where(eq(schema.rotationAssignments.id, assignmentId));
+  }
+
+  it('подтверждение с галочкой пишет строку −1 на то же 1 июля, что и начисление', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9841');
+      await withWriteOff(tx, fixture.assignmentId);
+
+      await confirmAssignment(
+        fixture.worker,
+        fixture.assignmentId,
+        {},
+        { executor: tx, instant: MOMENT },
+      );
+
+      const debts = await debtsOf(tx, fixture.workerId);
+      expect(debts).toHaveLength(1);
+      expect(debts[0]?.delta).toBe(-1);
+      expect(debts[0]?.reason).toBe('rotation.write_off');
+      expect(debts[0]?.sourceAssignmentId).toBe(fixture.assignmentId);
+      expect(debts[0]?.expiresAt).toBe('2027-07-01');
+      expect(debtBalance(debts)).toBe(-1);
+    });
+  });
+
+  it('повторное подтверждение админом не списывает второй раз', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9842');
+      await withWriteOff(tx, fixture.assignmentId);
+
+      await confirmAssignment(
+        fixture.worker,
+        fixture.assignmentId,
+        {},
+        { executor: tx, instant: MOMENT },
+      );
+      await markAssignment(
+        fixture.admin,
+        fixture.assignmentId,
+        { state: 'confirmed', score: 8 },
+        { executor: tx, instant: MOMENT },
+      );
+
+      expect(await debtsOf(tx, fixture.workerId)).toHaveLength(1);
+    });
+  });
+
+  it('возврат в «запланировано» забирает списание обратно', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9843');
+      await withWriteOff(tx, fixture.assignmentId);
+
+      await confirmAssignment(
+        fixture.worker,
+        fixture.assignmentId,
+        {},
+        { executor: tx, instant: MOMENT },
+      );
+      await markAssignment(
+        fixture.admin,
+        fixture.assignmentId,
+        { state: 'assigned' },
+        { executor: tx, instant: MOMENT },
+      );
+
+      expect(await debtsOf(tx, fixture.workerId)).toHaveLength(0);
+    });
+  });
+
+  it('без галочки подтверждение долг не трогает', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9844');
+
+      await confirmAssignment(
+        fixture.worker,
+        fixture.assignmentId,
+        {},
+        { executor: tx, instant: MOMENT },
+      );
+
+      expect(await debtsOf(tx, fixture.workerId)).toHaveLength(0);
+    });
+  });
+
+  it('«не выполнена» руками даёт +1, отмена занятия снимает его, возврат в расписание возвращает', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9845');
+
+      await markAssignment(
+        fixture.admin,
+        fixture.assignmentId,
+        { state: 'missed', score: 1 },
+        { executor: tx, instant: MOMENT },
+      );
+
+      const missed = await debtsOf(tx, fixture.workerId);
+      expect(missed).toHaveLength(1);
+      expect(missed[0]?.delta).toBe(1);
+      expect(missed[0]?.reason).toBe('rotation.missed');
+
+      await setOccurrenceStatus(fixture.admin, fixture.occurrenceId, 'cancelled', {
+        executor: tx,
+        instant: MOMENT,
+      });
+      expect(await debtsOf(tx, fixture.workerId)).toHaveLength(0);
+
+      await setOccurrenceStatus(fixture.admin, fixture.occurrenceId, 'scheduled', {
+        executor: tx,
+        instant: MOMENT,
+      });
+      const restored = await debtsOf(tx, fixture.workerId);
+      expect(restored).toHaveLength(1);
+      expect(restored[0]?.delta).toBe(1);
+    });
+  });
+
+  it('списание гасит начисление: баланс книги — ноль', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9846');
+      await withWriteOff(tx, fixture.assignmentId);
+
+      await createRotationDebt(
+        {
+          userId: fixture.workerId,
+          reason: 'rating.threshold:20',
+          expiresAt: parseBusinessDate('2027-07-01'),
+        },
+        tx,
+      );
+      await confirmAssignment(
+        fixture.worker,
+        fixture.assignmentId,
+        {},
+        { executor: tx, instant: MOMENT },
+      );
+
+      const debts = await debtsOf(tx, fixture.workerId);
+      expect(debts.map((row) => row.delta)).toEqual([1, -1]);
+      expect(debtBalance(debts)).toBe(0);
     });
   });
 });

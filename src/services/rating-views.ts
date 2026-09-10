@@ -3,6 +3,7 @@ import { listFines, listRatingEvents, readThresholdStates } from '@/db/repositor
 import { listResidencies } from '@/db/repositories/residencies';
 import { listCalendarDictionaries, listRotationDebts } from '@/db/repositories/rotations';
 import { foldRating, ratingYearStart } from '@/domain/rating';
+import { debtBalance } from '@/domain/rotation-debt';
 import { assertCan } from '@/lib/authz';
 import { now, todayInAlmaty, type BusinessDate } from '@/lib/time';
 
@@ -119,7 +120,7 @@ export async function readHouseRating(
       userId: member.userId,
       name: member.name,
       rating: foldRating(events.map((event) => event.delta)),
-      debts: debts.filter((debt) => debt.userId === member.userId).length,
+      debts: debtBalance(debts.filter((debt) => debt.userId === member.userId)),
       finesPending: fines
         .filter((fine) => fine.userId === member.userId)
         .reduce((sum, fine) => sum + fine.amount, 0),
@@ -207,7 +208,7 @@ export async function readResidentRating(
     rating: foldRating(events.map((event) => event.delta)),
     events,
     thresholds,
-    debts: debts.length,
+    debts: debtBalance(debts),
     fines,
   };
 }
