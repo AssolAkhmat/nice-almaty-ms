@@ -58,6 +58,17 @@ describe('миграции', () => {
     expect(constraint).toBeGreaterThan(backfill);
   });
 
+  /** Тот же случай, что и выше: без UPDATE проверка не встанет на старые ряды. */
+  it('миграция фазы 10 чинит день недели рядов до проверки диапазона', () => {
+    const name = migrationFiles().find((file) => file.startsWith('0023_')) ?? '';
+    const sql = readMigration(name);
+    const backfill = sql.indexOf('UPDATE "rotation_rows" SET "weekday" = 0');
+    const constraint = sql.indexOf('rotation_rows_weekday_range');
+
+    expect(backfill).toBeGreaterThan(-1);
+    expect(constraint).toBeGreaterThan(backfill);
+  });
+
   it('журнал drizzle перечисляет все файлы миграций', () => {
     const journal = JSON.parse(
       readFileSync(join(MIGRATIONS_DIR, 'meta', '_journal.json'), 'utf8'),

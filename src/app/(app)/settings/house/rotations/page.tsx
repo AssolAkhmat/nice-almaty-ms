@@ -10,6 +10,7 @@ import { can } from '@/lib/authz';
 import { getCurrentSession } from '@/lib/session';
 import { addDays, todayInAlmaty } from '@/lib/time';
 import { generalCleaningDate, readGeneralCleaningSettings } from '@/services/general-cleaning';
+import { previewRotationDays, readDaySetup } from '@/services/rotation-day-setup';
 import { readRows } from '@/services/rotation-rows';
 import { readTemplateText } from '@/services/rotation-templates';
 import { readSchedule } from '@/services/rotation-schedule';
@@ -21,6 +22,7 @@ import {
   type RowBlock,
   type ZoneOption,
 } from './rotation-rows-manager';
+import { RotationDayManager, type DayRowBlock } from './rotation-day-manager';
 import { RotationSetupManager, type AreaBlock, type GroupRow } from './rotation-setup-manager';
 import { GeneralCleaningPanel } from './general-cleaning-panel';
 import { TemplateSettings, type TemplateBlock } from './template-settings';
@@ -77,9 +79,10 @@ export default async function RotationSetupPage({
 
   const locale = await getLocale();
 
-  const [setup, rows, scheduled, generalSettings, regularTemplate, generalTemplate] =
+  const [setup, daySetup, rows, scheduled, generalSettings, regularTemplate, generalTemplate] =
     await Promise.all([
       readRotationSetup(actor, houseId),
+      readDaySetup(actor, houseId),
       readRows(actor, houseId),
       readSchedule(actor, houseId, { from: today, to: defaultUntil }),
       readGeneralCleaningSettings(actor, houseId),
@@ -153,6 +156,29 @@ export default async function RotationSetupPage({
     })),
   }));
 
+  /*
+   * Предпросмотр считается на сервере сразу: человек открывает экран и видит,
+   * что выйдет, не нажимая ничего. Кнопка в форме пересчитывает его по черновику.
+   */
+  const dayRows: DayRowBlock[] = await Promise.all(
+    daySetup.rows.map(async (view) => ({
+      rowId: view.row.id,
+      name: view.row.name,
+      type: view.row.type,
+      weekday: view.row.weekday,
+      startDate: view.row.startDate,
+      rosters: view.rosters.map((version) => ({
+        effectiveFrom: version.effectiveFrom,
+        bedIds: version.bedIds,
+      })),
+      norms: view.norms.map((version) => ({
+        effectiveFrom: version.effectiveFrom,
+        zones: version.zones,
+      })),
+      preview: await previewRotationDays(actor, { rowId: view.row.id, from: today }),
+    })),
+  );
+
   return (
     <section className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
@@ -191,6 +217,15 @@ export default async function RotationSetupPage({
       />
 
       <RotationRowsManager beds={beds} houseId={houseId} rows={rowBlocks} zones={zoneOptions} />
+
+      <RotationDayManager
+        beds={beds}
+        bedsInSeveralRows={daySetup.bedsInSeveralRows}
+        bedsOutsideRows={daySetup.bedsOutsideRows}
+        members={setup.members.map((member) => ({ userId: member.userId, name: member.name }))}
+        rows={dayRows}
+        zones={zoneOptions}
+      />
 
       <ScheduleGenerator
         defaultUntil={defaultUntil}

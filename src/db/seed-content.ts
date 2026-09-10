@@ -58,8 +58,11 @@ const ZONES = [
   { name: 'Коридор', checklist: 'Уборка коридора', people: 1 },
 ];
 
-/** Вторник, четверг, воскресенье — дни ротаций из сид-данных роадмапа. */
-const ROTATION_WEEKDAYS = [2, 4, 7] as const;
+/**
+ * Вторник, четверг, воскресенье — дни ротаций из сид-данных роадмапа.
+ * Нумерация приложения: 0 — воскресенье, 6 — суббота (`src/lib/time.ts`).
+ */
+const ROTATION_WEEKDAYS = [2, 4, 0] as const;
 
 const FIRST_NAMES = ['Алишер', 'Данияр', 'Ерлан', 'Мадина', 'Айгерим', 'Тимур'];
 const LAST_NAMES = ['Абдуллаев', 'Сериков', 'Нурланов', 'Жумабек', 'Оспанова', 'Калиев'];
@@ -81,7 +84,7 @@ function firstWeekdayOfMonth(month: BusinessDate, weekday: number): BusinessDate
     const candidate = addDays(month, shift);
     const day = toAlmatyParts(startOfDayUtc(candidate)).weekday;
 
-    if ((day === 0 ? 7 : day) === weekday) {
+    if (day === weekday) {
       return candidate;
     }
   }

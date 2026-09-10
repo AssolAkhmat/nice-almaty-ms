@@ -162,3 +162,49 @@ test.describe('настройка ротаций', () => {
     await expect(main).toContainText('Дом 2');
   });
 });
+
+/**
+ * Составы и нормы дней (T10.3b): экран считает предпросмотр по черновику
+ * и ничего при этом не сохраняет — поэтому сценарий безопасно идёт
+ * на всех трёх ширинах сразу, не мешая соседним прогонам.
+ */
+test.describe('составы и нормы дней', () => {
+  test.slow();
+
+  test('предпросмотр считается по тому, что стоит в полях', async ({ page }) => {
+    await login(page, E2E_ACCOUNTS.adminHouse1);
+    await page.goto('/settings/house/rotations');
+
+    const card = page.locator('[data-testid^="day-form-"]').first();
+    await expect(card).toBeVisible();
+
+    const rowId = (await card.getAttribute('data-testid'))?.replace('day-form-', '') ?? '';
+    expect(rowId).not.toBe('');
+
+    // Черновик: два места на позициях 0 и 1 и одна зона на одного человека.
+    const beds = card.locator(`[data-testid^="roster-bed-${rowId}-"]`);
+    await beds.nth(0).fill('0');
+    await beds.nth(1).fill('1');
+
+    const zones = card.locator(`[data-testid^="norm-zone-${rowId}-"]`);
+    await zones.nth(0).fill('0');
+    const people = card.locator(`[data-testid^="norm-people-${rowId}-"]`);
+    await people.nth(0).fill('1');
+
+    await page.getByTestId(`preview-${rowId}`).click();
+
+    const days = page.getByTestId(`preview-days-${rowId}`);
+    await expect(days).toBeVisible();
+    // Предпросмотр показывает четыре недели вперёд (§5 плана фазы 10).
+    await expect(days.locator('li')).toHaveCount(4);
+  });
+
+  test('места вне рядов и версии названы на экране', async ({ page }) => {
+    await login(page, E2E_ACCOUNTS.adminHouse1);
+    await page.goto('/settings/house/rotations');
+
+    const main = page.locator('main');
+    await expect(main).toContainText('Составы и нормы дней');
+    await expect(main).toContainText('Действует с');
+  });
+});

@@ -5,6 +5,13 @@ import { headers } from 'next/headers';
 import { actionErrorKey } from '@/lib/action-failure';
 import { getCurrentSession } from '@/lib/session';
 import { generateGeneralCleaning, setCancelRegularOnGeneral } from '@/services/general-cleaning';
+import {
+  previewRotationDays,
+  saveNorm,
+  saveRoster,
+  type PreviewDay,
+  type SaveNormZoneInput,
+} from '@/services/rotation-day-setup';
 import { archiveRow, saveRow } from '@/services/rotation-rows';
 import { saveTemplateText } from '@/services/rotation-templates';
 import { generateSchedule } from '@/services/rotation-schedule';
@@ -18,7 +25,7 @@ import {
 
 import { getLocale } from 'next-intl/server';
 
-import { tryParseBusinessDate } from '@/lib/time';
+import { todayInAlmaty, tryParseBusinessDate } from '@/lib/time';
 
 import type { UserActor } from '@/services/users';
 
@@ -405,4 +412,121 @@ export async function saveTemplateAction(
   refresh();
 
   return { done: 'rotationTemplates.saved' };
+}
+
+/**
+ * Состав ряда и норма дня (план фазы 10, §2.2, §2.3, §5).
+ *
+ * Все три действия читают одну и ту же форму: у ряда состав, норма
+ * и предпросмотр стоят рядом, и человеку не приходится переписывать
+ * черновик из одной формы в другую, чтобы посмотреть, что выйдет.
+ */
+function draftBedIds(formData: FormData): string[] {
+  return ordered(formData, 'bed-', (bedId) => bedId).map((item) => item.value);
+}
+
+function draftZones(formData: FormData): SaveNormZoneInput[] {
+  return ordered(formData, 'zone-', (key) => {
+    const [areaId = '', checklistId = ''] = key.split('|');
+    const people = Number(text(formData, `people-${key}`));
+
+    return {
+      areaId,
+      checklistId,
+      ...(Number.isFinite(people) && people > 0 ? { people } : {}),
+    };
+  }).map((item) => item.value);
+}
+
+export async function saveRosterAction(
+  _previous: RotationSetupActionState,
+  formData: FormData,
+): Promise<RotationSetupActionState> {
+  const user = await actor();
+  if (user === null) {
+    return { error: 'rotationSetup.errors.unknown' };
+  }
+
+  const effectiveFrom = tryParseBusinessDate(text(formData, 'rosterFrom'));
+  if (effectiveFrom === null) {
+    return { error: 'rotationDaySetup.errors.effectiveInvalid' };
+  }
+
+  try {
+    await saveRoster(user, {
+      rowId: text(formData, 'rowId'),
+      effectiveFrom,
+      bedIds: draftBedIds(formData),
+    });
+  } catch (error) {
+    return failure(error);
+  }
+
+  return { done: 'rotationDaySetup.rosterSaved' };
+}
+
+export async function saveNormAction(
+  _previous: RotationSetupActionState,
+  formData: FormData,
+): Promise<RotationSetupActionState> {
+  const user = await actor();
+  if (user === null) {
+    return { error: 'rotationSetup.errors.unknown' };
+  }
+
+  const effectiveFrom = tryParseBusinessDate(text(formData, 'normFrom'));
+  if (effectiveFrom === null) {
+    return { error: 'rotationDaySetup.errors.effectiveInvalid' };
+  }
+
+  try {
+    await saveNorm(user, {
+      rowId: text(formData, 'rowId'),
+      effectiveFrom,
+      zones: draftZones(formData),
+    });
+  } catch (error) {
+    return failure(error);
+  }
+
+  return { done: 'rotationDaySetup.normSaved' };
+}
+
+export interface RotationPreviewState {
+  error?: string;
+  preview?: PreviewDay[];
+}
+
+export async function previewRotationAction(
+  _previous: RotationPreviewState,
+  formData: FormData,
+): Promise<RotationPreviewState> {
+  const user = await actor();
+  if (user === null) {
+    return { error: 'rotationSetup.errors.unknown' };
+  }
+
+  const rosterFrom = tryParseBusinessDate(text(formData, 'rosterFrom'));
+  const normFrom = tryParseBusinessDate(text(formData, 'normFrom'));
+  const bedIds = draftBedIds(formData);
+  const zones = draftZones(formData);
+
+  try {
+    const preview = await previewRotationDays(user, {
+      rowId: text(formData, 'rowId'),
+      from: todayInAlmaty(),
+      // Черновик кладётся только заполненный: пустая форма означает
+      // «покажи, как есть», а не «ряд остался без состава».
+      ...(rosterFrom === null || bedIds.length === 0
+        ? {}
+        : { draftRoster: { effectiveFrom: rosterFrom, bedIds } }),
+      ...(normFrom === null || zones.length === 0
+        ? {}
+        : { draftNorm: { effectiveFrom: normFrom, zones } }),
+    });
+
+    return { preview };
+  } catch (error) {
+    return failure(error);
+  }
 }

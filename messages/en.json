@@ -1406,7 +1406,37 @@
       "areaOtherHouse": "The zone belongs to another house",
       "checklistArea": "The checklist belongs to another zone",
       "zoneTwice": "The same zone is in the norm twice",
-      "peopleInvalid": "People per zone must be a whole number from one"
+      "peopleInvalid": "People per zone must be a whole number from one",
+      "effectiveInvalid": "Set the date the version starts"
+    },
+    "title": "Rosters and day norms",
+    "hint": "The roster says who takes part; the day norm says which zones are cleaned and by how many people. Both take effect from a date: past weeks stay on the previous version.",
+    "roster": "Roster",
+    "norm": "Day norm",
+    "effectiveFrom": "In effect from",
+    "effectiveFromHint": "The new version applies from this date; past weeks stay unchanged",
+    "position": "Position",
+    "people": "People",
+    "saveRoster": "Save roster",
+    "saveNorm": "Save norm",
+    "rosterSaved": "Roster saved",
+    "normSaved": "Norm saved",
+    "preview": "Preview",
+    "previewHint": "Counts what is in the fields right now and saves nothing",
+    "previewEmpty": "Nothing to show: the row has no roster or no norm",
+    "week": "week {week}",
+    "rest": "Resting: {names}",
+    "versions": "Versions: {list}",
+    "rosterVersion": "from {date} — {count} beds",
+    "normVersion": "from {date} — {count} zones",
+    "noVersions": "No versions yet",
+    "bedsOutside": "Beds outside rows: {beds}",
+    "bedInSeveralRows": "The bed is also in another row: {beds}",
+    "holes": {
+      "empty_bed": "bed is empty",
+      "absent": "resident is away",
+      "not_eligible": "not allowed for the zone",
+      "no_one": "no one to assign"
     }
   },
   "rotationSchedule": {

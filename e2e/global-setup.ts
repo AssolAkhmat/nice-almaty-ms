@@ -151,11 +151,14 @@ async function removeLeftoverAccounts(db: ReturnType<typeof drizzle>): Promise<v
    * Ротации: долг принадлежит человеку и уходит вместе с ним, а назначение
    * принадлежит занятию — у него обезличивается исполнитель, как и автор
    * записи в журнале. Иначе внешние ключи не дадут удалить учётную запись.
+   *
+   * Причина пустоты обязательна (`rotation_assignments_empty_has_reason`):
+   * жильца прогона больше нет, значит место под этим назначением пустует.
    */
   await db.delete(schema.rotationDebts).where(inArray(schema.rotationDebts.userId, ids));
   await db
     .update(schema.rotationAssignments)
-    .set({ userId: null, state: 'needs_reassignment' })
+    .set({ userId: null, state: 'needs_reassignment', emptyReason: 'empty_bed' })
     .where(inArray(schema.rotationAssignments.userId, ids));
   await db
     .update(schema.rotationAssignments)

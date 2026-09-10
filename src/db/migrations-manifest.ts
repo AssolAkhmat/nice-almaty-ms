@@ -31,6 +31,7 @@ export const MIGRATIONS = [
   '0020_steady_manta.sql',
   '0021_bored_slapstick.sql',
   '0022_loud_vance_astro.sql',
+  '0023_colossal_goliath.sql',
 ] as const;
 
 export const EXPECTED_MIGRATIONS = MIGRATIONS.length;

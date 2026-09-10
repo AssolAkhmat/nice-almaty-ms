@@ -152,6 +152,13 @@ export const rotationRows = pgTable(
     uniqueIndex('rotation_rows_common_weekday_unique')
       .on(table.houseId, table.weekday)
       .where(sql`${table.type} = 'common' and ${table.isActive}`),
+    /*
+     * День недели — 0 (воскресенье) … 6 (суббота), как в `src/lib/time.ts`.
+     * Сид однажды писал сюда 7 по календарю ISO: даты у ряда были верные,
+     * а день недели не совпадал ни с одним настоящим, и экран не знал,
+     * как его назвать.
+     */
+    check('rotation_rows_weekday_range', sql`${table.weekday} between 0 and 6`),
     check(
       'rotation_rows_room_has_area',
       sql`(${table.type} = 'room' and ${table.roomAreaId} is not null) or (${table.type} <> 'room' and ${table.roomAreaId} is null)`,

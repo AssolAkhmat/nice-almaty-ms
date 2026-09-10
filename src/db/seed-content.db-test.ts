@@ -5,6 +5,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import * as schema from '@/db/schema';
 import { testDatabaseUrl } from '@/db/testing/database-url';
+import { startOfDayUtc, toAlmatyParts, type BusinessDate } from '@/lib/time';
 
 import { seedNetwork } from './seed';
 import { BEDS_PER_ROOM, FURNISHED_HOUSES, OCCUPANCY, ROOMS_PER_HOUSE } from './seed-content';
@@ -133,6 +134,12 @@ describe('состав сида', () => {
     });
   });
 
+  /*
+   * День недели в базе — 0 (воскресенье) … 6 (суббота), как в `src/lib/time.ts`.
+   * Проверяется не только сам список, но и согласие с датой первой ротации:
+   * разойдясь с ней, ряд сдвинул бы всю сетку на день, а экран назвал бы
+   * день недели, которого нет.
+   */
   it('ряды ротаций стоят на вторник, четверг и воскресенье', async () => {
     await inRollback(async (tx) => {
       const result = await runSeed(tx);
@@ -143,7 +150,13 @@ describe('состав сида', () => {
         .from(schema.rotationRows)
         .where(eq(schema.rotationRows.houseId, houseId));
 
-      expect(rows.map((row) => row.weekday).sort((left, right) => left - right)).toEqual([2, 4, 7]);
+      expect(rows.map((row) => row.weekday).sort((left, right) => left - right)).toEqual([0, 2, 4]);
+
+      for (const row of rows) {
+        const startWeekday = toAlmatyParts(startOfDayUtc(row.startDate as BusinessDate)).weekday;
+
+        expect(startWeekday).toBe(row.weekday);
+      }
     });
   });
 
