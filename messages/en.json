@@ -1,7 +1,14 @@
 {
   "app": {
     "name": "Nice Almaty",
-    "description": "Student housing network administration system"
+    "description": "Student housing network administration system",
+    "error": {
+      "title": "Something went wrong",
+      "subtitle": "The page did not open",
+      "hint": "The failure is logged. Try again; if it repeats, give the administrator the code below.",
+      "digest": "Failure code: {digest}",
+      "retry": "Try again"
+    }
   },
   "audit": {
     "title": "Audit log",

@@ -51,6 +51,25 @@ function auditActor(actor: UserActor): AuditActor {
  * Выдать одноразовое разрешение. Гасит его сам вход: провайдер обнуляет
  * поле при использовании, поэтому повторно оно не сработает.
  */
+/**
+ * Дом, к которому относится учётная запись: у админа — в самой записи,
+ * у жильца — в проживании (D11). Право с областью `house` иначе не находило
+ * дом жильца, и админу его жилец отвечал отказом (MAINTENANCE, фаза 9).
+ */
+async function houseOfTarget(
+  actor: UserActor,
+  target: User,
+  executor: Executor,
+): Promise<string | null> {
+  if (target.houseId !== null) {
+    return target.houseId;
+  }
+
+  const [residency] = await listResidencies(actor.context, { userId: target.id }, executor);
+
+  return residency?.houseId ?? null;
+}
+
 export async function allowPasswordReset(
   actor: UserActor,
   userId: string,
@@ -60,8 +79,9 @@ export async function allowPasswordReset(
 
   // Проверка прав идёт после поиска: чужой пользователь обязан быть
   // неотличим от несуществующего (P1-1), а не выдавать себя отказом.
+  // Дом жильца лежит в проживании (D11), у админа — в учётной записи.
   assertCan(actor.context, 'user.allowPasswordReset', {
-    houseId: target.houseId,
+    houseId: await houseOfTarget(actor, target, executor),
     userId: target.id,
   });
 
@@ -284,8 +304,7 @@ export async function changeAccountPhone(
    * «свой дом» он берётся оттуда. Видимость проживаний уже отфильтрована
    * по контексту, чужой дом сюда не попадёт.
    */
-  const [residency] = await listResidencies(actor.context, { userId: target.id }, executor);
-  const houseId = target.houseId ?? residency?.houseId ?? null;
+  const houseId = await houseOfTarget(actor, target, executor);
 
   assertCan(actor.context, 'user.changePhone', { houseId, userId: target.id });
 
@@ -338,7 +357,10 @@ export async function archiveAccount(
 ): Promise<User> {
   const target = await requireUser(actor.context, userId, executor);
 
-  assertCan(actor.context, 'user.archive', { houseId: target.houseId, userId: target.id });
+  assertCan(actor.context, 'user.archive', {
+    houseId: await houseOfTarget(actor, target, executor),
+    userId: target.id,
+  });
 
   if (target.id === actor.context.userId) {
     throw new ValidationError('Нельзя архивировать собственную учётную запись');

@@ -20,6 +20,7 @@ import { AUDIT_ACTIONS } from './audit';
 import { signIn } from './auth';
 import {
   allowPasswordReset,
+  archiveAccount,
   changeAccountPhone,
   createAccount,
   openResidencyForAccount,
@@ -418,6 +419,40 @@ describe('кто вправе выдавать разрешение', () => {
       await expect(
         allowPasswordReset({ context: fixture.superadmin }, stranger?.id ?? '', tx),
       ).rejects.toBeInstanceOf(NotFoundError);
+    });
+  });
+});
+
+/**
+ * Дом жильца лежит в проживании (D11): право с областью `house` обязано
+ * находить его там же, где смена номера (T9.7). До этого админу его жилец
+ * отвечал отказом (MAINTENANCE фазы 9, разобрано на закрытии фазы 10).
+ * Архивация админу закрыта матрицей прав целиком — дом в ней не участвует.
+ */
+describe('право на жильца — по дому проживания', () => {
+  it('админ разрешает сброс пароля жильцу своего дома', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '100041');
+
+      const created = await createAccount(
+        { context: fixture.superadmin },
+        { phone: '+77054100041', role: 'resident', houseId: fixture.houseA },
+        tx,
+      );
+
+      const updated = await allowPasswordReset({ context: fixture.adminA }, created.user.id, tx);
+
+      expect(updated.passwordResetAllowedUntil).not.toBeNull();
+    });
+  });
+
+  it('учётная запись чужого дома неотличима от несуществующей и для архивации', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '100043');
+
+      await expect(
+        archiveAccount({ context: fixture.adminA }, fixture.adminBId, tx),
+      ).rejects.toThrow(NotFoundError);
     });
   });
 });
