@@ -122,25 +122,39 @@ PostgreSQL 16. Все таблицы: `id uuid pk default gen_random_uuid()`, `c
 **area_eligibility** — `area_id`, `checklist_type`, `group_id`.
 
 **rotation_rows** — `house_id`, `name`, `type enum(common, room)`, `weekday int (0-6)`,
-`start_date date`, `is_active bool`, `sort_order`.
+`start_date date`, `room_area_id null` (обязателен у `room`), `is_active bool`, `sort_order`.
+На дом — не больше одного действующего `common` на день недели.
 
-**rotation_row_slots** — `row_id`, `position int`, `bed_id`. Уникальность `(row_id, position)`.
+**rotation_row_rosters** — `row_id`, `effective_from date` (версия состава, §6.1).
+Уникальность `(row_id, effective_from)`.
 
-**rotation_row_zones** — `row_id`, `position int`, `area_id`, `checklist_id`, `people_needed int`.
+**rotation_row_roster_slots** — `roster_id`, `position int`, `bed_id`.
+Уникальность `(roster_id, position)` и `(roster_id, bed_id)`.
+
+**rotation_day_norms** — `row_id`, `effective_from date` (версия нормы дня, §6.1).
+Уникальность `(row_id, effective_from)`.
+
+**rotation_day_norm_zones** — `norm_id`, `position int`, `area_id`, `checklist_id`,
+`people int >= 1` (по умолчанию из чек-листа).
 
 **rotation_occurrences** — `house_id`, `row_id null`, `area_id`, `checklist_id`,
 `date date`, `type enum(regular, room, general, extra)`,
 `status enum(scheduled, done, missed, cancelled)`,
+`people_needed int` (из нормы дня при материализации; правка недели меняет),
 `moved_from_date null`, `cycle_index int null`, `created_by null` (не null для `extra`).
 
 **rotation_assignments** — `occurrence_id`, `user_id null`, `slot_position null`,
 `source enum(auto, manual, debt)`,
 `state enum(assigned, needs_reassignment, confirmed, missed, cancelled)`,
+`empty_reason enum(empty_bed, absent, not_eligible, no_one) null` (не пуст ровно
+у назначения без исполнителя), `queued_user_id null` (кто стоял в очереди при недопуске),
+`write_off_debt bool` (галочка «списать доп. ротацию»),
 `confirmed_at`, `done_at`, `confirmed_by`, `score int null (1..10)`, `scored_by`, `scored_at`,
 `photo_file_ids uuid[]`, `note`.
 
-**rotation_debts** — `user_id`, `reason`, `source_assignment_id null`,
-`resolved_by_assignment_id null`, `expires_at date` (1 июля), `created_at`.
+**rotation_debts** — `user_id`, `reason`, `delta int in (+1, −1)`,
+`source_assignment_id null` (не больше одной строки на назначение),
+`expires_at date` (1 июля), `created_at`. Баланс — сумма `delta` несгоревших строк.
 
 **rotation_templates_settings** — `house_id`, `type enum(regular, general)`,
 `header_i18n jsonb`, `footer_i18n jsonb`.
@@ -223,5 +237,7 @@ PostgreSQL 16. Все таблицы: `id uuid pk default gen_random_uuid()`, `c
 5. Сумма `invoice_lines.amount` = `invoices.total`.
 6. Сумма платежей по счёту не превышает `total` (иначе — явная переплата, запрещена без флага).
 7. Рейтинг всегда в [0, 100].
-8. Для любой `rotation_occurrence` число назначений = `people_needed` чек-листа.
-9. `D <= S` в каждом активном ряду ротаций.
+8. Для любой `rotation_occurrence` число назначений = `people_needed` занятия
+   (из нормы дня; правка недели меняет оба вместе).
+9. Назначение без исполнителя называет причину (`empty_reason`), назначение
+   с исполнителем — нет; у одного назначения не больше одной строки книги долга.
