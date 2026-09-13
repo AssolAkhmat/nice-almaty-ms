@@ -47,6 +47,14 @@ describe('палитра токенов', () => {
       'resident.id_doc_issuer',
       'resident.registration_address',
       'residency.contract_number',
+      // Номер документа, депозит, контакты и учёба нанимателя (сентябрь 2026).
+      'resident.id_doc_number',
+      'residency.deposit_amount',
+      'resident.phone',
+      'resident.emergency_name',
+      'resident.emergency_phone',
+      'resident.university',
+      'resident.course',
     ]);
   });
 });

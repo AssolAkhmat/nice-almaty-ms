@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -564,6 +565,116 @@ describe('версия шаблона у договора', () => {
       const signed = sign.printed[0] ?? '';
       expect(signed).not.toContain('ВТОРАЯ ВЕРСИЯ');
       expect(signed).toContain('Договор найма');
+    });
+  });
+});
+
+/**
+ * Реквизиты нанимателя, добавленные в палитру в сентябре 2026: номер
+ * документа (расшифровывается так же, как ИИН), депозит, контактные данные
+ * и учёба. Проверяются отдельно от основного сценария сборки, чтобы правка
+ * общего `TEMPLATE` не задевала остальные тесты файла.
+ */
+describe('реквизиты нанимателя: документ, депозит, контакты, учёба', () => {
+  it('подставляет номер документа, депозит, телефон, контакт и вуз', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6030');
+
+      await saveProfile(
+        fixture.admin,
+        fixture.userId,
+        {
+          phone: '+77011234567',
+          university: 'КазНУ им. аль-Фараби',
+          course: 2,
+          emergencyName: 'Иванова Мария Петровна',
+          emergencyPhone: '+77029876543',
+          idDocNumber: '012345678',
+        },
+        tx,
+      );
+      await tx
+        .update(schema.residencies)
+        .set({ depositAmount: 75_000 })
+        .where(eq(schema.residencies.id, fixture.residencyId));
+      await tx
+        .update(schema.contractTemplates)
+        .set({
+          bodyHtml: [
+            '<p>Документ: {{resident.id_doc_number}}</p>',
+            '<p>Депозит: {{residency.deposit_amount}}</p>',
+            '<p>Телефон: {{resident.phone}}</p>',
+            '<p>Контакт: {{resident.emergency_name}}, {{resident.emergency_phone}}</p>',
+            '<p>{{resident.university}}, {{resident.course}} курс</p>',
+          ].join(''),
+        })
+        .where(eq(schema.contractTemplates.orgId, fixture.orgId));
+
+      const pdf = fakePdf();
+
+      await buildContract(fixture.admin, fixture.residencyId, {
+        executor: tx,
+        storage: freshStorage(),
+        pdf: pdf.renderer,
+        today: TODAY,
+      });
+
+      // `money()` группирует тысячи неразрывным пробелом (U+00A0) для ru-RU,
+      // а не обычным: `{{residency.deposit_amount}}` сравнивается без разницы в пробелах.
+      const html = (pdf.printed[0] ?? '').replaceAll(' ', ' ');
+      expect(html).toContain('Документ: 012345678');
+      expect(html).toContain('Депозит: 75 000 ₸');
+      expect(html).toContain('Телефон: +77011234567');
+      expect(html).toContain('Контакт: Иванова Мария Петровна, +77029876543');
+      expect(html).toContain('КазНУ им. аль-Фараби, 2 курс');
+    });
+  });
+
+  it('телефон нанимателя берётся со входа, если в профиле не указан', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6031');
+
+      await tx
+        .update(schema.contractTemplates)
+        .set({ bodyHtml: '<p>Телефон: {{resident.phone}}</p>' })
+        .where(eq(schema.contractTemplates.orgId, fixture.orgId));
+
+      const pdf = fakePdf();
+
+      await buildContract(fixture.admin, fixture.residencyId, {
+        executor: tx,
+        storage: freshStorage(),
+        pdf: pdf.renderer,
+        today: TODAY,
+      });
+
+      // seed() заводит жильца с номером входа `+7706${suffix}`, профиль его не переопределяет.
+      expect(pdf.printed[0] ?? '').toContain('Телефон: +77066031');
+    });
+  });
+
+  it('незаполненные депозит, документ и контакты не роняют сборку', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6032');
+
+      await tx
+        .update(schema.contractTemplates)
+        .set({
+          bodyHtml:
+            '<p>[{{residency.deposit_amount}}][{{resident.id_doc_number}}][{{resident.emergency_name}}]</p>',
+        })
+        .where(eq(schema.contractTemplates.orgId, fixture.orgId));
+
+      const pdf = fakePdf();
+
+      await buildContract(fixture.admin, fixture.residencyId, {
+        executor: tx,
+        storage: freshStorage(),
+        pdf: pdf.renderer,
+        today: TODAY,
+      });
+
+      expect(pdf.printed[0] ?? '').toContain('<p>[][][]</p>');
     });
   });
 });

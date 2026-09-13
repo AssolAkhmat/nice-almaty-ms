@@ -23,6 +23,14 @@ export const CONTRACT_TOKENS = [
   'resident.id_doc_issuer',
   'resident.registration_address',
   'residency.contract_number',
+  /* Номер документа, депозит, контакты и учёба нанимателя (сентябрь 2026). */
+  'resident.id_doc_number',
+  'residency.deposit_amount',
+  'resident.phone',
+  'resident.emergency_name',
+  'resident.emergency_phone',
+  'resident.university',
+  'resident.course',
 ] as const;
 
 export type ContractToken = (typeof CONTRACT_TOKENS)[number];
@@ -103,4 +111,11 @@ export const SAMPLE_CONTRACT_VALUES: Readonly<Record<ContractToken, string>> = {
   'house.name': 'Дом 1',
   'house.address': 'Алматы, ул. Абая, 1',
   today: '08.09.2026',
+  'resident.id_doc_number': '012345678',
+  'residency.deposit_amount': '75 000 ₸',
+  'resident.phone': '+77011234567',
+  'resident.emergency_name': 'Иванова Мария Петровна',
+  'resident.emergency_phone': '+77029876543',
+  'resident.university': 'КазНУ им. аль-Фараби',
+  'resident.course': '2',
 };

@@ -8,6 +8,7 @@ import { requireHouseOfResidency } from '@/db/repositories/houses';
 import { createFile, requireFile, updateFile } from '@/db/repositories/files';
 import { requireProfile } from '@/db/repositories/resident-profiles';
 import { requireResidency, updateResidency } from '@/db/repositories/residencies';
+import { requireUser } from '@/db/repositories/users';
 import { contractTemplates, type ContractTemplate } from '@/db/schema';
 import { renderContractTemplate, unknownTokens } from '@/domain/contract-template';
 import { documentStorageKey } from '@/domain/files';
@@ -137,6 +138,9 @@ async function contractValues(
   const placement = await findPlacementOfResidency(actor.context, residency.id, executor);
 
   const profile = await requireProfile(actor.context, residency.userId, executor);
+  // Телефон входа — резерв для договора: у входа он обязателен всегда,
+  // а в профиле это отдельное, необязательное контактное поле (T9.7).
+  const user = await requireUser(actor.context, residency.userId, executor);
 
   const fullName = [profile.lastName, profile.firstName, profile.middleName]
     .filter((part) => part !== null && part !== '')
@@ -146,6 +150,11 @@ async function contractValues(
     profile.iinEnc === null
       ? ''
       : await revealSensitiveField(actor, residency.userId, 'iin', executor);
+
+  const idDocNumber =
+    profile.idDocNumberEnc === null
+      ? ''
+      : await revealSensitiveField(actor, residency.userId, 'idDocNumber', executor);
 
   return {
     'resident.full_name': fullName,
@@ -161,6 +170,13 @@ async function contractValues(
     'resident.id_doc_issuer': profile.idDocIssuer ?? '',
     'resident.registration_address': profile.registrationAddress ?? '',
     'residency.contract_number': contractNumber,
+    'resident.id_doc_number': idDocNumber,
+    'residency.deposit_amount': money(residency.depositAmount),
+    'resident.phone': profile.phone ?? user.phone,
+    'resident.emergency_name': profile.emergencyName ?? '',
+    'resident.emergency_phone': profile.emergencyPhone ?? '',
+    'resident.university': profile.university ?? '',
+    'resident.course': profile.course === null ? '' : String(profile.course),
   };
 }
 

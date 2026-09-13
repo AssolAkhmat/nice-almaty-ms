@@ -13,11 +13,21 @@
 - Дома: создание, переименование, адрес, комендантский час, депозит по умолчанию.
 - Правила рейтинга, штрафов и скидок (глобально + переопределение на дом, копирование между домами).
 - Типы документов и сроки годности.
-- Шаблон договора: HTML-редактор + палитра доступных токенов подстановки
-  (`{{resident.full_name}}`, `{{resident.iin}}`, `{{residency.contract_start}}`,
+- Шаблон договора: HTML-редактор + палитра доступных токенов подстановки —
+  `{{resident.full_name}}`, `{{resident.iin}}`, `{{residency.contract_start}}`,
   `{{residency.contract_end}}`, `{{bed.room}}`, `{{bed.label}}`, `{{bed.price}}`,
-  `{{house.name}}`, `{{house.address}}`, `{{today}}`).
+  `{{house.name}}`, `{{house.address}}`, `{{today}}`, `{{resident.id_doc_issuer}}`,
+  `{{resident.registration_address}}`, `{{residency.contract_number}}`,
+  `{{resident.id_doc_number}}`, `{{residency.deposit_amount}}`, `{{resident.phone}}`,
+  `{{resident.emergency_name}}`, `{{resident.emergency_phone}}`, `{{resident.university}}`,
+  `{{resident.course}}`. Палитра — источник истины для `unknownTokens()`
+  в `src/domain/contract-template.ts`; тест `contract-template.test.ts` держит
+  оба списка в согласии.
   Вставка токена кликом, кнопка «Предпросмотр на тестовых данных», версионирование шаблона.
+  Подпись — не токен: жилец рисует её на канвасе, файл проходит обычной двухшаговой
+  загрузкой, и уже готовое изображение вкладывается в конец собранного документа
+  отдельным блоком (`src/services/contracts.ts`, `withSignature`) — расположить его
+  токеном внутри текста нельзя.
   Загрузка готового текста договора (docx/pdf) поддерживается как вложение-образец;
   подставляемый документ формируется из HTML-шаблона.
 - Видимость рейтинга у жильцов (вкл/выкл глобально).
