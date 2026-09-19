@@ -158,7 +158,7 @@ Service worker кеширует только оболочку: страницу 
 DEPLOY_TARGET=docker|vercel
 DATABASE_URL=
 DIRECT_DATABASE_URL=          # для миграций на Supabase (порт 5432)
-POSTGRES_PORT=5432            # порт публикации postgres из compose наружу
+POSTGRES_PORT=5432            # порт публикации postgres из compose, только на 127.0.0.1
 TEST_DATABASE_URL=            # только для pnpm test:db, приложение не читает
 APP_URL=
 SESSION_SECRET=

@@ -8,8 +8,12 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-nice}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nice}
       POSTGRES_DB: ${POSTGRES_DB:-nice_almaty}
+    # Только на петлевом интерфейсе: на VPS с публичным адресом `5432:5432`
+    # открывает базу с паролем из .env всему интернету, и ufw этого не видит —
+    # Docker пишет свои правила iptables в обход него. Команды `db:*` с хоста
+    # и `pnpm test:db` ходят через localhost, им этого достаточно.
     ports:
-      - '${POSTGRES_PORT:-5432}:5432'
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
