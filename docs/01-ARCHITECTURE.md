@@ -167,7 +167,7 @@ CRON_SECRET=
 DEFAULT_LOCALE=ru
 TZ=Asia/Almaty
 
-CHROMIUM_PATH=               # путь к chromium для печати договора, пусто — искать самому
+CHROMIUM_PATH=               # путь к chromium для печати договора; пусто в Docker — из образа, вне Docker — печать отказывает
 
 STORAGE_DRIVER=gdrive|local|supabase
 GDRIVE_CLIENT_ID=

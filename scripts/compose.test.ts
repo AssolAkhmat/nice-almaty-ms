@@ -8,7 +8,8 @@ import { describe, expect, it } from 'vitest';
  * при первом подъёме на VPS (19 сентября 2026, docs/08-DECISIONS.md).
  *
  * Ни одно из них не видно ни тестам приложения, ни сборке: compose
- * поднимается, healthcheck зелёный, а база открыта в интернет.
+ * поднимается, healthcheck зелёный, а база открыта в интернет
+ * или договор не печатается.
  */
 const REPO_ROOT = join(import.meta.dirname, '..');
 
@@ -48,6 +49,31 @@ function postgresMappings(block: string): number {
   return [...block.matchAll(/:5432['"]?\s*$/gm)].length;
 }
 
+/**
+ * Путь chromium, который compose подставляет приложению, когда в `.env`
+ * пусто. Нужна именно форма `:-`: `env_file` передаёт пустое значение
+ * как заданное и перекрывает `ENV` образа, а `${X-путь}` пустую строку
+ * оставил бы пустой.
+ */
+function chromiumFallback(block: string): string | null {
+  const match = /^\s+CHROMIUM_PATH: ['"]?\$\{CHROMIUM_PATH:-([^}]+)\}['"]?\s*$/m.exec(block);
+
+  return match?.[1] ?? null;
+}
+
+/**
+ * PID 1 в контейнере приложения — init, а не node. Процессы chromium,
+ * осиротевшие после печати, переходят к PID 1; node их не подбирает,
+ * и каждый договор оставлял по четыре зомби до перезапуска контейнера.
+ */
+function hasInit(block: string): boolean {
+  return /^ {4}init: true\s*$/m.test(block);
+}
+
+function dockerfileChromium(dockerfile: string): string | null {
+  return /^ENV CHROMIUM_PATH=(\S+)\s*$/m.exec(dockerfile)?.[1] ?? null;
+}
+
 describe('docker-compose.yml', () => {
   const compose = read('docker-compose.yml');
 
@@ -56,6 +82,17 @@ describe('docker-compose.yml', () => {
 
     expect(postgresMappings(block)).toBeGreaterThan(0);
     expect(exposedPostgresPorts(block)).toEqual([]);
+  });
+
+  it('приложение получает путь chromium из образа, когда в .env пусто', () => {
+    const fromImage = dockerfileChromium(read('Dockerfile'));
+
+    expect(fromImage).not.toBeNull();
+    expect(chromiumFallback(serviceBlock(compose, 'app'))).toBe(fromImage);
+  });
+
+  it('у приложения PID 1 — init: зомби chromium подбираются', () => {
+    expect(hasInit(serviceBlock(compose, 'app'))).toBe(true);
   });
 });
 
@@ -70,5 +107,38 @@ describe('сторож compose ловит нарушения', () => {
     const block = ['    ports:', '      - "0.0.0.0:5432:5432"'].join('\n');
 
     expect(exposedPostgresPorts(block)).toEqual(['0.0.0.0:5432:5432']);
+  });
+
+  it('приложение без CHROMIUM_PATH в environment', () => {
+    const block = ['    environment:', '      DEPLOY_TARGET: docker'].join('\n');
+
+    expect(chromiumFallback(block)).toBeNull();
+  });
+
+  it('подстановку без двоеточия: пустое значение из .env осталось бы пустым', () => {
+    const block = [
+      '    environment:',
+      '      CHROMIUM_PATH: ${CHROMIUM_PATH-/usr/bin/chromium-browser}',
+    ].join('\n');
+
+    expect(chromiumFallback(block)).toBeNull();
+  });
+
+  it('пустой путь chromium в environment', () => {
+    const block = ['    environment:', "      CHROMIUM_PATH: ''"].join('\n');
+
+    expect(chromiumFallback(block)).toBeNull();
+  });
+
+  it('приложение без init', () => {
+    const block = ['    restart: unless-stopped', '    env_file:', '      - .env'].join('\n');
+
+    expect(hasInit(block)).toBe(false);
+  });
+
+  it('выключенный init', () => {
+    const block = ['    restart: unless-stopped', '    init: false'].join('\n');
+
+    expect(hasInit(block)).toBe(false);
   });
 });

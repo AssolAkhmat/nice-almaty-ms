@@ -21,7 +21,7 @@ export interface BrowserLike {
 }
 
 export interface ChromiumConfig {
-  /** Путь к исполняемому файлу; по умолчанию его ищет сам puppeteer. */
+  /** Путь к исполняемому файлу. Без него puppeteer-core запуск отклоняет: сам браузер он не ищет. */
   executablePath?: string | undefined;
   /** Подмена запуска: в тестах браузер не поднимается. */
   launch?: () => Promise<BrowserLike>;

@@ -56,9 +56,9 @@ export const envSchema = z.object({
   LOCAL_STORAGE_PATH: z.string().min(1).default('./storage'),
 
   /**
-   * Путь к chromium для печати договора. Пусто — ищет сам puppeteer:
-   * в образе браузер лежит по стандартному пути, на машине разработчика
-   * его может не быть вовсе, и тогда печать честно откажет (P2-15).
+   * Путь к chromium для печати договора. puppeteer-core браузер не ищет:
+   * в Docker путь из образа подставляет compose, даже если в .env пусто;
+   * на машине разработчика без него печать честно откажет (P2-15).
    */
   CHROMIUM_PATH: z.string().min(1).optional(),
 

@@ -45,6 +45,10 @@ services:
       context: .
       target: runner
     restart: unless-stopped
+    # PID 1 — tini, а не node: процессы chromium, осиротевшие после печати,
+    # переходят к PID 1, и node их не подбирает — каждый договор оставлял
+    # по четыре зомби до перезапуска контейнера.
+    init: true
     env_file:
       - .env
     environment:
@@ -52,6 +56,10 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-nice}:${POSTGRES_PASSWORD:-nice}@postgres:5432/${POSTGRES_DB:-nice_almaty}
       APP_URL: ${APP_URL:-http://localhost:3000}
       LOCAL_STORAGE_PATH: /app/storage
+      # Пустой `CHROMIUM_PATH=` из .env через env_file перекрывает ENV образа,
+      # а puppeteer-core сам браузер не ищет — договор не печатался бы вовсе.
+      # `:-` подставляет путь из Dockerfile и для пустого значения, и для отсутствующего.
+      CHROMIUM_PATH: ${CHROMIUM_PATH:-/usr/bin/chromium-browser}
     ports:
       - '${APP_PORT:-3000}:3000'
     volumes:
