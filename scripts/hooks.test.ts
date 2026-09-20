@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -109,5 +109,46 @@ describe('установка хуков', () => {
     });
 
     expect(install.status).toBe(0);
+  });
+});
+
+/**
+ * Бит исполнения у хука (CLAUDE.md §2).
+ *
+ * `core.hooksPath` был прописан, текст хука правильный, тест его запускал
+ * через `bash` — и всё это время git хук **игнорировал**: у файла не стоял
+ * бит исполнения, а в индексе лежал режим 100644. Обещание «перед отправкой
+ * прогоняется `pnpm verify`» было ложным с первого дня и молча: git сообщает
+ * об этом подсказкой в выводе push, которую никто не читает.
+ *
+ * Поэтому проверяются оба места. Рабочее дерево — то, что действует здесь
+ * и сейчас; индекс — то, что получит свежий клон, и именно он определяет
+ * бит после `git clone`.
+ */
+function isExecutable(mode: number): boolean {
+  return (mode & 0o111) !== 0;
+}
+
+describe('хук pre-push исполняемый', () => {
+  const HOOK_PATH = join(REPO_ROOT, '.githooks', 'pre-push');
+
+  it('бит исполнения стоит в рабочем дереве', () => {
+    expect(isExecutable(statSync(HOOK_PATH).mode)).toBe(true);
+  });
+
+  it('в индексе git режим 100755: свежий клон получит тот же бит', () => {
+    const listed = spawnSync('git', ['ls-files', '-s', '.githooks/pre-push'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    });
+
+    expect(listed.status).toBe(0);
+    expect(listed.stdout.trim().startsWith('100755 ')).toBe(true);
+  });
+
+  it('сторож отличает исполняемый файл от обычного', () => {
+    expect(isExecutable(0o100644)).toBe(false);
+    expect(isExecutable(0o100755)).toBe(true);
+    expect(isExecutable(0o100700)).toBe(true);
   });
 });
