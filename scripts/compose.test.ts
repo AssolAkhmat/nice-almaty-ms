@@ -67,17 +67,24 @@ function listItems(block: string): string[] {
 }
 
 /**
- * Публикации контейнерного порта 5432, открытые не только на петлевом
- * интерфейсе. `5432:5432` слушает все адреса машины, и ufw его не закрывает:
- * Docker пишет правила iptables в обход него. Суффикс протокола (`/tcp`)
- * отбрасывается: `0.0.0.0:5432:5432/tcp` — та же публикация наружу.
+ * Публикации портов, открытые не только на петлевом интерфейсе. `5432:5432`
+ * слушает все адреса машины, и ufw его не закрывает: Docker пишет правила
+ * iptables в обход него. Суффикс протокола (`/tcp`) отбрасывается:
+ * `0.0.0.0:5432:5432/tcp` — та же публикация наружу.
+ *
+ * Правило одно на все внутренние сервисы: снаружи доступен только caddy,
+ * он держит TLS. Публикация приложения мимо него отдавала бы то же самое
+ * по голому HTTP.
  */
-function exposedPostgresPorts(block: string): string[] {
+function exposedPorts(block: string): string[] {
   return listItems(block)
     .map((item) => item.replace(/\/(tcp|udp)$/, ''))
-    .filter((mapping) => /(^|:)5432$/.test(mapping) && mapping.includes(':'))
+    .filter((mapping) => /^\S+:\d+$/.test(mapping))
     .filter((mapping) => !mapping.startsWith('127.0.0.1:'));
 }
+
+/** Сервисы, которым наружу не положено. Дверь одна — caddy. */
+const INTERNAL_SERVICES = ['postgres', 'app', 'migrate', 'worker'] as const;
 
 /**
  * `network_mode: host` отменяет публикацию портов вовсе: контейнер слушает
@@ -169,14 +176,19 @@ function ownDatabaseUrls(compose: string): string[] {
  */
 function violations(compose: string): string[] {
   const found: string[] = [];
-  const postgres = serviceBlock(compose, 'postgres');
   const app = serviceBlock(compose, 'app');
 
-  if (postgres !== null) {
-    found.push(...exposedPostgresPorts(postgres).map((port) => `postgres опубликован как ${port}`));
+  for (const name of INTERNAL_SERVICES) {
+    const block = serviceBlock(compose, name);
 
-    if (hasHostNetwork(postgres)) {
-      found.push('postgres вынесен в network_mode: host');
+    if (block === null) {
+      continue;
+    }
+
+    found.push(...exposedPorts(block).map((port) => `${name} опубликован как ${port}`));
+
+    if (hasHostNetwork(block)) {
+      found.push(`${name} вынесен в network_mode: host`);
     }
   }
 
@@ -193,12 +205,31 @@ function violations(compose: string): string[] {
 describe('docker-compose.yml', () => {
   const compose = read(BASE_FILE);
 
-  it('postgres опубликован только на 127.0.0.1', () => {
-    const block = serviceBlock(compose, 'postgres');
+  it('наружу не смотрит ни один внутренний сервис', () => {
+    expect(serviceBlock(compose, 'postgres')).not.toBeNull();
+    expect(serviceBlock(compose, 'app')).not.toBeNull();
+
+    for (const name of INTERNAL_SERVICES) {
+      const block = serviceBlock(compose, name) ?? '';
+
+      expect(exposedPorts(block)).toEqual([]);
+      expect(hasHostNetwork(block)).toBe(false);
+    }
+  });
+
+  it('дверь снаружи одна: caddy с 80 и 443', () => {
+    const block = serviceBlock(compose, 'caddy');
 
     expect(block).not.toBeNull();
-    expect(exposedPostgresPorts(block ?? '')).toEqual([]);
-    expect(hasHostNetwork(block ?? '')).toBe(false);
+    expect(exposedPorts(block ?? '')).toEqual(['80:80', '443:443', '443:443']);
+  });
+
+  it('прокси ведёт на приложение, а домен берёт из APP_DOMAIN', () => {
+    const caddyfile = read('Caddyfile');
+
+    expect(caddyfile).toContain('{$APP_DOMAIN}');
+    expect(caddyfile).toContain('reverse_proxy app:3000');
+    expect(serviceBlock(compose, 'caddy')).toContain('APP_DOMAIN: ${APP_DOMAIN:?');
   });
 
   it('у пароля базы нет запасного значения', () => {
@@ -279,6 +310,15 @@ describe('сторож compose ловит нарушения', () => {
     );
 
     expect(violations(compose)).toEqual(['postgres опубликован как 0.0.0.0:5432:5432']);
+  });
+
+  it('публикацию приложения мимо прокси', () => {
+    const compose = document(
+      ['  app:', '    init: true', '    ports:', "      - '${APP_PORT:-3000}:3000'"].join('\n'),
+      '  postgres:\n    ports: []',
+    );
+
+    expect(violations(compose)).toEqual(['app опубликован как ${APP_PORT:-3000}:3000']);
   });
 
   it('подмену публикации на network_mode: host', () => {

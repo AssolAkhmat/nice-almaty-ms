@@ -67,8 +67,12 @@ services:
       # а puppeteer-core сам браузер не ищет — договор не печатался бы вовсе.
       # `:-` подставляет путь из Dockerfile и для пустого значения, и для отсутствующего.
       CHROMIUM_PATH: ${CHROMIUM_PATH:-/usr/bin/chromium-browser}
+    # Только на петлевом интерфейсе: снаружи приложение доступно через caddy,
+    # который держит TLS. Публикация на все адреса отдавала бы то же самое
+    # по голому HTTP в обход сертификата — и cookie сессии с флагом Secure
+    # там всё равно не встанет.
     ports:
-      - '${APP_PORT:-3000}:3000'
+      - '127.0.0.1:${APP_PORT:-3000}:3000'
     volumes:
       - storage-data:/app/storage
     depends_on:
@@ -106,6 +110,31 @@ services:
       app:
         condition: service_healthy
 
+  # Единственная дверь снаружи: TLS, продление сертификата, проксирование.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?домен приложения, например nice.aqy.kz, задайте APP_DOMAIN в .env}
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Сертификаты и ключи ACME переживают пересоздание контейнера:
+      # без тома каждый перезапуск просил бы у Let's Encrypt новый сертификат
+      # и упёрся бы в недельный предел выдач на домен.
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      # Намеренно `started`, а не `healthy`: прокси обязан подняться и держать
+      # сертификат даже тогда, когда приложение лежит, иначе отвалится и TLS.
+      app:
+        condition: service_started
+
 volumes:
   postgres-data:
   storage-data:
+  caddy-data:
+  caddy-config:
