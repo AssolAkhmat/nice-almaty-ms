@@ -25,7 +25,14 @@ export interface AccessContext {
 export function visibleHouseIds(context: AccessContext): 'all' | readonly string[] {
   switch (context.role) {
     case 'superadmin':
-      return 'all';
+      /*
+       * У суперадмина дома нет (D11), и тогда видна вся сеть. Дом в контексте
+       * суперадмина появляется единственным способом — токеном API, выданным
+       * на один дом (`src/lib/api/token-auth.ts`). До 20 сентября 2026 такой
+       * токен область не сужал: обещание «дом токена сужает область» было
+       * словами в комментарии, а `visibleHouseIds` всё равно отдавал `all`.
+       */
+      return context.houseId === null ? 'all' : [context.houseId];
     case 'admin':
       return context.houseId === null ? [] : [context.houseId];
     case 'resident':

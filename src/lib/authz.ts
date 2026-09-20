@@ -28,7 +28,13 @@ export function can(
     case 'none':
       return false;
     case 'org':
-      return true;
+      /*
+       * Сеть целиком — но не шире, чем область самого контекста. Дом в контексте
+       * бывает только у токена API, выданного на один дом: без этой строки такой
+       * токен суперадмина действовал бы на любой дом, хотя выдан на один.
+       * У обычного суперадмина дом `null`, и `canSeeHouse` отвечает `true`.
+       */
+      return target.houseId == null || canSeeHouse(context, target.houseId);
     case 'house':
       return target.houseId != null && canSeeHouse(context, target.houseId);
     case 'self':
