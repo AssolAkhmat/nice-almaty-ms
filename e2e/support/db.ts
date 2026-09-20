@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 
 import { dotEnvFallback } from '../../scripts/read-dotenv';
+import { e2eDatabaseUrl } from '../../src/db/testing/database-url';
 import * as schema from '../../src/db/schema';
 
 /**
@@ -15,13 +16,7 @@ import * as schema from '../../src/db/schema';
 export function databaseUrl(): string {
   const fileEnv = dotEnvFallback(fileURLToPath(new URL('../../.env', import.meta.url)));
 
-  return (
-    process.env.E2E_DATABASE_URL ??
-    process.env.TEST_DATABASE_URL ??
-    fileEnv.E2E_DATABASE_URL ??
-    fileEnv.TEST_DATABASE_URL ??
-    'postgres://nice:nice@127.0.0.1:55432/nice_almaty'
-  );
+  return e2eDatabaseUrl(process.env, fileEnv);
 }
 
 export function openDb() {

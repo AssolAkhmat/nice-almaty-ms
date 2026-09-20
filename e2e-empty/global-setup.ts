@@ -5,6 +5,7 @@ import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import postgres from 'postgres';
 
 import { dotEnvFallback } from '../scripts/read-dotenv';
+import { e2eDatabaseUrl } from '../src/db/testing/database-url';
 import * as schema from '../src/db/schema';
 import { hashPassword } from '../src/lib/password';
 import { seedNetwork, SUPERADMIN_PHONE } from '../src/db/seed';
@@ -31,13 +32,7 @@ const fileEnv = dotEnvFallback(fileURLToPath(new URL('../.env', import.meta.url)
 
 /** Адрес основной тестовой базы: от неё берутся сервер и учётные данные. */
 function baseDatabaseUrl(): string {
-  return (
-    process.env.E2E_DATABASE_URL ??
-    process.env.TEST_DATABASE_URL ??
-    fileEnv.E2E_DATABASE_URL ??
-    fileEnv.TEST_DATABASE_URL ??
-    'postgres://nice:nice@127.0.0.1:5432/nice_almaty'
-  );
+  return e2eDatabaseUrl(process.env, fileEnv);
 }
 
 export function emptyDatabaseUrl(): string {

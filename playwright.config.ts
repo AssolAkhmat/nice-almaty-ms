@@ -3,6 +3,7 @@ import { chromium, defineConfig, devices } from '@playwright/test';
 
 import { E2E_CRON_SECRET } from './e2e/global-setup';
 import { dotEnvFallback } from './scripts/read-dotenv';
+import { e2eDatabaseUrl } from './src/db/testing/database-url';
 
 /*
  * `.env` читается явно: playwright его в окружение не переносит, и прогон
@@ -18,12 +19,7 @@ const BASE_URL = `http://127.0.0.1:${PORT}`;
  * Три ширины из docs/05-DESIGN-SYSTEM.md: 375 / 768 / 1440.
  * Каждый экран проверяется во всех трёх.
  */
-const DATABASE_URL =
-  process.env.E2E_DATABASE_URL ??
-  process.env.TEST_DATABASE_URL ??
-  fileEnv.E2E_DATABASE_URL ??
-  fileEnv.TEST_DATABASE_URL ??
-  'postgres://nice:nice@127.0.0.1:5432/nice_almaty';
+const DATABASE_URL = e2eDatabaseUrl(process.env, fileEnv);
 
 export default defineConfig({
   testDir: './e2e',

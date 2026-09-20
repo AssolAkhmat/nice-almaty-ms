@@ -92,7 +92,7 @@ pnpm dev
 | `pnpm build` | production-сборка; при `DEPLOY_TARGET=docker` — standalone |
 | `pnpm verify` | `typecheck` + `lint` + `format:check` + `test` |
 | `pnpm test` | юнит-тесты (Vitest) |
-| `pnpm test:e2e` | e2e (Playwright) на ширинах 375 / 768 / 1440 |
+| `pnpm test:e2e` | e2e (Playwright) на ширинах 375 / 768 / 1440; нужны `pnpm exec playwright install chromium` и собранное приложение (`pnpm build`) |
 | `pnpm db:generate` | сгенерировать миграцию из схемы Drizzle |
 | `pnpm db:migrate` | применить миграции |
 | `pnpm db:studio` | Drizzle Studio |
