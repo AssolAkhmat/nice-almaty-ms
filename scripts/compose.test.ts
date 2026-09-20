@@ -84,7 +84,44 @@ function exposedPorts(block: string): string[] {
 }
 
 /** Сервисы, которым наружу не положено. Дверь одна — caddy. */
-const INTERNAL_SERVICES = ['postgres', 'app', 'migrate', 'worker'] as const;
+const INTERNAL_SERVICES = ['postgres', 'app', 'migrate', 'worker', 'backup'] as const;
+
+/**
+ * Профиль сервиса. Бэкап — одноразовый, его зовёт `scripts/backup.sh`;
+ * без профиля `docker compose up` поднял бы его постоянным контейнером,
+ * и он гонял бы дамп при каждом старте стека.
+ */
+function profiles(block: string): string[] {
+  const inline = /^\s+profiles:\s*\[([^\]]*)\]\s*$/m.exec(block);
+
+  if (inline !== null) {
+    return (inline[1] ?? '')
+      .split(',')
+      .map((value) => value.trim().replace(/^['"]|['"]$/g, ''))
+      .filter((value) => value !== '');
+  }
+
+  const lines = block.split('\n');
+  const start = lines.findIndex((line) => /^\s+profiles:\s*$/.test(line));
+
+  if (start === -1) {
+    return [];
+  }
+
+  const items: string[] = [];
+
+  for (const line of lines.slice(start + 1)) {
+    const item = /^\s+-\s+(.+?)\s*$/.exec(line);
+
+    if (item === null) {
+      break;
+    }
+
+    items.push((item[1] ?? '').replace(/^['"]|['"]$/g, ''));
+  }
+
+  return items;
+}
 
 /**
  * `network_mode: host` отменяет публикацию портов вовсе: контейнер слушает
@@ -253,6 +290,10 @@ describe('docker-compose.yml', () => {
     expect(chromiumFallback(serviceBlock(compose, 'app') ?? '')).toBe(fromImage);
   });
 
+  it('бэкап сидит в профиле: docker compose up его не поднимает', () => {
+    expect(profiles(serviceBlock(compose, 'backup') ?? '')).toContain('tools');
+  });
+
   it('у приложения PID 1 — init: зомби chromium подбираются', () => {
     expect(initValue(serviceBlock(compose, 'app') ?? '')).toBe('true');
   });
@@ -358,6 +399,12 @@ describe('сторож compose ловит нарушения', () => {
     );
 
     expect(violations(compose)).toEqual(['пароль базы без требования: ${POSTGRES_PASSWORD}']);
+  });
+
+  it('сервис без профиля — постоянный контейнер', () => {
+    expect(profiles(['    build:', '      context: .'].join('\n'))).toEqual([]);
+    expect(profiles(['    profiles:', '      - tools'].join('\n'))).toEqual(['tools']);
+    expect(profiles('    profiles: [tools, ops]')).toEqual(['tools', 'ops']);
   });
 
   it('выключенный init у приложения', () => {

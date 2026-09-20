@@ -110,6 +110,23 @@ services:
       app:
         condition: service_healthy
 
+  # Шифрование дампа и выгрузка его на Drive (docs/BACKUP.md).
+  # Одноразовый, как migrate: поднимается только из scripts/backup.sh,
+  # поэтому вынесен в профиль и `docker compose up` его не трогает.
+  backup:
+    build:
+      context: .
+      target: tooling
+    profiles:
+      - tools
+    env_file:
+      - .env
+    volumes:
+      # Каталог с дампом общий с хостом: дамп делает pg_dump из контейнера базы,
+      # шифрует и выгружает этот сервис.
+      - ${BACKUP_WORK_DIR:-/var/tmp/nice-almaty-backup}:/work
+    restart: 'no'
+
   # Единственная дверь снаружи: TLS, продление сертификата, проксирование.
   caddy:
     image: caddy:2-alpine

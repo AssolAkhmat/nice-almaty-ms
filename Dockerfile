@@ -13,8 +13,11 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY scripts ./scripts
 RUN pnpm install --frozen-lockfile
 
-# Полное дерево с исходниками: из него работают миграции и воркер.
+# Полное дерево с исходниками: из него работают миграции, воркер и бэкап.
 FROM deps AS tooling
+# age шифрует дамп базы открытым ключом владельца: закрытого на сервере нет
+# и быть не должно (docs/BACKUP.md). Пакет маленький, отдельного образа не стоит.
+RUN apk add --no-cache age
 COPY . .
 
 FROM tooling AS build

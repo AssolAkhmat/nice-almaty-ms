@@ -61,6 +61,12 @@ export interface GdriveConfig {
   refreshToken: string;
   /** Пусто — драйвер заведёт «Nice Almaty» в «Моём диске» сам. */
   rootFolderId?: string | undefined;
+  /**
+   * Имя корневой папки, когда её идентификатор не задан. Пусто — «Nice Almaty».
+   * Бэкапам нужна своя папка рядом с документами, а не внутри них: утечка
+   * ссылки на папку документов не должна отдавать ещё и слепки базы.
+   */
+  rootFolderName?: string | undefined;
   /** Подмена сети: в тестах Drive поднимается локально. */
   fetch?: typeof fetch;
   /**
@@ -89,8 +95,19 @@ function quote(value: string): string {
   return value.replaceAll('\\', '\\\\').replaceAll("'", "\\'");
 }
 
-export function createGdriveStorage(config: GdriveConfig): StorageProvider {
+/**
+ * Drive умеет то, чего нет в общем интерфейсе хранилища: перечислить папку.
+ * В порт это не вынесено намеренно — перечень нужен одному бэкапу, а драйверы
+ * `local` и `supabase` отвечали бы за него формально и непроверенно.
+ */
+export interface GdriveStorage extends StorageProvider {
+  /** Файлы каталога без обхода вложенных папок. Пустая строка — сама корневая. */
+  list: (directory: string) => Promise<StoredObject[]>;
+}
+
+export function createGdriveStorage(config: GdriveConfig): GdriveStorage {
   const net = config.fetch ?? fetch;
+  const rootName = config.rootFolderName ?? ROOT_FOLDER_NAME;
 
   let token: { value: string; expiresAt: number } | null = null;
   /** Найденные папки: ключ — `родитель/имя`. */
@@ -205,9 +222,9 @@ export function createGdriveStorage(config: GdriveConfig): StorageProvider {
 
   /** Корневая папка приложения: найденная или заведённая этим запуском. */
   async function discoverRoot(): Promise<string> {
-    const cacheKey = `${MY_DRIVE}/${ROOT_FOLDER_NAME}`;
-    const existing = folders.get(cacheKey) ?? (await findChild(ROOT_FOLDER_NAME, MY_DRIVE, true));
-    const id = existing ?? (await createFolder(ROOT_FOLDER_NAME, MY_DRIVE));
+    const cacheKey = `${MY_DRIVE}/${rootName}`;
+    const existing = folders.get(cacheKey) ?? (await findChild(rootName, MY_DRIVE, true));
+    const id = existing ?? (await createFolder(rootName, MY_DRIVE));
 
     folders.set(cacheKey, id);
     config.onRootFolder?.({ id, created: existing === null });
@@ -239,9 +256,9 @@ export function createGdriveStorage(config: GdriveConfig): StorageProvider {
       return rootLookup;
     }
 
-    const cacheKey = `${MY_DRIVE}/${ROOT_FOLDER_NAME}`;
+    const cacheKey = `${MY_DRIVE}/${rootName}`;
 
-    return folders.get(cacheKey) ?? (await findChild(ROOT_FOLDER_NAME, MY_DRIVE, true));
+    return folders.get(cacheKey) ?? (await findChild(rootName, MY_DRIVE, true));
   }
 
   /** Разбор ключа: цепочка папок и имя файла в последней из них. */
@@ -471,6 +488,57 @@ export function createGdriveStorage(config: GdriveConfig): StorageProvider {
 
     async exists(key: string): Promise<boolean> {
       return (await findByKey(key)) !== null;
+    },
+
+    /*
+     * Перечень нужен ротации бэкапов: удалять лишние копии можно только зная,
+     * какие есть. Страницы обходятся до конца — оборванный на первой сотне
+     * перечень означал бы «старых копий нет», и ротация тихо перестала бы
+     * работать ровно тогда, когда копий стало много.
+     */
+    async list(directory: string): Promise<StoredObject[]> {
+      const directories = directory === '' ? [] : assertSafeKey(directory).split('/');
+      const parentId = await resolveParent(directories, false);
+
+      if (parentId === null) {
+        return [];
+      }
+
+      const objects: StoredObject[] = [];
+      let pageToken: string | undefined;
+
+      do {
+        const url = `${FILES_URL}?${new URLSearchParams({
+          q: [
+            `'${quote(parentId)}' in parents`,
+            'trashed = false',
+            `mimeType != '${FOLDER_MIME}'`,
+          ].join(' and '),
+          fields: 'nextPageToken, files(id,name,size)',
+          pageSize: '1000',
+          ...(pageToken === undefined ? {} : { pageToken }),
+        }).toString()}`;
+
+        const response = await authorized(url);
+        if (!response.ok) {
+          throw await driveError(response, `перечень папки «${directory}»`);
+        }
+
+        const body = (await response.json()) as { files?: DriveFile[]; nextPageToken?: string };
+
+        for (const file of body.files ?? []) {
+          const name = file.name ?? '';
+
+          objects.push({
+            key: directory === '' ? name : `${directory}/${name}`,
+            sizeBytes: Number(file.size ?? '0'),
+          });
+        }
+
+        pageToken = body.nextPageToken;
+      } while (pageToken !== undefined);
+
+      return objects;
     },
 
     async delete(key: string): Promise<void> {
