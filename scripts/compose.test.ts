@@ -62,6 +62,18 @@ function chromiumFallback(block: string): string | null {
 }
 
 /**
+ * Подстановки пароля базы, не требующие значения. `${POSTGRES_PASSWORD:-nice}`
+ * означает, что пустая переменная молча вернёт общеизвестный пароль базе,
+ * опубликованной портом на хост; голая `${POSTGRES_PASSWORD}` подставит пустой.
+ * Годится только форма `:?` — она останавливает compose и называет причину.
+ */
+function passwordDefaults(compose: string): string[] {
+  return [...compose.matchAll(/\$\{POSTGRES_PASSWORD([^}]*)\}/g)]
+    .map((match) => match[1] ?? '')
+    .filter((suffix) => !suffix.startsWith(':?'));
+}
+
+/**
  * PID 1 в контейнере приложения — init, а не node. Процессы chromium,
  * осиротевшие после печати, переходят к PID 1; node их не подбирает,
  * и каждый договор оставлял по четыре зомби до перезапуска контейнера.
@@ -89,6 +101,11 @@ describe('docker-compose.yml', () => {
 
     expect(fromImage).not.toBeNull();
     expect(chromiumFallback(serviceBlock(compose, 'app'))).toBe(fromImage);
+  });
+
+  it('у пароля базы нет запасного значения', () => {
+    expect(compose).toContain('${POSTGRES_PASSWORD:?');
+    expect(passwordDefaults(compose)).toEqual([]);
   });
 
   it('у приложения PID 1 — init: зомби chromium подбираются', () => {
@@ -128,6 +145,36 @@ describe('сторож compose ловит нарушения', () => {
     const block = ['    environment:', "      CHROMIUM_PATH: ''"].join('\n');
 
     expect(chromiumFallback(block)).toBeNull();
+  });
+
+  it('запасной пароль базы', () => {
+    const line = '      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nice}';
+
+    expect(passwordDefaults(line)).toEqual([':-nice']);
+  });
+
+  it('запасной пароль в строке подключения', () => {
+    const line = '      DATABASE_URL: postgres://nice:${POSTGRES_PASSWORD:-nice}@postgres:5432/db';
+
+    expect(passwordDefaults(line)).toEqual([':-nice']);
+  });
+
+  it('подстановку без двоеточия: пустой пароль остался бы пустым', () => {
+    const line = '      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD-nice}';
+
+    expect(passwordDefaults(line)).toEqual(['-nice']);
+  });
+
+  it('голую подстановку: пароль стал бы пустым', () => {
+    const line = '      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}';
+
+    expect(passwordDefaults(line)).toEqual(['']);
+  });
+
+  it('требование пароля формой :? нарушением не считает', () => {
+    const line = '      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задайте пароль}';
+
+    expect(passwordDefaults(line)).toEqual([]);
   });
 
   it('приложение без init', () => {

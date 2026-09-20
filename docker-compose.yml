@@ -1,12 +1,19 @@
 name: nice-almaty
 
+# Строка подключения одна на три сервиса: миграции, приложение и планировщик
+# обязаны смотреть в одну базу, а три копии строки однажды разойдутся.
+# Запасного значения у пароля нет (CLAUDE.md §5): пустая переменная молча
+# вернула бы общеизвестный пароль. Нет значения — compose останавливается.
+x-database-url: &database-url postgres://${POSTGRES_USER:-nice}:${POSTGRES_PASSWORD:?пароль роли postgres, задайте POSTGRES_PASSWORD в .env}@postgres:5432/${POSTGRES_DB:-nice_almaty}
+
 services:
   postgres:
     image: postgres:16
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-nice}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nice}
+      # Пароль без запасного значения — как у остальных секретов (CLAUDE.md §5).
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?пароль роли postgres, задайте POSTGRES_PASSWORD в .env}
       POSTGRES_DB: ${POSTGRES_DB:-nice_almaty}
     # Только на петлевом интерфейсе: на VPS с публичным адресом `5432:5432`
     # открывает базу с паролем из .env всему интернету, и ufw этого не видит —
@@ -33,7 +40,7 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-nice}:${POSTGRES_PASSWORD:-nice}@postgres:5432/${POSTGRES_DB:-nice_almaty}
+      DATABASE_URL: *database-url
       DIRECT_DATABASE_URL: ''
     depends_on:
       postgres:
@@ -53,7 +60,7 @@ services:
       - .env
     environment:
       DEPLOY_TARGET: docker
-      DATABASE_URL: postgres://${POSTGRES_USER:-nice}:${POSTGRES_PASSWORD:-nice}@postgres:5432/${POSTGRES_DB:-nice_almaty}
+      DATABASE_URL: *database-url
       APP_URL: ${APP_URL:-http://localhost:3000}
       LOCAL_STORAGE_PATH: /app/storage
       # Пустой `CHROMIUM_PATH=` из .env через env_file перекрывает ENV образа,
@@ -93,7 +100,7 @@ services:
       - .env
     environment:
       DEPLOY_TARGET: docker
-      DATABASE_URL: postgres://${POSTGRES_USER:-nice}:${POSTGRES_PASSWORD:-nice}@postgres:5432/${POSTGRES_DB:-nice_almaty}
+      DATABASE_URL: *database-url
       APP_URL: http://app:3000
     depends_on:
       app:

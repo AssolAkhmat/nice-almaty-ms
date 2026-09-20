@@ -51,7 +51,9 @@
 
 ```bash
 cp .env.example .env
-# заполните SESSION_SECRET, FIELD_ENCRYPTION_KEY и CRON_SECRET
+# заполните POSTGRES_PASSWORD, SESSION_SECRET, FIELD_ENCRYPTION_KEY и CRON_SECRET
+# пароль базы: openssl rand -base64 24 — он же подставляется в DATABASE_URL
+#   и TEST_DATABASE_URL; без него compose не стартует
 # ключ шифрования: openssl rand -base64 32
 
 docker compose up -d          # postgres + миграции + приложение + worker
