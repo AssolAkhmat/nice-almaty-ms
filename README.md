@@ -52,8 +52,9 @@
 ```bash
 cp .env.example .env
 # заполните POSTGRES_PASSWORD, SESSION_SECRET, FIELD_ENCRYPTION_KEY и CRON_SECRET
-# пароль базы: openssl rand -base64 24 — он же подставляется в DATABASE_URL
-#   и TEST_DATABASE_URL; без него compose не стартует
+# пароль базы: openssl rand -hex 24 — он же подставляется в DATABASE_URL
+#   и TEST_DATABASE_URL вместо <пароль>; без него compose не стартует.
+#   hex, а не base64: `/` из base64 ломает разбор строки подключения
 # ключ шифрования: openssl rand -base64 32
 
 docker compose up -d          # postgres + миграции + приложение + worker
@@ -136,6 +137,18 @@ pnpm dev
 `FIELD_ENCRYPTION_KEY`, `CRON_SECRET`, `STORAGE_DRIVER`. Остальное зависит
 от выбранных драйверов: ключи Google Drive — при `STORAGE_DRIVER=gdrive`,
 ключи Web Push — все три или ни одного.
+
+Отдельно стоят `POSTGRES_PASSWORD`, `POSTGRES_USER`, `POSTGRES_DB` и `POSTGRES_PORT`:
+их читает не приложение, а `docker-compose.yml` — из них он собирает базу и строку
+подключения для своих сервисов. В `src/env.ts` их нет и быть не должно. У пароля
+запасного значения нет: без него compose останавливается. Тот же пароль стоит
+в `DATABASE_URL` и `TEST_DATABASE_URL`, которыми пользуются команды с хоста;
+расхождение ловят команды `db:*` (`scripts/db-guard.mjs`), а не тишина.
+
+`POSTGRES_PASSWORD` действует в момент создания тома. У уже поднятой базы смена
+переменной не меняет ничего: пароль меняется запросом
+`ALTER USER <роль> WITH PASSWORD '…'`, а `docker compose down -v` сносит данные
+вместе с томом — на боевой это не способ сменить пароль.
 
 ## Что где лежит
 

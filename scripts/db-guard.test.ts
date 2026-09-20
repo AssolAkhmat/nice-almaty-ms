@@ -56,6 +56,8 @@ function runGuard(options: RunOptions = {}) {
   // Собственные переменные машины не должны просачиваться в тест.
   delete environment.DATABASE_URL;
   delete environment.DIRECT_DATABASE_URL;
+  delete environment.POSTGRES_PASSWORD;
+  delete environment.POSTGRES_PORT;
 
   for (const [key, value] of Object.entries(options.shellEnv ?? {})) {
     if (value === undefined) {
@@ -152,6 +154,91 @@ describe('страж подключения перед db:*', () => {
 
     expect(result.status).not.toBe(0);
     expect(commandRan(result)).toBe(false);
+  });
+});
+
+describe('страж сверяет пароль в строке подключения', () => {
+  /*
+   * Свежий клон заполняет POSTGRES_PASSWORD и оставляет в DATABASE_URL
+   * плейсхолдер из `.env.example`. Стек поднимается зелёным — свою строку
+   * контейнеры собирают сами, — и падает первая же команда с хоста,
+   * причём «password authentication failed», то есть ни о чём.
+   */
+  it('останавливается на плейсхолдере пароля из .env.example', () => {
+    const result = runGuard({
+      dotenv:
+        'DATABASE_URL=postgres://nice:<пароль>@localhost:5432/nice_almaty\nPOSTGRES_PASSWORD=a1b2c3\n',
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(commandRan(result)).toBe(false);
+    expect(result.stderr).toContain('плейсхолдер');
+  });
+
+  it('останавливается на пустом пароле', () => {
+    const result = runGuard({
+      shellEnv: { DATABASE_URL: 'postgres://nice:@localhost:5432/nice_almaty' },
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(commandRan(result)).toBe(false);
+    expect(result.stderr).toContain('пустой пароль');
+  });
+
+  it('останавливается, когда пароль разошёлся с POSTGRES_PASSWORD', () => {
+    const result = runGuard({
+      shellEnv: { DATABASE_URL: LOCAL, POSTGRES_PASSWORD: 'a1b2c3' },
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(commandRan(result)).toBe(false);
+    expect(result.stderr).toContain('POSTGRES_PASSWORD');
+  });
+
+  it('пропускает совпадающий пароль', () => {
+    const result = runGuard({
+      shellEnv: { DATABASE_URL: LOCAL, POSTGRES_PASSWORD: 'nice' },
+    });
+
+    expect(result.status).toBe(0);
+    expect(commandRan(result)).toBe(true);
+  });
+
+  /*
+   * База разработчика на другом порту — не та база, что поднял compose.
+   * Сверять их пароли незачем: как раз из-за занятого 5432 порт публикации
+   * и вынесен в переменную (инцидент I2).
+   */
+  it('чужую базу на другом порту с POSTGRES_PASSWORD не сверяет', () => {
+    const result = runGuard({
+      shellEnv: {
+        DATABASE_URL: 'postgres://nice:другой@localhost:55432/nice_almaty',
+        POSTGRES_PASSWORD: 'a1b2c3',
+      },
+    });
+
+    expect(result.status).toBe(0);
+    expect(commandRan(result)).toBe(true);
+  });
+
+  it('нелокальную цель с POSTGRES_PASSWORD не сверяет', () => {
+    const result = runGuard({
+      shellEnv: { DATABASE_URL: REMOTE, POSTGRES_PASSWORD: 'a1b2c3' },
+      args: ['--allow-remote=db.abcdef.supabase.co'],
+    });
+
+    expect(result.status).toBe(0);
+    expect(commandRan(result)).toBe(true);
+  });
+
+  it('подсказывает про спецсимволы, когда пароль ломает разбор адреса', () => {
+    const result = runGuard({
+      shellEnv: { DATABASE_URL: 'postgres://nice:a/b@localhost:5432/nice_almaty' },
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(commandRan(result)).toBe(false);
+    expect(result.stderr).toContain('openssl rand -hex 24');
   });
 });
 

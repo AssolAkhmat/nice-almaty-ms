@@ -4,7 +4,7 @@ name: nice-almaty
 # обязаны смотреть в одну базу, а три копии строки однажды разойдутся.
 # Запасного значения у пароля нет (CLAUDE.md §5): пустая переменная молча
 # вернула бы общеизвестный пароль. Нет значения — compose останавливается.
-x-database-url: &database-url postgres://${POSTGRES_USER:-nice}:${POSTGRES_PASSWORD:?пароль роли postgres, задайте POSTGRES_PASSWORD в .env}@postgres:5432/${POSTGRES_DB:-nice_almaty}
+x-database-url: &database-url postgres://${POSTGRES_USER:-nice}:${POSTGRES_PASSWORD:?пароль роли базы из POSTGRES_USER, по умолчанию nice, задайте POSTGRES_PASSWORD в .env}@postgres:5432/${POSTGRES_DB:-nice_almaty}
 
 services:
   postgres:
@@ -13,7 +13,7 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-nice}
       # Пароль без запасного значения — как у остальных секретов (CLAUDE.md §5).
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?пароль роли postgres, задайте POSTGRES_PASSWORD в .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?пароль роли базы из POSTGRES_USER, по умолчанию nice, задайте POSTGRES_PASSWORD в .env}
       POSTGRES_DB: ${POSTGRES_DB:-nice_almaty}
     # Только на петлевом интерфейсе: на VPS с публичным адресом `5432:5432`
     # открывает базу с паролем из .env всему интернету, и ufw этого не видит —

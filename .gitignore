@@ -25,6 +25,11 @@ test-results-empty/
 # проглатывает и src/adapters/storage/
 /storage/
 
+# Локальная настройка стека под конкретную машину: лимиты памяти, свои порты.
+# Compose подмешивает его автоматически, поэтому он способен ослабить основной
+# файл — за этим следит scripts/compose.test.ts.
+/docker-compose.override.yml
+
 # платформы
 .vercel/
 .turbo/

@@ -108,7 +108,9 @@ try {
 } catch {
   fail(
     `Отказ: строку подключения из ${target.variable} не удалось разобрать как адрес.\n` +
-      'Пропустить непонятную цель нельзя: неизвестно, куда пойдёт команда.',
+      'Пропустить непонятную цель нельзя: неизвестно, куда пойдёт команда.\n' +
+      'Частая причина — спецсимвол в пароле: «/», «@» и «:» нужно кодировать\n' +
+      'процентами либо брать пароль без них (openssl rand -hex 24).',
   );
 }
 
@@ -119,6 +121,68 @@ const database = parsed.pathname.replace(/^\//, '');
 // Пароль сюда не попадает намеренно: вывод команды уходит в логи и в CI.
 console.log(`Цель: ${host}:${port}/${database}`);
 console.log(`Источник: ${target.variable} — ${target.source}`);
+
+/**
+ * Пароль из строки подключения. Разбор URL кодирует всё подряд процентами,
+ * и `<пароль>` из `.env.example` превращается в `%3C…%3E` — сравнивать
+ * и показывать нужно исходный текст.
+ */
+const password = decodeURIComponent(parsed.password);
+
+/*
+ * Свежий клон заполняет POSTGRES_PASSWORD, а в DATABASE_URL оставляет
+ * плейсхолдер из `.env.example`. Стек при этом поднимается зелёным: свою
+ * строку подключения контейнеры собирают из POSTGRES_PASSWORD, а плейсхолдер
+ * лежит только в файле. Падает первая же команда с хоста — `pnpm db:seed` —
+ * и падает она «password authentication failed», то есть ни о чём.
+ */
+if (password === '') {
+  fail(
+    `Отказ: в ${target.variable} пустой пароль (${target.source}).\n` +
+      'Подставьте в строку подключения значение POSTGRES_PASSWORD из .env.',
+  );
+}
+
+if (/[<>]/.test(password)) {
+  fail(
+    `Отказ: в ${target.variable} остался плейсхолдер пароля из .env.example (${target.source}).\n` +
+      'Подставьте в строку подключения значение POSTGRES_PASSWORD из .env.',
+  );
+}
+
+/**
+ * Пароль контейнера базы: его же compose передаёт postgres и подставляет
+ * в строку подключения своих сервисов. Пустое значение значением не считается.
+ */
+function containerPassword() {
+  const fromShell = process.env.POSTGRES_PASSWORD;
+
+  if (fromShell !== undefined && fromShell !== '') {
+    return fromShell;
+  }
+
+  const fromFile = dotenvValues().POSTGRES_PASSWORD;
+
+  return fromFile === undefined || fromFile === '' ? null : fromFile;
+}
+
+/*
+ * Расхождение паролей в одном `.env`. POSTGRES_PASSWORD, DATABASE_URL
+ * и TEST_DATABASE_URL хранят его тремя независимыми копиями: опечатка
+ * при ротации оставляет стек зелёным и роняет только команды с хоста.
+ * Сверяется лишь та же самая база — локальный хост и порт публикации.
+ */
+const publishedPort = process.env.POSTGRES_PORT ?? dotenvValues().POSTGRES_PORT ?? '5432';
+const expected = containerPassword();
+
+if (expected !== null && LOCAL_HOSTS.has(host) && port === publishedPort && password !== expected) {
+  fail(
+    `Отказ: пароль в ${target.variable} не совпадает с POSTGRES_PASSWORD.\n` +
+      `Контейнер базы на ${host}:${port} поднят с одним паролем, команда идёт с другим.\n` +
+      'Оба значения живут в .env — выровняйте их, а базе пароль меняет\n' +
+      "ALTER USER <роль> WITH PASSWORD '…': переменная действует при создании тома.",
+  );
+}
 
 if (!LOCAL_HOSTS.has(host)) {
   if (!allowed.includes(host)) {
