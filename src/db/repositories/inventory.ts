@@ -6,6 +6,7 @@ import { now, type BusinessDate } from '@/lib/time';
 import { assertHouseVisible, visibleHouseIds, type AccessContext } from '../access';
 import { getDb, type Executor } from '../client';
 import {
+  areas,
   inventoryAuditLines,
   inventoryAudits,
   inventoryItems,
@@ -40,13 +41,21 @@ function houseScope(
 export interface ItemFilter {
   houseId?: string;
   status?: InventoryItem['status'];
+  /** Зона дома. Пусто — все позиции, включая те, у которых зоны нет. */
+  areaId?: string;
 }
+
+/**
+ * Позиция вместе с названием зоны: разбивка по зонам иначе стоила бы
+ * запроса на каждую строку списка.
+ */
+export type InventoryItemWithArea = InventoryItem & { areaName: string | null };
 
 export async function listItems(
   context: AccessContext,
   filter: ItemFilter = {},
   executor: Executor = getDb(),
-): Promise<InventoryItem[]> {
+): Promise<InventoryItemWithArea[]> {
   const conditions = [
     eq(inventoryItems.orgId, context.orgId),
     houseScope(context, inventoryItems.houseId),
@@ -61,11 +70,22 @@ export async function listItems(
     conditions.push(eq(inventoryItems.status, filter.status));
   }
 
-  return executor
-    .select()
+  if (filter.areaId !== undefined) {
+    conditions.push(eq(inventoryItems.areaId, filter.areaId));
+  }
+
+  /*
+   * Левое соединение, а не внутреннее: позиция без зоны — нормальное
+   * состояние, и внутреннее соединение просто выбросило бы её из списка.
+   */
+  const rows = await executor
+    .select({ item: inventoryItems, areaName: areas.name })
     .from(inventoryItems)
+    .leftJoin(areas, eq(areas.id, inventoryItems.areaId))
     .where(and(...conditions))
     .orderBy(asc(inventoryItems.name), asc(inventoryItems.id));
+
+  return rows.map((row) => ({ ...row.item, areaName: row.areaName }));
 }
 
 export async function findItem(
@@ -104,6 +124,8 @@ export async function requireItem(
 
 export interface CreateItemInput {
   houseId: string;
+  /** Зона дома, необязательна: «по дому вообще» — нормальное состояние. */
+  areaId?: string | null;
   name: string;
   unit: string;
   unitCost: number;
@@ -124,6 +146,7 @@ export async function createItem(
     .values({
       orgId: context.orgId,
       houseId: input.houseId,
+      areaId: input.areaId ?? null,
       name: input.name,
       unit: input.unit,
       unitCost: input.unitCost,
@@ -150,6 +173,8 @@ export interface UpdateItemInput {
   /** Количество приходит уже посчитанным: репозиторий сам ничего не складывает. */
   qty?: string;
   houseId?: string;
+  /** `null` снимает зону: так делает перевод позиции в другой дом. */
+  areaId?: string | null;
 }
 
 export async function updateItem(

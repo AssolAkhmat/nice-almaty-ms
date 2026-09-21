@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  InventoryQtyError,
   applyMovement,
   auditDifference,
   formatQty,
-  InventoryQtyError,
+  groupItemsByArea,
   parseQty,
 } from './inventory';
 
@@ -77,5 +78,64 @@ describe('расхождение ведомости', () => {
 
   it('непроверенная строка расхождения не даёт', () => {
     expect(auditDifference('10.00', null)).toBeNull();
+  });
+});
+
+/**
+ * Разбивка по зонам (модуль 10). Позиция без зоны — нормальное состояние,
+ * и её группа идёт последней: приписать такую позицию к чужой зоне нельзя,
+ * а потерять из отчёта — тем более.
+ */
+describe('разбивка инвентаря по зонам', () => {
+  const item = (areaId: string | null, areaName: string | null, qty: string, unitCost: number) => ({
+    areaId,
+    areaName,
+    qty,
+    unitCost,
+  });
+
+  it('пустой список даёт пустую разбивку', () => {
+    expect(groupItemsByArea([])).toEqual([]);
+  });
+
+  it('собирает позиции по зонам и считает стоимость группы', () => {
+    const groups = groupItemsByArea([
+      item('a-1', 'Кухня', '2.00', 1500),
+      item('a-1', 'Кухня', '1.00', 500),
+      item('a-2', 'Двор', '3.00', 1000),
+    ]);
+
+    expect(groups.map((group) => group.areaName)).toEqual(['Двор', 'Кухня']);
+    expect(groups[0]?.totalCost).toBe(3000);
+    expect(groups[1]?.totalCost).toBe(3500);
+    expect(groups[1]?.items).toHaveLength(2);
+  });
+
+  it('позиции без зоны идут отдельной группой и последними', () => {
+    const groups = groupItemsByArea([
+      item(null, null, '1.00', 700),
+      item('a-1', 'Кухня', '1.00', 100),
+    ]);
+
+    expect(groups.map((group) => group.areaId)).toEqual(['a-1', null]);
+    expect(groups[1]?.totalCost).toBe(700);
+  });
+
+  it('дробное количество не порождает копеек: доля тенге уходит вверх', () => {
+    const groups = groupItemsByArea([item('a-1', 'Кухня', '1.50', 333)]);
+
+    // 1.5 × 333 = 499.5 — в отчёт уходит 500, а не 499 и не 499.5.
+    expect(groups[0]?.totalCost).toBe(500);
+    expect(Number.isInteger(groups[0]?.totalCost)).toBe(true);
+  });
+
+  it('зоны упорядочены по названию, а не по порядку в списке', () => {
+    const groups = groupItemsByArea([
+      item('a-1', 'Ясли', '1.00', 0),
+      item('a-2', 'Актовый зал', '1.00', 0),
+      item('a-3', 'Беседка', '1.00', 0),
+    ]);
+
+    expect(groups.map((group) => group.areaName)).toEqual(['Актовый зал', 'Беседка', 'Ясли']);
   });
 });

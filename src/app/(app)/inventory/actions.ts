@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 
 import { actionErrorKey } from '@/lib/action-failure';
 import { getCurrentSession } from '@/lib/session';
-import { consumeItem, receiveItem, transferItem } from '@/services/inventory';
+import { consumeItem, receiveItem, setItemArea, transferItem } from '@/services/inventory';
 import { closeInventoryAudit, saveAuditFact, startAudit } from '@/services/inventory-audit';
 
 import type { UserActor } from '@/services/users';
@@ -69,6 +69,7 @@ export async function receiveAction(
       unit: text(formData, 'unit'),
       unitCost: Number(text(formData, 'unitCost') || '0'),
       qty: text(formData, 'qty'),
+      ...(text(formData, 'areaId') === '' ? {} : { areaId: text(formData, 'areaId') }),
       ...(text(formData, 'note') === '' ? {} : { note: text(formData, 'note') }),
     });
     refresh();
@@ -116,6 +117,32 @@ export async function transferAction(
     refresh();
 
     return { done: 'inventory.transferred' };
+  } catch (error) {
+    return failure(error);
+  }
+}
+
+/**
+ * Зона позиции внутри дома. Пустое значение снимает зону: «по дому вообще» —
+ * нормальное состояние позиции, а не ошибка заполнения.
+ */
+export async function setItemAreaAction(
+  _previous: InventoryActionState,
+  formData: FormData,
+): Promise<InventoryActionState> {
+  const user = await actor();
+
+  if (user === null) {
+    return { error: 'inventory.errors.unknown' };
+  }
+
+  const areaId = text(formData, 'areaId');
+
+  try {
+    await setItemArea(user, text(formData, 'itemId'), areaId === '' ? null : areaId);
+    refresh();
+
+    return { done: 'inventory.areaSaved' };
   } catch (error) {
     return failure(error);
   }

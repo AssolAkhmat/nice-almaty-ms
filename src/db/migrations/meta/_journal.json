@@ -183,6 +183,13 @@
       "when": 1789076542977,
       "tag": "0025_wealthy_catseye",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1789964935899,
+      "tag": "0026_empty_puck",
+      "breakpoints": true
     }
   ]
 }

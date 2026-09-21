@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { AppLink } from '@/components/ui/app-link';
 import { EmptyState } from '@/components/ui/empty-state';
 import { listHouses } from '@/db/repositories/houses';
+import { listAreas } from '@/db/repositories/areas';
 import { listAudits } from '@/db/repositories/inventory';
 import { can } from '@/lib/authz';
 import { getCurrentSession } from '@/lib/session';
@@ -63,9 +64,10 @@ export default async function InventoryPage({
     );
   }
 
-  const [items, audits] = await Promise.all([
+  const [items, audits, areas] = await Promise.all([
     listInventory(actor, { houseId }),
     listAudits(context, houseId),
+    listAreas(context, houseId),
   ]);
 
   const open = audits.find((audit) => audit.status === 'draft');
@@ -79,6 +81,8 @@ export default async function InventoryPage({
     unitCost: item.unitCost,
     status: item.status,
     note: item.note,
+    areaId: item.areaId,
+    areaName: item.areaName,
   }));
 
   const auditLines: AuditLineRow[] =
@@ -116,6 +120,7 @@ export default async function InventoryPage({
       )}
 
       <InventoryView
+        areas={areas.map((area) => ({ id: area.id, name: area.name }))}
         audit={
           sheet === null
             ? null

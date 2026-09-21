@@ -10,13 +10,21 @@ import {
   saveAuditLine,
   updateItem,
 } from '@/db/repositories/inventory';
-import { applyMovement, auditDifference, formatQty, parseQty } from '@/domain/inventory';
+import {
+  applyMovement,
+  auditDifference,
+  formatQty,
+  groupItemsByArea,
+  parseQty,
+} from '@/domain/inventory';
 import { ConflictError, ValidationError } from '@/lib/errors';
 import { toCsv, type Column } from '@/lib/export/csv';
 import { toXlsx } from '@/lib/export/xlsx';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
 import { assertInventoryHouse, resolveInventoryDeps, type InventoryDeps } from './inventory';
+
+import type { InventoryItemWithArea } from '@/db/repositories/inventory';
 
 import type { InventoryAudit, InventoryAuditLine, InventoryItem } from '@/db/schema';
 import type { BusinessDate } from '@/lib/time';
@@ -254,6 +262,14 @@ export interface ExportedFile {
  * доли, и превращение его в `12.5` теряет заявленную точность. Выгрузку
  * читают глазами и сверяют, а не пересчитывают.
  */
+/** Группа без зоны: так она называется в выгрузке. */
+const WITHOUT_AREA = 'Без зоны';
+
+/** Строка выгрузки: позиция или итог по зоне. */
+type ExportRow =
+  | { kind: 'item'; areaName: string; item: InventoryItemWithArea }
+  | { kind: 'total'; areaName: string; positions: number; totalCost: number };
+
 export async function exportInventory(
   actor: UserActor,
   houseId: string,
@@ -265,27 +281,64 @@ export async function exportInventory(
   assertInventoryHouse(actor, houseId, false);
   const items = await listItems(actor.context, { houseId }, executor);
 
-  const columns: Column<InventoryItem>[] = [
-    { header: 'Наименование', value: (item) => item.name },
-    { header: 'Количество', value: (item) => item.qty },
-    { header: 'Единица', value: (item) => item.unit },
-    { header: 'Стоимость единицы', value: (item) => item.unitCost },
-    { header: 'Статус', value: (item) => item.status },
-    { header: 'Принято', value: (item) => item.acquiredAt },
-    { header: 'Примечание', value: (item) => item.note },
+  /*
+   * Выгрузка идёт с разбивкой по зонам (модуль 10): строки сгруппированы,
+   * после каждой группы — итог по зоне. Позиции без зоны собраны в группу
+   * «Без зоны» и стоят последними: приписывать их к чужой зоне нельзя.
+   *
+   * Итог — отдельная строка того же листа, а не второй лист: ведомость
+   * читают глазами и сверяют, а не открывают в двух вкладках.
+   */
+  const rows: ExportRow[] = [];
+
+  for (const group of groupItemsByArea(items)) {
+    const areaName = group.areaName ?? WITHOUT_AREA;
+
+    for (const item of group.items) {
+      rows.push({ kind: 'item', areaName, item });
+    }
+
+    rows.push({
+      kind: 'total',
+      areaName,
+      positions: group.items.length,
+      totalCost: group.totalCost,
+    });
+  }
+
+  const columns: Column<ExportRow>[] = [
+    { header: 'Зона', value: (row) => row.areaName },
+    {
+      header: 'Наименование',
+      value: (row) =>
+        row.kind === 'item' ? row.item.name : `Итого позиций: ${String(row.positions)}`,
+    },
+    { header: 'Количество', value: (row) => (row.kind === 'item' ? row.item.qty : '') },
+    { header: 'Единица', value: (row) => (row.kind === 'item' ? row.item.unit : '') },
+    {
+      header: 'Стоимость единицы',
+      value: (row) => (row.kind === 'item' ? row.item.unitCost : ''),
+    },
+    {
+      header: 'Стоимость зоны',
+      value: (row) => (row.kind === 'total' ? row.totalCost : ''),
+    },
+    { header: 'Статус', value: (row) => (row.kind === 'item' ? row.item.status : '') },
+    { header: 'Принято', value: (row) => (row.kind === 'item' ? row.item.acquiredAt : '') },
+    { header: 'Примечание', value: (row) => (row.kind === 'item' ? row.item.note : '') },
   ];
 
   if (format === 'csv') {
     return {
       filename: `inventory-${today}.csv`,
       mime: 'text/csv; charset=utf-8',
-      body: toCsv(columns, items),
+      body: toCsv(columns, rows),
     };
   }
 
   return {
     filename: `inventory-${today}.xlsx`,
     mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    body: toXlsx(columns, items, 'Инвентарь'),
+    body: toXlsx(columns, rows, 'Инвентарь'),
   };
 }

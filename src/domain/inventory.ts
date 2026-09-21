@@ -84,3 +84,64 @@ export function auditDifference(expected: string, actual: string | null): number
 
   return parseQty(actual) - parseQty(expected);
 }
+
+/**
+ * Разбивка инвентаря по зонам дома (модуль 10, указание владельца
+ * 21 сентября 2026).
+ *
+ * Позиция без зоны — нормальное состояние: «по дому вообще». Такие идут
+ * отдельной группой и последними: приписать их к чужой зоне нельзя,
+ * а потерять — тем более.
+ *
+ * Стоимость группы считается в целых тенге: количество умножается на цену
+ * единицы через сотые доли, поэтому дробное количество не порождает копеек
+ * и не ломает правило §0.
+ */
+export interface ZonedItem {
+  areaId: string | null;
+  areaName: string | null;
+  qty: string;
+  unitCost: number;
+}
+
+export interface AreaGroup<Item extends ZonedItem> {
+  areaId: string | null;
+  /** `null` — группа «без зоны»; название подставляет интерфейс. */
+  areaName: string | null;
+  items: Item[];
+  /** Сумма `количество × стоимость единицы`, целые тенге. */
+  totalCost: number;
+}
+
+export function groupItemsByArea<Item extends ZonedItem>(
+  items: readonly Item[],
+): AreaGroup<Item>[] {
+  const groups = new Map<string, AreaGroup<Item>>();
+
+  for (const item of items) {
+    const key = item.areaId ?? '';
+    const group = groups.get(key) ?? {
+      areaId: item.areaId,
+      areaName: item.areaName,
+      items: [],
+      totalCost: 0,
+    };
+
+    group.items.push(item);
+    // Округление вверх — правило §0: доля тенге в пользу дома.
+    group.totalCost += Math.ceil((parseQty(item.qty) * item.unitCost) / SCALE);
+    groups.set(key, group);
+  }
+
+  return [...groups.values()].sort((left, right) => {
+    if (left.areaId === null) {
+      return 1;
+    }
+
+    if (right.areaId === null) {
+      return -1;
+    }
+
+    return (left.areaName ?? '').localeCompare(right.areaName ?? '', 'ru');
+  });
+}

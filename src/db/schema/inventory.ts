@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   bigint,
   date,
+  foreignKey,
   index,
   numeric,
   pgEnum,
@@ -11,6 +12,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
+import { areas } from './areas';
 import { houses } from './houses';
 import { organizations } from './organizations';
 import { users } from './users';
@@ -44,6 +46,13 @@ export const inventoryItems = pgTable(
     unit: text('unit').notNull(),
     /** Стоимость единицы в целых тенге (§0). */
     unitCost: bigint('unit_cost', { mode: 'number' }).notNull().default(0),
+    /**
+     * Зона дома, где предмет стоит. Необязательна: «по дому вообще» —
+     * нормальное состояние позиции (модуль 10). Зона обязана принадлежать
+     * тому же дому, и это обеспечивает составной внешний ключ ниже,
+     * а не проверка в сервисе.
+     */
+    areaId: uuid('area_id'),
     responsibleUserId: uuid('responsible_user_id').references(() => users.id),
     status: inventoryStatusEnum('status').notNull().default('in_use'),
     acquiredAt: date('acquired_at'),
@@ -51,7 +60,21 @@ export const inventoryItems = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index('inventory_items_house_idx').on(table.houseId, table.status)],
+  (table) => [
+    index('inventory_items_house_idx').on(table.houseId, table.status),
+    index('inventory_items_area_idx').on(table.areaId),
+    /*
+     * Зона — только своего дома. Ключ составной, поэтому перевод позиции
+     * в другой дом с непустой зоной база отвергает сама: пара перестаёт
+     * существовать в `areas`. Обычного внешнего ключа на `areas(id)`
+     * для этого мало — он разрешил бы зону любого дома сети.
+     */
+    foreignKey({
+      columns: [table.areaId, table.houseId],
+      foreignColumns: [areas.id, areas.houseId],
+      name: 'inventory_items_area_house_fk',
+    }),
+  ],
 );
 
 export const inventoryMovementTypeEnum = pgEnum('inventory_movement_type', [

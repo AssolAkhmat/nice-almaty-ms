@@ -10,12 +10,14 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Field, Input, Select } from '@/components/ui/input';
 import { Money } from '@/components/ui/money';
+import { groupItemsByArea } from '@/domain/inventory';
 
 import {
   closeAuditAction,
   consumeAction,
   receiveAction,
   saveAuditLineAction,
+  setItemAreaAction,
   startAuditAction,
   transferAction,
   type InventoryActionState,
@@ -31,6 +33,9 @@ export interface InventoryRow {
   unitCost: number;
   status: 'in_use' | 'written_off';
   note: string | null;
+  /** Зона дома. `null` — позиция числится по дому вообще. */
+  areaId: string | null;
+  areaName: string | null;
 }
 
 export interface AuditLineRow {
@@ -47,6 +52,7 @@ export interface InventoryViewProps {
   houseId: string;
   houses: { id: string; name: string }[];
   items: InventoryRow[];
+  areas: { id: string; name: string }[];
   audit: { auditId: string; date: string; lines: AuditLineRow[] } | null;
 }
 
@@ -79,7 +85,13 @@ function useRefreshOnDone(state: InventoryActionState): void {
   }, [router, state]);
 }
 
-function ReceiveForm({ houseId }: { houseId: string }) {
+function ReceiveForm({
+  areas,
+  houseId,
+}: {
+  areas: { id: string; name: string }[];
+  houseId: string;
+}) {
   const t = useTranslations('inventory');
   const [state, action, pending] = useActionState(receiveAction, INITIAL);
 
@@ -104,6 +116,19 @@ function ReceiveForm({ houseId }: { houseId: string }) {
         </Field>
       </div>
 
+      {areas.length > 0 && (
+        <Field label={t('area')}>
+          <Select data-testid="item-area" defaultValue="" name="areaId">
+            <option value="">{t('withoutArea')}</option>
+            {areas.map((area) => (
+              <option key={area.id} value={area.id}>
+                {area.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      )}
+
       <Field label={t('note')}>
         <Input name="note" />
       </Field>
@@ -119,18 +144,22 @@ function ReceiveForm({ houseId }: { houseId: string }) {
 }
 
 function ItemActions({
+  areas,
   item,
   houses,
 }: {
+  areas: { id: string; name: string }[];
   item: InventoryRow;
   houses: { id: string; name: string }[];
 }) {
   const t = useTranslations('inventory');
   const [consumeState, consume, consuming] = useActionState(consumeAction, INITIAL);
   const [transferState, transfer, transferring] = useActionState(transferAction, INITIAL);
+  const [areaState, saveArea, savingArea] = useActionState(setItemAreaAction, INITIAL);
 
   useRefreshOnDone(consumeState);
   useRefreshOnDone(transferState);
+  useRefreshOnDone(areaState);
 
   return (
     <div className="flex flex-col gap-2">
@@ -156,6 +185,30 @@ function ItemActions({
         </Button>
         <Message state={consumeState} />
       </form>
+
+      {areas.length > 0 && (
+        <form action={saveArea} className="flex flex-wrap items-end gap-2">
+          <input name="itemId" type="hidden" value={item.itemId} />
+          <Field label={t('area')}>
+            <Select
+              data-testid={`area-${item.itemId}`}
+              defaultValue={item.areaId ?? ''}
+              name="areaId"
+            >
+              <option value="">{t('withoutArea')}</option>
+              {areas.map((area) => (
+                <option key={area.id} value={area.id}>
+                  {area.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Button disabled={savingArea} size="sm" type="submit" variant="secondary">
+            {t('save')}
+          </Button>
+          <Message state={areaState} />
+        </form>
+      )}
 
       {houses.length > 1 && (
         <form action={transfer} className="flex flex-wrap items-end gap-2">
@@ -267,8 +320,14 @@ function AuditPanel({ audit, houseId }: { audit: InventoryViewProps['audit']; ho
   );
 }
 
-export function InventoryView({ audit, houseId, houses, items }: InventoryViewProps) {
+export function InventoryView({ areas, audit, houseId, houses, items }: InventoryViewProps) {
   const t = useTranslations('inventory');
+  /*
+   * Разбивка по зонам (модуль 10): позиции сгруппированы, у каждой группы —
+   * своя стоимость. Позиции без зоны идут последней группой «Без зоны»:
+   * они не теряются и не приписываются чужой зоне.
+   */
+  const groups = groupItemsByArea(items);
 
   return (
     <div className="flex flex-col gap-4">
@@ -276,7 +335,7 @@ export function InventoryView({ audit, houseId, houses, items }: InventoryViewPr
         <CardHeader>
           <CardTitle>{t('add')}</CardTitle>
         </CardHeader>
-        <ReceiveForm houseId={houseId} />
+        <ReceiveForm areas={areas} houseId={houseId} />
       </Card>
 
       <Card data-testid="inventory-list">
@@ -305,24 +364,45 @@ export function InventoryView({ audit, houseId, houses, items }: InventoryViewPr
         {items.length === 0 ? (
           <EmptyState title={t('empty')} />
         ) : (
-          <ul className="flex flex-col gap-4">
-            {items.map((item) => (
-              <li className="flex flex-col gap-2" key={item.itemId}>
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="text-[15px] font-medium">{item.name}</span>
-                  <span className="tabular text-[13px]">
-                    {item.qty} {item.unit}
+          <div className="flex flex-col gap-5">
+            {groups.map((group) => (
+              <section
+                className="flex flex-col gap-3"
+                data-testid={`area-group-${group.areaId ?? 'none'}`}
+                key={group.areaId ?? 'none'}
+              >
+                <div className="border-border flex flex-wrap items-center justify-between gap-2 border-b pb-1">
+                  <span className="text-[13px] font-medium">
+                    {group.areaName ?? t('withoutArea')}
                   </span>
-                  <Money amount={item.unitCost} />
-                  <Badge tone={item.status === 'in_use' ? 'neutral' : 'warning'}>
-                    {t(`statuses.${item.status}`)}
-                  </Badge>
+                  <span className="text-text-muted text-[13px]">
+                    {t('areaTotal')}: <Money amount={group.totalCost} />
+                  </span>
                 </div>
 
-                {item.status === 'in_use' && <ItemActions houses={houses} item={item} />}
-              </li>
+                <ul className="flex flex-col gap-4">
+                  {group.items.map((item) => (
+                    <li className="flex flex-col gap-2" key={item.itemId}>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span className="text-[15px] font-medium">{item.name}</span>
+                        <span className="tabular text-[13px]">
+                          {item.qty} {item.unit}
+                        </span>
+                        <Money amount={item.unitCost} />
+                        <Badge tone={item.status === 'in_use' ? 'neutral' : 'warning'}>
+                          {t(`statuses.${item.status}`)}
+                        </Badge>
+                      </div>
+
+                      {item.status === 'in_use' && (
+                        <ItemActions areas={areas} houses={houses} item={item} />
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </section>
             ))}
-          </ul>
+          </div>
         )}
       </Card>
 

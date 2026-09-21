@@ -13,6 +13,7 @@ import {
   listInventory,
   readItemHistory,
   receiveItem,
+  setItemArea,
   transferItem,
 } from './inventory';
 
@@ -314,6 +315,178 @@ describe('журнал', () => {
         'inventory_item.created',
         'inventory_item.moved',
       ]);
+    });
+  });
+});
+
+/**
+ * Зона дома у позиции (модуль 10, указание владельца 21 сентября 2026).
+ *
+ * Принадлежность зоны дому обеспечивает составной внешний ключ
+ * `(area_id, house_id) → areas(id, house_id)`, а не проверка в сервисе.
+ * Поэтому здесь два разных доказательства: сервис отвечает внятным отказом,
+ * а база отвергает запись и в обход сервиса.
+ */
+describe('зона позиции', () => {
+  async function withAreas(tx: Transaction, suffix: string) {
+    const fixture = await seed(tx, suffix);
+
+    const [kitchen] = await tx
+      .insert(schema.areas)
+      .values({ houseId: fixture.houseA, type: 'common', name: 'Кухня' })
+      .returning();
+    const [yardOfB] = await tx
+      .insert(schema.areas)
+      .values({ houseId: fixture.houseB, type: 'common', name: 'Двор дома B' })
+      .returning();
+
+    return { ...fixture, kitchen: kitchen?.id ?? '', yardOfB: yardOfB?.id ?? '' };
+  }
+
+  it('приход с зоной своего дома проходит, и зона видна в перечне', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await withAreas(tx, '7101');
+
+      const item = await receiveItem(
+        fixture.admin,
+        {
+          houseId: fixture.houseA,
+          areaId: fixture.kitchen,
+          name: 'Чайник',
+          unit: 'шт',
+          unitCost: 12000,
+          qty: '1',
+        },
+        { executor: tx, today: TODAY },
+      );
+
+      expect(item.areaId).toBe(fixture.kitchen);
+
+      const [listed] = await listInventory(
+        fixture.admin,
+        { houseId: fixture.houseA },
+        { executor: tx, today: TODAY },
+      );
+
+      expect(listed?.areaName).toBe('Кухня');
+    });
+  });
+
+  it('зона чужого дома отклоняется сервисом внятной ошибкой', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await withAreas(tx, '7102');
+
+      await expect(
+        receiveItem(
+          fixture.network,
+          {
+            houseId: fixture.houseA,
+            areaId: fixture.yardOfB,
+            name: 'Чайник',
+            unit: 'шт',
+            unitCost: 1,
+            qty: '1',
+          },
+          { executor: tx, today: TODAY },
+        ),
+      ).rejects.toThrow(ValidationError);
+    });
+  });
+
+  /*
+   * Негативная фикстура к правилу доказанного запрета (CLAUDE.md §2):
+   * если бы гарантия держалась только на сервисе, эта запись прошла бы.
+   */
+  it('зону чужого дома отвергает сама база, в обход сервиса', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await withAreas(tx, '7103');
+
+      const failure = await tx
+        .insert(schema.inventoryItems)
+        .values({
+          orgId: fixture.orgId,
+          houseId: fixture.houseA,
+          areaId: fixture.yardOfB,
+          name: 'Мимо сервиса',
+          unit: 'шт',
+        })
+        .then(
+          () => null,
+          (reason: unknown) => reason,
+        );
+
+      // Имя ограничения лежит в причине: так видно, что сработал именно
+      // составной ключ, а не какая-нибудь другая проверка по дороге.
+      const cause = (failure as { cause?: { code?: string; constraint_name?: string } }).cause;
+
+      expect(cause?.code).toBe('23503');
+      expect(cause?.constraint_name).toBe('inventory_items_area_house_fk');
+    });
+  });
+
+  it('перемещение в другой дом снимает зону', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await withAreas(tx, '7104');
+
+      const item = await receiveItem(
+        fixture.network,
+        {
+          houseId: fixture.houseA,
+          areaId: fixture.kitchen,
+          name: 'Стремянка',
+          unit: 'шт',
+          unitCost: 30000,
+          qty: '1',
+        },
+        { executor: tx, today: TODAY },
+      );
+
+      const moved = await transferItem(fixture.network, item.id, fixture.houseB, {
+        executor: tx,
+        today: TODAY,
+      });
+
+      expect(moved.houseId).toBe(fixture.houseB);
+      expect(moved.areaId).toBeNull();
+    });
+  });
+
+  it('зона ставится и снимается отдельным действием, с записью в журнал', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await withAreas(tx, '7105');
+
+      const item = await receiveItem(
+        fixture.admin,
+        { houseId: fixture.houseA, name: 'Пылесос', unit: 'шт', unitCost: 50000, qty: '1' },
+        { executor: tx, today: TODAY },
+      );
+
+      expect(item.areaId).toBeNull();
+
+      const placed = await setItemArea(fixture.admin, item.id, fixture.kitchen, { executor: tx });
+      expect(placed.areaId).toBe(fixture.kitchen);
+
+      const removed = await setItemArea(fixture.admin, item.id, null, { executor: tx });
+      expect(removed.areaId).toBeNull();
+
+      const actions = (await tx.select().from(schema.auditLog)).map((entry) => entry.action);
+      expect(actions.filter((action) => action === 'inventory_item.updated')).toHaveLength(2);
+    });
+  });
+
+  it('чужую зону не поставить и отдельным действием', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await withAreas(tx, '7106');
+
+      const item = await receiveItem(
+        fixture.network,
+        { houseId: fixture.houseA, name: 'Ведро', unit: 'шт', unitCost: 1000, qty: '1' },
+        { executor: tx, today: TODAY },
+      );
+
+      await expect(
+        setItemArea(fixture.network, item.id, fixture.yardOfB, { executor: tx }),
+      ).rejects.toThrow(ValidationError);
     });
   });
 });

@@ -187,7 +187,7 @@ PostgreSQL 16. Все таблицы: `id uuid pk default gen_random_uuid()`, `c
 
 ## Инвентарь
 
-**inventory_items** — `house_id`, `name`, `qty numeric(12,2)`, `unit`, `unit_cost bigint`,
+**inventory_items** — `house_id`, `area_id null` (зона того же дома, составной внешний ключ `(area_id, house_id) → areas(id, house_id)`), `name`, `qty numeric(12,2)`, `unit`, `unit_cost bigint`,
 `responsible_user_id null`, `status enum(in_use, written_off)`, `acquired_at date`, `note`.
 
 **inventory_movements** — `item_id`, `type enum(in, out, write_off, transfer, audit_adjust)`,
