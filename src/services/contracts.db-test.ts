@@ -412,21 +412,120 @@ describe('подпись договора', () => {
     });
   });
 
-  it('подпись попадает в журнал', async () => {
+  it('подпись попадает в журнал с временем, адресом и номером запроса', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '6014');
       const storage = freshStorage();
       const signatureId = await signatureFile(tx, storage, fixture);
 
-      await signContract(fixture.resident, fixture.residencyId, signatureId, {
+      const signer = {
+        ...fixture.resident,
+        ip: '203.0.113.7',
+        requestId: 'req-signature-1',
+      };
+
+      const result = await signContract(signer, fixture.residencyId, signatureId, {
         executor: tx,
         storage,
         pdf: fakePdf().renderer,
         today: TODAY,
       });
 
-      const actions = (await tx.select().from(schema.auditLog)).map((entry) => entry.action);
-      expect(actions).toContain('contract.signed');
+      const entries = await tx.select().from(schema.auditLog);
+      const signed = entries.find((entry) => entry.action === 'contract.signed');
+
+      expect(signed).toBeDefined();
+      expect(signed?.entityId).toBe(fixture.residencyId);
+      expect(signed?.createdAt).not.toBeNull();
+      /*
+       * Адрес и номер запроса: до 21 сентября 2026 действия экрана договора
+       * не заполняли `requestId`, и связать запись журнала с журналом
+       * приложения было нечем.
+       */
+      expect(signed?.ip).toBe('203.0.113.7');
+      expect(signed?.requestId).toBe('req-signature-1');
+
+      const after = signed?.after as { contractSignedAt?: string } | null;
+      expect(after?.contractSignedAt).toBe(result.residency.contractSignedAt?.toISOString());
+    });
+  });
+
+  /*
+   * Место подписи задаёт токен `{{resident.signature}}` (указание владельца,
+   * 21 сентября 2026; пересмотр P2-17). Шаблоны, написанные до токена,
+   * печатаются по-прежнему — блоком в конце: иначе подписанный договор
+   * по старому шаблону вышел бы без подписи вовсе.
+   */
+  it('подпись встаёт на место токена, а не в конец документа', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6015');
+      const storage = freshStorage();
+      const pdf = fakePdf();
+
+      await tx
+        .update(schema.contractTemplates)
+        .set({ bodyHtml: '<p>ДО</p><p>{{resident.signature}}</p><p>ПОСЛЕ</p>' });
+
+      const signatureId = await signatureFile(tx, storage, fixture);
+
+      await signContract(fixture.resident, fixture.residencyId, signatureId, {
+        executor: tx,
+        storage,
+        pdf: pdf.renderer,
+        today: TODAY,
+      });
+
+      const html = pdf.printed[0] ?? '';
+      const image = html.indexOf('<img');
+
+      expect(image).toBeGreaterThan(html.indexOf('ДО'));
+      expect(image).toBeLessThan(html.indexOf('ПОСЛЕ'));
+    });
+  });
+
+  it('шаблон без токена подписи печатается по-старому, блоком в конце', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6016');
+      const storage = freshStorage();
+      const pdf = fakePdf();
+
+      const signatureId = await signatureFile(tx, storage, fixture);
+
+      await signContract(fixture.resident, fixture.residencyId, signatureId, {
+        executor: tx,
+        storage,
+        pdf: pdf.renderer,
+        today: TODAY,
+      });
+
+      const html = pdf.printed[0] ?? '';
+
+      expect(html).toContain('data:image/png;base64,');
+      expect(html.indexOf('<img')).toBeGreaterThan(html.indexOf('Дата:'));
+    });
+  });
+
+  it('до подписания токен раскрывается пустым, а не остаётся скобками', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6017');
+      const storage = freshStorage();
+      const pdf = fakePdf();
+
+      await tx
+        .update(schema.contractTemplates)
+        .set({ bodyHtml: '<p>ДО</p><p>{{resident.signature}}</p>' });
+
+      await buildContract(fixture.admin, fixture.residencyId, {
+        executor: tx,
+        storage,
+        pdf: pdf.renderer,
+        today: TODAY,
+      });
+
+      const html = pdf.printed[0] ?? '';
+
+      expect(html).not.toContain('{{');
+      expect(html).not.toContain('<img');
     });
   });
 });

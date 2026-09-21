@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CONTRACT_TOKENS,
-  renderContractTemplate,
   SAMPLE_CONTRACT_VALUES,
+  hasToken,
+  renderContractTemplate,
   unknownTokens,
 } from './contract-template';
 
@@ -55,6 +56,7 @@ describe('палитра токенов', () => {
       'resident.emergency_phone',
       'resident.university',
       'resident.course',
+      'resident.signature',
     ]);
   });
 });
@@ -146,5 +148,68 @@ describe('образец для предпросмотра', () => {
     const template = CONTRACT_TOKENS.map((token) => `<p>{{${token}}}</p>`).join('');
 
     expect(renderContractTemplate(template, SAMPLE_CONTRACT_VALUES)).not.toContain('{{');
+  });
+});
+
+/**
+ * Подпись жильца встаёт на место токена (указание владельца, 21 сентября 2026,
+ * пересмотр P2-17). Её значение — единственное, которое вставляется разметкой:
+ * это `<img>`, собранный сервером из байтов файла.
+ */
+describe('токен подписи', () => {
+  const SIGNATURE = '<img alt="" src="data:image/png;base64,AAAA" style="max-height:120px" />';
+
+  it('есть в палитре', () => {
+    expect(CONTRACT_TOKENS).toContain('resident.signature');
+  });
+
+  it('подставляется разметкой, а не текстом', () => {
+    const html = renderContractTemplate('<p>Наниматель: {{resident.signature}}</p>', {
+      'resident.signature': SIGNATURE,
+    });
+
+    expect(html).toBe(`<p>Наниматель: ${SIGNATURE}</p>`);
+    expect(html).not.toContain('&lt;img');
+  });
+
+  it('встаёт именно туда, где стоит токен', () => {
+    const html = renderContractTemplate('<p>A{{resident.signature}}B</p>', {
+      'resident.signature': SIGNATURE,
+    });
+
+    expect(html.indexOf('<img')).toBeGreaterThan(html.indexOf('A'));
+    expect(html.indexOf('<img')).toBeLessThan(html.indexOf('B'));
+  });
+
+  it('до подписания раскрывается пустым значением, а не остаётся скобками', () => {
+    expect(
+      renderContractTemplate('<p>{{resident.signature}}</p>', { 'resident.signature': '' }),
+    ).toBe('<p></p>');
+  });
+
+  /*
+   * Негативная фикстура к правилу «разметкой вставляется только подпись»
+   * (CLAUDE.md §2): если бы исключение распространилось на прочие токены,
+   * поле профиля стало бы способом положить разметку в договор.
+   */
+  it('остальные значения по-прежнему экранируются', () => {
+    const attack = '<script>alert(1)</script>';
+
+    for (const token of CONTRACT_TOKENS) {
+      if (token === 'resident.signature') {
+        continue;
+      }
+
+      const html = renderContractTemplate(`<p>{{${token}}}</p>`, { [token]: attack });
+
+      expect(html, token).toContain('&lt;script&gt;');
+      expect(html, token).not.toContain('<script>');
+    }
+  });
+
+  it('находит токен в шаблоне и не путает его с другими', () => {
+    expect(hasToken('<p>{{ resident.signature }}</p>', 'resident.signature')).toBe(true);
+    expect(hasToken('<p>{{resident.full_name}}</p>', 'resident.signature')).toBe(false);
+    expect(hasToken('<p>подпись</p>', 'resident.signature')).toBe(false);
   });
 });

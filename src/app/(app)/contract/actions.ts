@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 
 import { actionErrorKey } from '@/lib/action-failure';
+import { newRequestId } from '@/lib/logger';
 import { getCurrentSession } from '@/lib/session';
 import { buildContract, markKeysIssued, signContract } from '@/services/contracts';
 
@@ -26,9 +27,15 @@ async function actor(): Promise<UserActor | null> {
 
   const store = await headers();
 
+  /*
+   * `requestId` заполняется наравне с ip: без него все три действия экрана
+   * договора писали в журнал строку с пустым request_id, и связать запись
+   * с журналом приложения было нечем (найдено разбором 21 сентября 2026).
+   */
   return {
     context: session.context,
     ip: store.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined,
+    requestId: newRequestId(),
   };
 }
 

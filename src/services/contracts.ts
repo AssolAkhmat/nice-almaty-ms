@@ -10,7 +10,7 @@ import { requireProfile } from '@/db/repositories/resident-profiles';
 import { requireResidency, updateResidency } from '@/db/repositories/residencies';
 import { requireUser } from '@/db/repositories/users';
 import { contractTemplates, type ContractTemplate } from '@/db/schema';
-import { renderContractTemplate, unknownTokens } from '@/domain/contract-template';
+import { hasToken, renderContractTemplate, unknownTokens } from '@/domain/contract-template';
 import { documentStorageKey } from '@/domain/files';
 import { assertCan } from '@/lib/authz';
 import { ConflictError, NotFoundError, ValidationError } from '@/lib/errors';
@@ -180,13 +180,43 @@ async function contractValues(
   };
 }
 
-/** Подпись приходит картинкой и вставляется отдельным блоком в конце (P2-17). */
+/** Картинка подписи. Собирается сервером из байтов файла, не из ввода человека. */
+function signatureImage(dataUrl: string): string {
+  return `<img alt="" src="${dataUrl}" style="max-height:120px" />`;
+}
+
+/**
+ * Подпись блоком в конце документа — для шаблонов без токена
+ * `{{resident.signature}}`.
+ *
+ * Так было до 21 сентября 2026 у всех договоров (P2-17). Теперь место подписи
+ * задаётся токеном, но шаблоны, написанные раньше, токена не содержат:
+ * убрать этот путь значило бы напечатать подписанный договор без подписи.
+ */
 function withSignature(html: string, signature: string | null): string {
   if (signature === null) {
     return html;
   }
 
-  return `${html}<div style="margin-top:24px"><img alt="" src="${signature}" style="max-height:120px" /></div>`;
+  return `${html}<div style="margin-top:24px">${signatureImage(signature)}</div>`;
+}
+
+/**
+ * Готовый HTML договора. Подпись встаёт на место токена, а у шаблона без него —
+ * блоком в конце. Пустая строка до подписания: токен обязан иметь значение,
+ * иначе подстановка падает на «Нет значения для токена».
+ */
+function renderContract(
+  bodyHtml: string,
+  values: Readonly<Record<string, string>>,
+  dataUrl: string | null,
+): string {
+  const html = renderContractTemplate(bodyHtml, {
+    ...values,
+    'resident.signature': dataUrl === null ? '' : signatureImage(dataUrl),
+  });
+
+  return hasToken(bodyHtml, 'resident.signature') ? html : withSignature(html, dataUrl);
 }
 
 async function storeServerFile(
@@ -276,7 +306,8 @@ export async function buildContract(
 
   const contractNumber = await ensureContractNumber(actor.context, residency, executor);
   const values = await contractValues(actor, residency, resolved, contractNumber);
-  const html = renderContractTemplate(template.bodyHtml, values);
+  // Договор до подписания: токен подписи получает пустое значение.
+  const html = renderContract(template.bodyHtml, values, null);
   const pdf = await resolved.pdf.render(html);
 
   const file = await storeServerFile(
@@ -366,7 +397,7 @@ export async function signContract(
   const dataUrl = `data:image/png;base64,${Buffer.from(bytes).toString('base64')}`;
   const contractNumber = await ensureContractNumber(actor.context, residency, executor);
   const values = await contractValues(actor, residency, resolved, contractNumber);
-  const html = withSignature(renderContractTemplate(template.bodyHtml, values), dataUrl);
+  const html = renderContract(template.bodyHtml, values, dataUrl);
   const pdf = await resolved.pdf.render(html);
 
   const file = await storeServerFile(
@@ -382,10 +413,11 @@ export async function signContract(
   );
 
   return executor.transaction(async (tx) => {
+    const signedAt = now();
     const updated = await updateResidency(
       actor.context,
       residency.id,
-      { contractFileId: file.id, signatureFileId: signature.id, contractSignedAt: now() },
+      { contractFileId: file.id, signatureFileId: signature.id, contractSignedAt: signedAt },
       tx,
     );
 
@@ -399,7 +431,13 @@ export async function signContract(
         action: AUDIT_ACTIONS.contractSigned,
         entityType: 'residency',
         entityId: residency.id,
-        after: { contractFileId: file.id, signatureFileId: signature.id },
+        // Время подписания в самом снимке: `created_at` строки журнала — это
+        // время записи, а договор подписан моментом, который лежит в проживании.
+        after: {
+          contractFileId: file.id,
+          signatureFileId: signature.id,
+          contractSignedAt: signedAt.toISOString(),
+        },
       },
       tx,
     );

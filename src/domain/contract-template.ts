@@ -31,6 +31,13 @@ export const CONTRACT_TOKENS = [
   'resident.emergency_phone',
   'resident.university',
   'resident.course',
+  /*
+   * Подпись жильца (указание владельца, 21 сентября 2026; пересмотр P2-17).
+   * Раньше картинка подписи приклеивалась блоком в конец документа, и место
+   * подписи в договоре не настраивалось. Теперь оно задаётся токеном там,
+   * где ему положено быть по тексту договора.
+   */
+  'resident.signature',
 ] as const;
 
 export type ContractToken = (typeof CONTRACT_TOKENS)[number];
@@ -43,6 +50,20 @@ const TOKEN_PATTERN = /\{\{\s*([\w.]+)\s*\}\}/g;
 function isKnown(token: string): token is ContractToken {
   return (CONTRACT_TOKENS as readonly string[]).includes(token);
 }
+
+/**
+ * Токены, значение которых вставляется разметкой как есть.
+ *
+ * Ровно один: подпись — это `<img>` с картинкой, собранный сервером
+ * из байтов файла, а не данные, пришедшие от человека. Всё остальное
+ * экранируется без исключений: имя жильца, примечание, адрес — данные,
+ * и тегом в документ они попасть не должны.
+ *
+ * Список закрыт намеренно. Добавление сюда второго токена означает, что
+ * кто-то сможет положить разметку в договор через поле профиля, поэтому
+ * такому токену нужна своя причина и своя негативная фикстура.
+ */
+const RAW_TOKENS: readonly ContractToken[] = ['resident.signature'];
 
 function escapeHtml(value: string): string {
   return value
@@ -85,8 +106,19 @@ export function renderContractTemplate(template: string, values: ContractValues)
       throw new RangeError(`Нет значения для токена шаблона: ${rawToken}`);
     }
 
-    return escapeHtml(value);
+    return RAW_TOKENS.includes(rawToken) ? value : escapeHtml(value);
   });
+}
+
+/** Есть ли токен в тексте шаблона. Нужно, чтобы знать, куда класть подпись. */
+export function hasToken(template: string, token: ContractToken): boolean {
+  for (const match of template.matchAll(TOKEN_PATTERN)) {
+    if (match[1] === token) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /**
@@ -118,4 +150,12 @@ export const SAMPLE_CONTRACT_VALUES: Readonly<Record<ContractToken, string>> = {
   'resident.emergency_phone': '+77029876543',
   'resident.university': 'КазНУ им. аль-Фараби',
   'resident.course': '2',
+  /*
+   * Предпросмотр показывает место подписи, а не подпись: настоящей картинки
+   * до подписания не существует, а пустая строка оставила бы суперадмина
+   * в неведении, куда она встанет.
+   */
+  'resident.signature':
+    '<span style="display:inline-block;min-width:180px;border-bottom:1px solid #999">' +
+    '<span style="color:#999;font-size:12px">место подписи</span></span>',
 };
