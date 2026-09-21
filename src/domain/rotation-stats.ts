@@ -12,7 +12,12 @@ export interface StatsRecord {
   userId: string | null;
   areaId: string;
   date: BusinessDate;
-  state: 'assigned' | 'needs_reassignment' | 'confirmed' | 'missed' | 'cancelled';
+  /*
+   * `unconfirmed` — день закрылся без подтверждения ротации временного
+   * жильца (D23). В свод не попадает: `counted` пускает только `confirmed`
+   * и `missed`, поэтому ни в «пропущено», ни в знаменатель доли он не идёт.
+   */
+  state: 'assigned' | 'needs_reassignment' | 'confirmed' | 'missed' | 'unconfirmed' | 'cancelled';
   /** Оценка 1–10; `null` — админ её не ставил. */
   score: number | null;
 }

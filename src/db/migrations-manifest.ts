@@ -35,6 +35,7 @@ export const MIGRATIONS = [
   '0024_backfill_rotation_versions.sql',
   '0025_wealthy_catseye.sql',
   '0026_empty_puck.sql',
+  '0027_smart_starjammers.sql',
 ] as const;
 
 export const EXPECTED_MIGRATIONS = MIGRATIONS.length;

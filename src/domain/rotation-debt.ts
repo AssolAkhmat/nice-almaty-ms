@@ -14,7 +14,11 @@
 export type DebtStep = -1 | 0 | 1;
 
 export interface DebtStepInput {
-  state: 'assigned' | 'needs_reassignment' | 'confirmed' | 'missed' | 'cancelled';
+  /*
+   * `unconfirmed` — ротация временного жильца, закрытая без подтверждения
+   * (D23). Шаг долга нулевой: долг заводится только на `missed`.
+   */
+  state: 'assigned' | 'needs_reassignment' | 'confirmed' | 'missed' | 'unconfirmed' | 'cancelled';
   /** Галочка «списать доп. ротацию» на назначении (§2.7). */
   writeOffDebt: boolean;
   /** Есть ли исполнитель: дырке долг не начисляют (§6.3). */

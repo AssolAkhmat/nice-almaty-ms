@@ -45,6 +45,13 @@ export const beds = pgTable(
   (table) => [
     uniqueIndex('beds_area_number_tier_unique').on(table.areaId, table.number, table.tier),
     index('beds_house_idx').on(table.houseId),
+    /*
+     * Опора для составного внешнего ключа `(bed_id, house_id)` из других
+     * таблиц: он даёт базе право отвергнуть место чужого дома. Сам по себе
+     * индекс избыточен — `id` и так первичный ключ, — но без него
+     * PostgreSQL такой ключ не создаст.
+     */
+    uniqueIndex('beds_id_house_unique').on(table.id, table.houseId),
   ],
 );
 

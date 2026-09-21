@@ -33,7 +33,7 @@ export interface AssignmentView {
   assignmentId: string;
   userId: string | null;
   userName: string | null;
-  state: 'assigned' | 'needs_reassignment' | 'confirmed' | 'missed' | 'cancelled';
+  state: 'assigned' | 'needs_reassignment' | 'confirmed' | 'missed' | 'unconfirmed' | 'cancelled';
   /** Назначение самого читателя: жилец должен видеть свою ротацию сразу. */
   isMine: boolean;
   /** Оценка 1–10; жильцу не приходит вовсе (§7). */
@@ -179,6 +179,10 @@ function OccurrenceBlock({
               <Badge tone="success">{t('confirmedShort')}</Badge>
             )}
             {assignment.state === 'missed' && <Badge tone="danger">{t('missedShort')}</Badge>}
+            {/* Временный жилец: день закрылся без подтверждения, но это не пропуск (D23). */}
+            {assignment.state === 'unconfirmed' && (
+              <Badge tone="neutral">{t('unconfirmedShort')}</Badge>
+            )}
             {assignment.score !== null && (
               <Badge tone="neutral">{t('score', { score: assignment.score })}</Badge>
             )}

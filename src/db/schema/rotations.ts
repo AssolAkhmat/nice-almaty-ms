@@ -18,6 +18,7 @@ import { areas } from './areas';
 import { beds } from './beds';
 import { houses } from './houses';
 import { organizations } from './organizations';
+import { temporaryResidents } from './temporary-residents';
 import { users } from './users';
 
 /**
@@ -374,6 +375,14 @@ export const rotationAssignmentStateEnum = pgEnum('rotation_assignment_state', [
   'needs_reassignment',
   'confirmed',
   'missed',
+  /*
+   * День закрылся, подтверждения не было, но и пропуском это не считается:
+   * так закрывается ротация временного жильца (D23). Статус новый намеренно —
+   * свод статистики пускает только `confirmed` и `missed`
+   * (`src/domain/rotation-stats.ts`), поэтому неподтверждённое не попадает
+   * ни в отчёты, ни в долг, ни в рейтинг само собой, без правки счётчиков.
+   */
+  'unconfirmed',
   'cancelled',
 ]);
 
@@ -389,12 +398,22 @@ export const rotationAssignments = pgTable(
       .references(() => rotationOccurrences.id),
     /** Пусто, пока назначение ждёт решения админа: место пустует. */
     userId: uuid('user_id').references(() => users.id),
+    /**
+     * Исполнитель-временный жилец: у него нет учётной записи, поэтому он
+     * не может лежать в `user_id`. Прошлые занятия хранят эту ссылку и после
+     * того, как место занял настоящий жилец: история не переписывается.
+     */
+    temporaryResidentId: uuid('temporary_resident_id').references(() => temporaryResidents.id),
     /** Позиция слота в ряду, из которой пришёл исполнитель. */
     slotPosition: integer('slot_position'),
     /** Причина пустоты; у назначения с исполнителем её нет. */
     emptyReason: rotationEmptyReasonEnum('empty_reason'),
     /** Кто стоял в очереди на зону, но не допущен к ней (§2.5). */
     queuedUserId: uuid('queued_user_id').references(() => users.id),
+    /** То же для временного жильца: иначе дырка потеряла бы имя. */
+    queuedTemporaryResidentId: uuid('queued_temporary_resident_id').references(
+      () => temporaryResidents.id,
+    ),
     /** Галочка «списать доп. ротацию»: долг уменьшится при подтверждении (P10-3). */
     writeOffDebt: boolean('write_off_debt').notNull().default(false),
     source: rotationAssignmentSourceEnum('source').notNull().default('auto'),
@@ -424,7 +443,16 @@ export const rotationAssignments = pgTable(
      */
     check(
       'rotation_assignments_empty_has_reason',
-      sql`(${table.userId} is null) = (${table.emptyReason} is not null)`,
+      sql`(${table.userId} is null and ${table.temporaryResidentId} is null) = (${table.emptyReason} is not null)`,
+    ),
+    /*
+     * Исполнитель ровно один: жилец или временный, но не оба сразу.
+     * Иначе календарь показал бы на одном занятии двух человек, а закрытие
+     * дня не знало бы, кому ставить пропуск.
+     */
+    check(
+      'rotation_assignments_single_executor',
+      sql`not (${table.userId} is not null and ${table.temporaryResidentId} is not null)`,
     ),
   ],
 );
