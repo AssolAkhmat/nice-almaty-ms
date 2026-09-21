@@ -14,6 +14,7 @@ import {
   eligibilityGroups,
   residencies,
   residentProfiles,
+  temporaryResidents,
   rotationAssignments,
   rotationOccurrences,
   rotationDayNormZones,
@@ -55,6 +56,7 @@ function houseScope(
     | typeof rotationOccurrences.houseId
     | typeof eligibilityGroups.houseId
     | typeof residencies.houseId
+    | typeof temporaryResidents.houseId
     | typeof rotationTemplatesSettings.houseId,
 ) {
   /*
@@ -1032,13 +1034,17 @@ export async function requireOccurrence(
 export interface CreateAssignmentInput {
   occurrenceId: string;
   userId?: string | null;
+  /** Исполнитель без учётной записи (T11.3): либо он, либо `userId`, не оба. */
+  temporaryResidentId?: string | null;
   slotPosition?: number | null;
   source?: 'auto' | 'manual' | 'debt';
-  state?: 'assigned' | 'needs_reassignment' | 'confirmed' | 'missed' | 'cancelled';
+  state?: 'assigned' | 'needs_reassignment' | 'confirmed' | 'missed' | 'unconfirmed' | 'cancelled';
   /** Причина пустоты; без неё пустое назначение получает «некого назначить». */
   emptyReason?: RotationEmptyReason | null;
   /** Кто стоял в очереди на зону, но не допущен к ней (§2.5). */
   queuedUserId?: string | null;
+  /** То же для временного жильца: иначе дырка потеряла бы имя. */
+  queuedTemporaryResidentId?: string | null;
   /** Галочка «списать доп. ротацию» (§2.7). */
   writeOffDebt?: boolean;
 }
@@ -1050,11 +1056,16 @@ export interface CreateAssignmentInput {
  * и держать это правило в каждом сервисе значило бы рано или поздно
  * забыть его в одном: дырка без причины выпала бы из «Требует решения».
  */
+/**
+ * Причина пустоты есть тогда и только тогда, когда исполнителя нет.
+ * Исполнителем считается и временный жилец (T11.3): у него нет учётной
+ * записи, но занятие он выполняет, и дыркой оно быть не должно.
+ */
 function emptyReasonFor(
-  userId: string | null,
+  executorId: string | null,
   reason: RotationEmptyReason | null | undefined,
 ): RotationEmptyReason | null {
-  if (userId !== null) {
+  if (executorId !== null) {
     return null;
   }
 
@@ -1069,17 +1080,20 @@ export async function createAssignment(
   await requireOccurrence(context, input.occurrenceId, executor);
 
   const userId = input.userId ?? null;
+  const temporaryResidentId = input.temporaryResidentId ?? null;
 
   const [assignment] = await executor
     .insert(rotationAssignments)
     .values({
       occurrenceId: input.occurrenceId,
       userId,
+      temporaryResidentId,
       slotPosition: input.slotPosition ?? null,
       source: input.source ?? 'auto',
       state: input.state ?? 'assigned',
-      emptyReason: emptyReasonFor(userId, input.emptyReason),
+      emptyReason: emptyReasonFor(userId ?? temporaryResidentId, input.emptyReason),
       queuedUserId: input.queuedUserId ?? null,
+      queuedTemporaryResidentId: input.queuedTemporaryResidentId ?? null,
       writeOffDebt: input.writeOffDebt ?? false,
     })
     .returning();
@@ -1097,7 +1111,7 @@ export interface UpdateAssignmentInput {
   emptyReason?: RotationEmptyReason | null;
   queuedUserId?: string | null;
   writeOffDebt?: boolean;
-  state?: 'assigned' | 'needs_reassignment' | 'confirmed' | 'missed' | 'cancelled';
+  state?: 'assigned' | 'needs_reassignment' | 'confirmed' | 'missed' | 'unconfirmed' | 'cancelled';
   source?: 'auto' | 'manual' | 'debt';
   confirmedAt?: Date | null;
   confirmedBy?: string | null;
@@ -1285,6 +1299,12 @@ export interface CalendarDictionaries {
   areas: { id: string; name: string }[];
   checklists: { id: string; areaId: string; title: string; peopleNeeded: number }[];
   members: { userId: string; name: string }[];
+  /**
+   * Временные жильцы дома (T11.3). Отдельным списком, а не вперемешку
+   * с жильцами: у них нет учётной записи, и путать их идентификаторы
+   * с `user_id` нельзя — на этом стоит `check` «исполнитель ровно один».
+   */
+  temporary: { temporaryResidentId: string; name: string }[];
 }
 
 /**
@@ -1349,6 +1369,14 @@ export async function listCalendarDictionaries(
       asc(users.id),
     );
 
+  const temporaryRows = await executor
+    .select({ temporaryResidentId: temporaryResidents.id, name: temporaryResidents.name })
+    .from(temporaryResidents)
+    .where(
+      and(eq(temporaryResidents.houseId, houseId), houseScope(context, temporaryResidents.houseId)),
+    )
+    .orderBy(asc(temporaryResidents.name), asc(temporaryResidents.id));
+
   return {
     areas: areaRows,
     checklists: checklistRows,
@@ -1360,6 +1388,7 @@ export async function listCalendarDictionaries(
 
       return { userId: row.userId, name: name === '' ? row.phone : name };
     }),
+    temporary: temporaryRows,
   };
 }
 

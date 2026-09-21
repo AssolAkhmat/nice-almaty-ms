@@ -71,6 +71,12 @@ export const ACTIONS = [
   'accounting.write',
   'inventory.read',
   'inventory.manage',
+  /*
+   * Временные жильцы для ротаций (T11.3): имя и пол, привязанные к месту
+   * на период. Заводит и правит админ своего дома или суперадмин.
+   */
+  'temporaryResident.read',
+  'temporaryResident.write',
   'settings.org.read',
   'settings.org.write',
   'settings.house.read',
@@ -129,6 +135,8 @@ export const PERMISSIONS: PermissionMatrix = {
     'rotation.manage': 'org',
     'rotation.confirm': 'org',
     'rotation.score': 'org',
+    'temporaryResident.read': 'org',
+    'temporaryResident.write': 'org',
     'absence.read': 'org',
     'absence.create': 'org',
     'absence.review': 'org',
@@ -201,6 +209,8 @@ export const PERMISSIONS: PermissionMatrix = {
     'rotation.manage': 'house',
     'rotation.confirm': 'house',
     'rotation.score': 'house',
+    'temporaryResident.read': 'house',
+    'temporaryResident.write': 'house',
     'absence.read': 'house',
     'absence.create': 'house',
     'absence.review': 'house',
@@ -323,6 +333,8 @@ export const PERMISSIONS: PermissionMatrix = {
     /* Жилец подтверждает свою ротацию сам; оценку ставит только админ (§7). */
     'rotation.confirm': 'self',
     'rotation.score': 'none',
+    'temporaryResident.read': 'none',
+    'temporaryResident.write': 'none',
     /*
      * Отсутствие жилец подаёт сам и видит своё (§9); одобряет админ —
      * ему решать, отпускать ли, и жилец себе этого не подписывает.

@@ -7,6 +7,7 @@ import {
   releaseBed,
   requireResidency,
 } from '@/db/repositories/residencies';
+import { releaseTemporaryOnBed } from '@/db/repositories/temporary-residents';
 import { assertCan } from '@/lib/authz';
 import { ValidationError } from '@/lib/errors';
 import { todayInAlmaty, type BusinessDate } from '@/lib/time';
@@ -86,6 +87,29 @@ export async function assignBedToResidency(
   const previous = await findOpenAssignment(residency.id, executor);
 
   return executor.transaction(async (tx) => {
+    /*
+     * Место освобождается от временных жильцов с даты заселения (T11.3):
+     * одно место не бывает одновременно за временным и за настоящим, и без
+     * этого шага вставку отклонил бы триггер базы. Период, начавшийся раньше,
+     * обрезается — прошлые ротации остаются с именем временного, история
+     * не переписывается.
+     */
+    const released = await releaseTemporaryOnBed(actor.context, bed.id, from, tx);
+
+    for (const temporary of released) {
+      await recordAudit(
+        { context: actor.context, ip: actor.ip, requestId: actor.requestId },
+        {
+          action: AUDIT_ACTIONS.temporaryResidentReleased,
+          entityType: 'temporary_resident',
+          entityId: temporary.id,
+          before: { name: temporary.name, period: temporary.period },
+          after: { releasedFrom: from, residencyId: residency.id },
+        },
+        tx,
+      );
+    }
+
     const assignment = await assignBed(
       { residencyId: residency.id, bedId: bed.id, price, from, createdBy: actor.context.userId },
       tx,

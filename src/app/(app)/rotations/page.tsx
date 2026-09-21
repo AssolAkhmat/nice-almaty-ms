@@ -129,6 +129,14 @@ export default async function RotationsPage({
   const memberNames = new Map(
     calendar.dictionaries.members.map((member) => [member.userId, member.name]),
   );
+  /*
+   * Имена временных жильцов (T11.3) живут отдельным справочником: учётной
+   * записи у них нет, и класть их в тот же словарь, что и `user_id`, значило
+   * бы смешать два разных пространства идентификаторов.
+   */
+  const temporaryNames = new Map(
+    calendar.dictionaries.temporary.map((person) => [person.temporaryResidentId, person.name]),
+  );
 
   const cards: OccurrenceCard[] = calendar.occurrences.map((item) => ({
     occurrenceId: item.occurrence.id,
@@ -141,7 +149,12 @@ export default async function RotationsPage({
     assignments: item.assignments.map((assignment) => ({
       assignmentId: assignment.id,
       userId: assignment.userId,
-      userName: assignment.userId === null ? null : (memberNames.get(assignment.userId) ?? '—'),
+      userName:
+        assignment.temporaryResidentId !== null
+          ? (temporaryNames.get(assignment.temporaryResidentId) ?? '—')
+          : assignment.userId === null
+            ? null
+            : (memberNames.get(assignment.userId) ?? '—'),
       state: assignment.state,
       isMine: assignment.userId === context.userId,
       score: assignment.score,

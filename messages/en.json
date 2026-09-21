@@ -1,4 +1,157 @@
 {
+  "absences": {
+    "title": "Absences",
+    "subtitle": "Tell in advance: a trip needs at least one day",
+    "submitTitle": "Report an absence",
+    "mineTitle": "My notices",
+    "mineEmpty": "No notices yet",
+    "queueTitle": "Awaiting a decision",
+    "queueEmpty": "Nothing is awaiting a decision",
+    "calendarTitle": "House calendar",
+    "calendarEmpty": "No absences in the house",
+    "nothing": "The section is empty",
+    "type": "Type",
+    "startDate": "Start date",
+    "endDate": "End date",
+    "returnAt": "Back at",
+    "reason": "Reason",
+    "reasonHint": "Required for every type",
+    "longHint": "Tomorrow at the earliest",
+    "submit": "Send",
+    "submitted": "Notice sent",
+    "approve": "Approve",
+    "approved": "Absence approved",
+    "reject": "Reject",
+    "rejected": "Absence rejected",
+    "rejectNote": "Rejection reason",
+    "types": {
+      "short": "Late tonight",
+      "long": "Away",
+      "sick": "Sick"
+    },
+    "statuses": {
+      "pending": "Awaiting",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    },
+    "errors": {
+      "reasonRequired": "A reason is required",
+      "longTooLate": "A trip is reported at least one day ahead",
+      "endBeforeStart": "The end date is before the start",
+      "rejectReasonRequired": "Rejection needs a reason",
+      "startRequired": "Set the start date",
+      "unknown": "Could not complete"
+    }
+  },
+  "accounting": {
+    "title": "Accounting",
+    "subtitle": "Chart of accounts, ledger entries and network reports",
+    "errors": {
+      "unauthorized": "Sign-in required",
+      "unknown": "The action could not be completed",
+      "unbalanced": "Debit and credit of the entry are not equal",
+      "tooFewLines": "An entry needs at least two lines",
+      "amountInvalid": "A line amount is a positive whole number of tenge",
+      "alreadyReversed": "The entry has already been reversed",
+      "forbidden": "This action is not available to your role",
+      "not_found": "Not found",
+      "category": "Choose an expense category from the list",
+      "descriptionRequired": "Enter an expense description"
+    },
+    "trialBalance": "Trial balance",
+    "account": "Account",
+    "code": "Code",
+    "balance": "Balance",
+    "noAccounts": "Chart of accounts is empty",
+    "noAccountsHint": "The network has no accounts: restore the skeleton with pnpm db:seed --skeleton or create the accounts in network settings. Until then there are no entries, reports or reconciliation.",
+    "reconciliation": "Deposit fund reconciliation",
+    "matches": "Matches",
+    "mismatch": "Mismatch",
+    "fundBalance": "Fund balance",
+    "depositsTotal": "Deposits total",
+    "difference": "Difference",
+    "journal": "Ledger journal",
+    "noEntries": "No entries",
+    "noEntriesHint": "There were no entries in the selected period",
+    "reverse": "Reverse",
+    "reversed": "Reversed",
+    "expense": "Expense",
+    "recordExpense": "Record expense",
+    "categoryField": "Category",
+    "amount": "Amount",
+    "writeOffAccount": "Write-off account",
+    "paidFrom": "Paid from",
+    "cash": "Cash",
+    "date": "Date",
+    "description": "Description",
+    "tax": "Tax calculator",
+    "from": "From",
+    "to": "To",
+    "taxRate": "Tax, %",
+    "acquiringRate": "Acquiring, %",
+    "percentHint": "Defaults are 3% and 0.95%",
+    "recalculate": "Recalculate",
+    "kaspiIncome": "Income via Kaspi",
+    "kaspiTurnover": "Turnover via Kaspi",
+    "taxAmount": "Tax",
+    "acquiringAmount": "Acquiring fee",
+    "deduction": "Total deduction",
+    "net": "Net",
+    "byHouse": "By house",
+    "house": "House",
+    "taxDisclaimer": "The calculation is for reference only, creates no entries and is not tax advice",
+    "closed": "Superadmin section",
+    "closedHint": "The ledger is kept for the whole network, not for one house",
+    "direction": {
+      "debit": "debit",
+      "credit": "credit"
+    },
+    "source": {
+      "invoice": "Invoice",
+      "deposit": "Deposit",
+      "damage": "Damage",
+      "utilities": "Utilities",
+      "expense": "Expense",
+      "manual": "Manual"
+    },
+    "category": {
+      "rent": "Rent",
+      "equipment": "Equipment",
+      "chemicals": "Cleaning supplies",
+      "depreciation": "Depreciation",
+      "repair": "Repair",
+      "other": "Other"
+    },
+    "done": {
+      "expense": "Expense recorded",
+      "reversed": "Entry reversed"
+    },
+    "noAccountsLink": "Open the chart of accounts"
+  },
+  "apiTokens": {
+    "title": "API tokens",
+    "subtitle": "Keys for bots: a scope narrows the issuer's rights",
+    "name": "Name",
+    "scopes": "Scopes",
+    "house": "House",
+    "wholeNetwork": "Whole network",
+    "issue": "Issue a token",
+    "issued": "Token issued. The value is shown once",
+    "value": "Token value",
+    "copyHint": "Copy it now: only a hash is stored, there is nowhere to show it again",
+    "revoke": "Revoke",
+    "revoked": "Token revoked",
+    "empty": "No tokens",
+    "expires": "Valid until",
+    "lastUsed": "Last used",
+    "never": "never used",
+    "errors": {
+      "unknown": "It did not work. Try again",
+      "nameRequired": "Name is required",
+      "scopesRequired": "Choose at least one scope",
+      "unknownScope": "Unknown scope"
+    }
+  },
   "app": {
     "name": "Nice Almaty",
     "description": "Student housing network administration system",
@@ -30,35 +183,36 @@
       "apply": "Show"
     },
     "entities": {
-      "user": "Account",
-      "house": "House",
-      "setting": "Setting",
-      "area": "Area",
-      "bed": "Bed",
-      "residency": "Residency",
-      "resident_profile": "Resident profile",
-      "document": "Document",
-      "document_type": "Document type",
-      "file": "File",
-      "invoice": "Invoice",
-      "ledger_entry": "Ledger entry",
+      "absence": "Absence",
       "account": "Account",
+      "api_token": "API token",
+      "area": "Area",
+      "area_checklist": "Area checklist",
+      "bed": "Bed",
       "contract_template": "Contract template",
       "damage": "Damage",
-      "utility_period": "Utility period",
-      "area_checklist": "Area checklist",
-      "eligibility_group": "Eligibility group",
-      "rotation_row": "Rotation row",
-      "rotation_occurrence": "Rotation",
-      "rotation_template": "Rotation template",
-      "absence": "Absence",
-      "rating_event": "Rating event",
-      "fine": "Fine",
       "discount": "Discount",
-      "rating_rule": "Rating rule",
-      "inventory_item": "Inventory item",
+      "document": "Document",
+      "document_type": "Document type",
+      "eligibility_group": "Eligibility group",
+      "file": "File",
+      "fine": "Fine",
+      "house": "House",
       "inventory_audit": "Inventory audit",
-      "api_token": "API token"
+      "inventory_item": "Inventory item",
+      "invoice": "Invoice",
+      "ledger_entry": "Ledger entry",
+      "rating_event": "Rating event",
+      "rating_rule": "Rating rule",
+      "residency": "Residency",
+      "resident_profile": "Resident profile",
+      "rotation_occurrence": "Rotation",
+      "rotation_row": "Rotation row",
+      "rotation_template": "Rotation template",
+      "setting": "Setting",
+      "temporary_resident": "Temporary resident",
+      "user": "Account",
+      "utility_period": "Utility period"
     }
   },
   "auth": {
@@ -95,6 +249,98 @@
     },
     "signOut": "Sign out"
   },
+  "beds": {
+    "title": "Beds",
+    "subtitle": "Your room and bed",
+    "adminSubtitle": "House layout: rooms, beds and occupancy",
+    "assign": "Assign a bed",
+    "assignHint": "Room, bed, price and start date",
+    "resident": "Resident",
+    "room": "Room",
+    "bed": "Bed",
+    "price": "Price",
+    "priceHint": "Defaults to the bed price; can be changed individually",
+    "priceInvalid": "The price must be a whole number of tenge",
+    "bedFromAnotherHouse": "This bed belongs to another house",
+    "from": "Start date",
+    "confirm": "Assign",
+    "assigned": "The bed is assigned",
+    "free": "free",
+    "occupancy": "{taken} of {total} taken",
+    "unplaced": "without a bed: {count}",
+    "empty": "No rooms yet",
+    "emptyHint": "Areas and beds are set up in the house settings",
+    "noPlacement": "No bed assigned yet",
+    "noPlacementHint": "The house admin assigns it",
+    "errors": {
+      "unauthorized": "Sign-in required",
+      "unknown": "The action could not be completed",
+      "date": "The date is invalid"
+    },
+    "chooseHouse": "House"
+  },
+  "chartOfAccounts": {
+    "title": "Chart of accounts",
+    "subtitle": "Network accounts and house funds with balances",
+    "empty": "No accounts",
+    "columns": {
+      "name": "Name",
+      "code": "Code",
+      "type": "Type",
+      "house": "House",
+      "balance": "Balance",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "types": {
+      "cash": "Cash",
+      "kaspi": "Kaspi",
+      "common_fund": "Common fund",
+      "deposit_fund": "Deposit fund",
+      "utility_fund": "Utility fund",
+      "house_fund": "House fund"
+    },
+    "values": {
+      "network": "Whole network"
+    },
+    "statuses": {
+      "active": "Active",
+      "system": "System",
+      "archived": "Archived"
+    },
+    "actions": {
+      "rename": "Rename",
+      "archive": "Archive"
+    },
+    "create": {
+      "title": "New account",
+      "submit": "Create",
+      "codeHint": "Lowercase latin: the code shows up in ledger entries and never changes"
+    },
+    "rename": {
+      "title": "Account “{name}”",
+      "submit": "Save"
+    },
+    "archiveConfirm": {
+      "title": "Archive account “{name}”?",
+      "description": "The account leaves the pickers. Its ledger entries stay: nothing is deleted."
+    },
+    "done": {
+      "saved": "Account saved",
+      "archived": "Account archived"
+    },
+    "errors": {
+      "codeInvalid": "Code: lowercase latin, digits and underscore, at least two characters",
+      "codeTaken": "An account with this code already exists",
+      "nameRequired": "The name is required",
+      "typeInvalid": "This account type is not created by hand",
+      "systemAccount": "A system account cannot be archived: typical entries rely on it",
+      "forbidden": "Only a superadmin edits the chart of accounts",
+      "not_found": "Account not found",
+      "unauthorized": "Session expired, sign in again",
+      "validation_error": "Check the fields you filled in"
+    }
+  },
   "common": {
     "close": "Close",
     "previous": "Previous",
@@ -112,37 +358,205 @@
     "moduleNotReadyHint": "It arrives in its own phase of the roadmap.",
     "remove": "Remove"
   },
-  "nav": {
-    "label": "Main navigation",
-    "dashboard": "Dashboard",
-    "rotations": "Rotations",
-    "invoices": "Invoices",
-    "absences": "Absences",
-    "residents": "Residents",
-    "beds": "Beds",
-    "utilities": "Utilities",
-    "damages": "Damages",
-    "rating": "Rating",
-    "accounting": "Accounting",
-    "inventory": "Inventory",
-    "settings": "Settings",
-    "documents": "Documents",
-    "contract": "Contract",
-    "deposit": "Deposit",
-    "notifications": "Notifications"
+  "contract": {
+    "title": "Contract",
+    "subtitle": "Read the contract and sign it",
+    "adminSubtitle": "Contracts of residents in your house and key handover marks",
+    "open": "Open the contract",
+    "statusSigned": "Signed",
+    "statusUnsigned": "Not signed",
+    "keysIssued": "Keys handed over",
+    "keysNotIssued": "Keys not handed over",
+    "issueKeys": "Mark keys as handed over",
+    "build": "Build the contract",
+    "rebuild": "Build again",
+    "built": "The contract is built",
+    "signed": "The contract is signed",
+    "keysIssuedDone": "Keys are marked as handed over",
+    "sign": "Sign",
+    "prepare": "Save the signature",
+    "sending": "Sending",
+    "clear": "Clear",
+    "signHint": "Draw your signature in the field below, save it and sign the contract",
+    "signedHint": "The contract is signed. The PDF below contains your signature",
+    "notBuilt": "The contract is not built yet",
+    "notBuiltHint": "It appears here once the admin builds it from your data",
+    "noResidency": "Residency is not set up yet",
+    "noResidencyHint": "The contract appears once the admin sets up your move-in",
+    "listEmpty": "No residencies",
+    "listEmptyHint": "Contracts appear here once move-in is set up",
+    "unknownTokens": "The contract template contains unknown tokens",
+    "signatureMustBePng": "The signature must be a PNG image",
+    "errors": {
+      "unauthorized": "Sign-in required",
+      "unknown": "The action could not be completed",
+      "upload": "The signature could not be sent",
+      "emptySignature": "Draw your signature first"
+    }
   },
-  "houses": {
-    "title": "Houses",
-    "subtitle": "Houses are created and archived by the superadmin. An admin sees only their own.",
-    "empty": "No houses yet",
+  "contractTemplate": {
+    "title": "Contract template",
+    "subtitle": "The tenancy contract text and its token palette",
+    "missing": "No active template. Restore the network skeleton: pnpm db:seed --skeleton",
+    "fields": {
+      "name": "Template name",
+      "body": "Contract text (HTML)",
+      "bodyHint": "Tokens are filled in when the contract is built: {{resident.full_name}} and the rest of the palette"
+    },
+    "palette": {
+      "title": "Token palette",
+      "hint": "Click a token and it lands where the cursor is"
+    },
+    "preview": {
+      "title": "Preview",
+      "hint": "Sample data: checking the layout needs no real resident"
+    },
+    "actions": {
+      "save": "Save",
+      "preview": "Preview"
+    },
+    "done": {
+      "saved": "Contract template saved"
+    },
+    "errors": {
+      "unknownTokens": "The template uses tokens that are not in the palette:",
+      "nameRequired": "The template name is required",
+      "bodyRequired": "The contract text cannot be empty",
+      "forbidden": "Only a superadmin edits the contract template",
+      "not_found": "No active contract template",
+      "unauthorized": "Session expired, sign in again",
+      "validation_error": "Check the fields you filled in"
+    },
+    "version": "Version {version}. Editing starts the next one; earlier versions stay, so contracts never change retroactively."
+  },
+  "damages": {
+    "title": "Damage",
+    "subtitle": "Repairs charged to residents’ deposits",
+    "errors": {
+      "amountInvalid": "Damage amount must be a whole number of tenge above zero",
+      "titleRequired": "Enter a damage title",
+      "noParticipants": "No participants selected for the split",
+      "alreadyReversed": "This damage has already been reversed",
+      "notUpdated": "Damage was not updated",
+      "unauthorized": "Sign in required",
+      "forbidden": "This action is not available to your role",
+      "not_found": "Not found",
+      "unknown": "The action could not be completed"
+    },
+    "create": "Record damage",
+    "titleField": "Title",
+    "descriptionField": "Description",
+    "amountField": "Damage amount",
+    "amountHint": "Whole tenge",
+    "mode": "How to split",
+    "modes": {
+      "single": "One person",
+      "room": "By room",
+      "all": "Everyone in the house",
+      "all_except": "Everyone except selected",
+      "custom": "Custom list"
+    },
+    "room": "Room",
+    "participants": "Participants",
+    "exclude": "Who to leave out",
+    "preview": "Preview",
+    "previewEmpty": "Enter an amount and participants — the split appears here",
+    "participantsCount": "Participants: {count}, each pays",
+    "surplus": "Rounding surplus",
+    "surplusHint": "The surplus stays in the house fund",
+    "charged": "Charged to deposits",
+    "submit": "Record and charge",
+    "reverse": "Reverse",
+    "reversed": "Reversed",
+    "empty": "No damage recorded yet",
+    "emptyHint": "Recorded repairs and charges will appear here",
+    "noHouse": "No house selected",
+    "noHouseHint": "Add a house in the network settings",
+    "residentTitle": "Admin section",
+    "residentHint": "Your own charges are in the Deposit section",
+    "done": {
+      "created": "Damage recorded",
+      "reversed": "Damage reversed"
+    }
+  },
+  "deposit": {
+    "title": "Deposit",
+    "subtitle": "Deposit balance and its movement over the year",
+    "adminSubtitle": "Deposits of residents in your house: invoices and payments",
+    "invoice": "Deposit invoice",
+    "noInvoice": "The invoice is not issued yet",
+    "total": "Invoice total",
+    "paid": "Paid",
+    "remaining": "Left to pay",
+    "movements": "Movement in {year}",
+    "noMovements": "No movement yet",
+    "amount": "Deposit amount",
+    "amountHint": "Empty — the house default is used",
+    "issue": "Issue the invoice",
+    "paymentAmount": "Payment amount",
+    "method": "Payment method",
+    "cash": "Cash",
+    "record": "Record the payment",
+    "invoiceIssued": "The invoice is issued",
+    "paymentRecorded": "The payment is recorded",
+    "empty": "No residencies",
+    "emptyHint": "Deposits appear here once move-in is set up",
+    "noResidency": "Residency is not set up yet",
+    "noResidencyHint": "The deposit appears once the admin sets up your move-in",
+    "status": {
+      "pending": "Pending",
+      "issued": "Issued",
+      "partially_paid": "Partially paid",
+      "paid": "Paid",
+      "cancelled": "Cancelled",
+      "returned": "Returned",
+      "burned": "Burned"
+    },
+    "movement": {
+      "charge": "Deposit top-up",
+      "damage_share": "Damage deduction",
+      "damage_reversal": "Damage reversal",
+      "refund": "Deposit refund",
+      "burn": "Deposit burn",
+      "adjustment": "Adjustment"
+    },
+    "errors": {
+      "unauthorized": "Sign-in required",
+      "unknown": "The action could not be completed",
+      "method": "Choose a payment method"
+    },
+    "participants": "split by {count}"
+  },
+  "deposits": {
+    "amountInvalid": "The amount must be a whole number of tenge",
+    "overpayment": "The amount exceeds what is left on the invoice"
+  },
+  "documentTypes": {
+    "title": "Document types",
+    "subtitle": "What a resident must upload and how long it stays valid",
+    "empty": "No document types",
     "columns": {
       "name": "Name",
-      "slug": "Slug",
-      "address": "Address",
-      "curfew": "Curfew",
-      "deposit": "Default deposit",
+      "code": "Code",
+      "validity": "Validity",
+      "issueDate": "From issue date",
+      "required": "Required",
+      "order": "Order",
       "status": "Status",
       "actions": "Actions"
+    },
+    "fields": {
+      "nameRu": "Name (русский)",
+      "nameKk": "Name (қазақша)",
+      "nameEn": "Name (English)",
+      "requiresIssueDate": "Count validity from the issue date",
+      "isRequired": "Required for move-in"
+    },
+    "values": {
+      "forever": "No expiry",
+      "months": "{count} mo.",
+      "yes": "Yes",
+      "no": "No"
     },
     "statuses": {
       "active": "Active",
@@ -153,226 +567,103 @@
       "archive": "Archive"
     },
     "create": {
-      "title": "Add house",
-      "submit": "Add",
-      "curfewHint": "23:00 by default",
-      "depositHint": "Whole tenge, 45,000 by default"
+      "title": "New document type",
+      "submit": "Create",
+      "codeHint": "Lowercase latin: the code goes into the storage path and never changes",
+      "validityHint": "Empty means the document never expires"
     },
     "edit": {
-      "title": "House {name}",
+      "title": "Type “{name}”",
       "submit": "Save"
     },
     "archiveConfirm": {
-      "title": "Archive house {name}?",
-      "description": "The house disappears from lists. Its slug stays taken: documents are stored under it and it cannot be reused."
+      "title": "Archive type “{name}”?",
+      "description": "The type disappears from the move-in list. Uploaded documents stay: nothing is deleted."
     },
     "done": {
-      "created": "House added",
-      "updated": "House saved",
-      "archived": "House archived"
+      "saved": "Document type saved",
+      "archived": "Document type archived"
     },
     "errors": {
-      "unauthorized": "Sign-in required",
-      "forbidden": "Action not available to this role",
-      "not_found": "Not found",
-      "validation_error": "Check the entered data",
-      "conflict": "Such a house already exists",
-      "rate_limited": "Too often, try later",
-      "internal": "Something went wrong"
+      "codeInvalid": "Code: lowercase latin, digits and underscore, at least two characters",
+      "codeTaken": "A type with this code already exists",
+      "nameRequired": "The name is required in all three locales",
+      "validityInvalid": "Validity is 1 to 120 months, or empty",
+      "forbidden": "Only a superadmin edits document types",
+      "not_found": "Document type not found",
+      "unauthorized": "Session expired, sign in again",
+      "validation_error": "Check the fields you filled in"
     }
   },
-  "profile": {
-    "title": "My profile",
-    "subtitle": "Room, bed and price are assigned by the admin. The rest is yours to fill in.",
-    "submit": "Save",
-    "reveal": "Show in full",
-    "revealed": "Revealed, written to the log",
-    "sections": {
-      "personal": "Personal data",
-      "documents": "Documents",
-      "study": "Study",
-      "emergency": "Emergency contact",
-      "other": "Other"
+  "documents": {
+    "title": "Documents",
+    "subtitle": "Upload your certificates and keep an eye on their validity",
+    "reviewSubtitle": "Documents from residents of your house awaiting review",
+    "file": "File",
+    "issueDate": "Date of the scan",
+    "issueDateHint": "Validity is counted from this date, not from the upload day",
+    "issueDateInvalid": "The date of the scan is invalid",
+    "send": "Submit",
+    "uploading": "Uploading",
+    "submitted": "The document was sent for review",
+    "approved": "The document is accepted",
+    "rejected": "The document is rejected",
+    "approve": "Accept",
+    "reject": "Reject",
+    "confirmReject": "Reject the document",
+    "rejectReason": "Reason for rejection",
+    "rejectedBecause": "Rejected: {reason}",
+    "openFile": "Open the file",
+    "uploadedAt": "Uploaded on {date}",
+    "validUntil": "Valid until {date}",
+    "expiredOn": "Expired on {date}",
+    "daysLeft": "days left: {days}",
+    "permanent": "Permanent",
+    "queueEmpty": "Nothing to review",
+    "queueEmptyHint": "New documents appear here as soon as they are uploaded",
+    "noResidency": "Residency is not set up yet",
+    "noResidencyHint": "You will be able to upload documents once the admin sets up your move-in",
+    "status": {
+      "missing": "Required",
+      "uploaded": "In review",
+      "approved": "Accepted",
+      "rejected": "Rejected"
     },
-    "placement": {
-      "title": "Room and bed",
-      "room": "Room",
-      "bed": "Bed",
-      "notAssigned": "Not assigned"
-    },
-    "fields": {
-      "lastName": "Last name",
-      "firstName": "First name",
-      "middleName": "Middle name",
-      "sex": "Sex",
-      "birthDate": "Date of birth",
-      "phone": "Phone",
-      "iin": "IIN",
-      "iinHint": "Twelve digits. Entered once, then shown masked.",
-      "idDocNumber": "ID document number",
-      "idDocHint": "Entered once, then shown masked.",
-      "idDocIssuer": "Document issued by",
-      "registrationAddress": "Registration address",
-      "university": "University",
-      "course": "Year",
-      "major": "Major",
-      "emergencyName": "Name",
-      "emergencyPhone": "Phone",
-      "emergencyRelation": "Relation",
-      "preferredPayment": "Preferred payment method",
-      "noEpilepsy": "I confirm: no epilepsy",
-      "noAsthma": "I confirm: no asthma",
-      "notChosen": "Not chosen"
-    },
-    "sex": {
-      "male": "Male",
-      "female": "Female"
-    },
-    "payment": {
-      "cash": "Cash"
-    },
-    "done": {
-      "saved": "Profile saved"
-    },
+    "issueDateRequired": "Fluorography requires the date of the scan",
+    "issueDateInFuture": "The date of the scan cannot be in the future",
+    "rejectReasonRequired": "State the reason for rejection",
     "errors": {
       "unauthorized": "Sign-in required",
-      "forbidden": "Action not available",
-      "not_found": "Not found",
-      "validation_error": "Check the entered data",
-      "conflict": "Data changed, try again",
-      "rate_limited": "Too often",
-      "internal": "Something went wrong"
+      "unknown": "The action could not be completed",
+      "upload": "The file could not be uploaded"
     }
   },
-  "settings": {
-    "personal": {
-      "title": "Personal settings",
-      "subtitle": "Language, theme and password. The choice lives in the account and survives a device change.",
-      "localeHint": "Interface language",
-      "themeHint": "Light, dark or follow the system",
-      "submit": "Save",
-      "changePassword": "Change password"
-    },
-    "network": {
-      "title": "Network settings",
-      "subtitle": "Apply to every house. Only the superadmin can change them.",
-      "ratingVisible": "Show rating to residents",
-      "ratingVisibleHint": "Turning this off hides the rating number from every resident in the network.",
-      "defaultLocale": "Default language",
-      "defaultLocaleHint": "Assigned to new accounts",
-      "submit": "Save"
-    },
-    "done": {
-      "personalSaved": "Settings saved",
-      "networkSaved": "Network settings saved",
-      "phoneChanged": "Number changed. Sign in with the new number."
-    },
+  "files": {
+    "receipt": "Receipt",
+    "receiptHint": "Optional: a photo or PDF up to 10 MB",
+    "receiptReady": "Receipt uploaded",
     "errors": {
-      "unauthorized": "Sign-in required",
-      "forbidden": "Action not available to this role",
-      "not_found": "Not found",
-      "validation_error": "Check the entered data",
-      "conflict": "Data changed, try again",
-      "rate_limited": "Too often, try later",
-      "internal": "Something went wrong",
-      "wrongPassword": "Wrong current password",
-      "phoneTaken": "This number is already used by another account"
+      "upload": "The file could not be uploaded"
     },
-    "phone": {
-      "title": "Phone number",
-      "hint": "This is your login: after the change, sign in with the new number. The password stays the same.",
-      "newPhone": "New number",
-      "currentPassword": "Current password",
-      "submit": "Change number"
-    }
+    "unknownPurpose": "Unknown file purpose",
+    "photo": "Cleaning photo",
+    "photoHint": "Optional",
+    "photoReady": "Photo uploaded",
+    "rotationPhotoWithoutResident": "The rotation has no assignee to attach a photo to"
   },
-  "users": {
-    "title": "Users",
-    "subtitle": "Accounts are created by the superadmin. There is no deletion, only archiving.",
-    "empty": "No accounts yet",
-    "columns": {
-      "phone": "Phone",
-      "role": "Role",
-      "house": "House",
-      "status": "Status",
-      "lastLogin": "Last sign-in",
-      "actions": "Actions"
-    },
-    "roles": {
-      "superadmin": "Superadmin",
-      "admin": "Admin",
-      "resident": "Resident"
-    },
-    "statuses": {
-      "active": "Active",
-      "archived": "Archived"
-    },
-    "actions": {
-      "allowReset": "Allow reset",
-      "archive": "Archive",
-      "openResidency": "Open residency",
-      "changePhone": "Change phone"
-    },
-    "create": {
-      "title": "Create account",
-      "submit": "Create",
-      "houseHint": "Required for an admin and for a resident: a resident's house comes from their residency",
-      "noHouse": "No house",
-      "passwordOnce": "Temporary password. Shown once, it cannot be recovered later."
-    },
-    "archiveConfirm": {
-      "title": "Archive {phone}?",
-      "description": "The account will no longer sign in and open sessions end. Data and history are kept, nothing is deleted."
-    },
-    "done": {
-      "resetAllowed": "Reset allowed for 24 hours. One sign-in will pass with any password.",
-      "archived": "Account archived",
-      "residencyOpened": "Residency opened: a bed can now be assigned",
-      "phoneChanged": "Number changed"
-    },
+  "generalCleaning": {
+    "title": "Deep cleaning",
+    "date": "Date",
+    "dateHint": "Defaults to the last Sunday of the month",
+    "plan": "Distribute randomly",
+    "planned": "Deep cleaning distributed",
+    "nothingNew": "Cleaning for this date is already distributed",
+    "cancelRegular": "Cancel the regular Sunday rotation",
+    "save": "Save",
+    "settingSaved": "Setting saved",
     "errors": {
-      "unauthorized": "Sign-in required",
-      "forbidden": "Action not available to this role",
-      "not_found": "Not found",
-      "validation_error": "Check the entered data",
-      "conflict": "An account with this phone already exists",
-      "rate_limited": "Too often, try later",
-      "internal": "Something went wrong"
-    },
-    "changePhone": {
-      "title": "Change phone {phone}",
-      "description": "The new number becomes the account login. The password stays the same and active sessions continue.",
-      "newPhone": "New number",
-      "submit": "Change"
+      "dateInvalid": "Set the cleaning date"
     }
-  },
-  "validation": {
-    "password": {
-      "tooShort": "Password is shorter than 10 characters",
-      "tooLong": "Password is longer than 128 characters",
-      "sameAsPhone": "Password cannot match the phone number",
-      "reused": "This password was already used"
-    },
-    "files": {
-      "mimeNotAllowed": "This file type cannot be uploaded: use JPEG, PNG, WebP or PDF",
-      "tooLarge": "The file is larger than 10 MB",
-      "empty": "The file is empty",
-      "sizeMismatch": "The file size did not match the declared one",
-      "mimeMismatch": "The file contents did not match the declared type",
-      "invalidBody": "The upload request is filled in incorrectly"
-    }
-  },
-  "theme": {
-    "label": "Theme",
-    "light": "Light",
-    "dark": "Dark",
-    "system": "System"
-  },
-  "language": {
-    "label": "Language",
-    "ru": "Русский",
-    "kk": "Қазақша",
-    "en": "English"
   },
   "home": {
     "title": "Nice Almaty",
@@ -489,462 +780,6 @@
       "noDecisions": "Nothing pending"
     }
   },
-  "documents": {
-    "title": "Documents",
-    "subtitle": "Upload your certificates and keep an eye on their validity",
-    "reviewSubtitle": "Documents from residents of your house awaiting review",
-    "file": "File",
-    "issueDate": "Date of the scan",
-    "issueDateHint": "Validity is counted from this date, not from the upload day",
-    "issueDateInvalid": "The date of the scan is invalid",
-    "send": "Submit",
-    "uploading": "Uploading",
-    "submitted": "The document was sent for review",
-    "approved": "The document is accepted",
-    "rejected": "The document is rejected",
-    "approve": "Accept",
-    "reject": "Reject",
-    "confirmReject": "Reject the document",
-    "rejectReason": "Reason for rejection",
-    "rejectedBecause": "Rejected: {reason}",
-    "openFile": "Open the file",
-    "uploadedAt": "Uploaded on {date}",
-    "validUntil": "Valid until {date}",
-    "expiredOn": "Expired on {date}",
-    "daysLeft": "days left: {days}",
-    "permanent": "Permanent",
-    "queueEmpty": "Nothing to review",
-    "queueEmptyHint": "New documents appear here as soon as they are uploaded",
-    "noResidency": "Residency is not set up yet",
-    "noResidencyHint": "You will be able to upload documents once the admin sets up your move-in",
-    "status": {
-      "missing": "Required",
-      "uploaded": "In review",
-      "approved": "Accepted",
-      "rejected": "Rejected"
-    },
-    "issueDateRequired": "Fluorography requires the date of the scan",
-    "issueDateInFuture": "The date of the scan cannot be in the future",
-    "rejectReasonRequired": "State the reason for rejection",
-    "errors": {
-      "unauthorized": "Sign-in required",
-      "unknown": "The action could not be completed",
-      "upload": "The file could not be uploaded"
-    }
-  },
-  "documentTypes": {
-    "title": "Document types",
-    "subtitle": "What a resident must upload and how long it stays valid",
-    "empty": "No document types",
-    "columns": {
-      "name": "Name",
-      "code": "Code",
-      "validity": "Validity",
-      "issueDate": "From issue date",
-      "required": "Required",
-      "order": "Order",
-      "status": "Status",
-      "actions": "Actions"
-    },
-    "fields": {
-      "nameRu": "Name (русский)",
-      "nameKk": "Name (қазақша)",
-      "nameEn": "Name (English)",
-      "requiresIssueDate": "Count validity from the issue date",
-      "isRequired": "Required for move-in"
-    },
-    "values": {
-      "forever": "No expiry",
-      "months": "{count} mo.",
-      "yes": "Yes",
-      "no": "No"
-    },
-    "statuses": {
-      "active": "Active",
-      "archived": "Archived"
-    },
-    "actions": {
-      "edit": "Edit",
-      "archive": "Archive"
-    },
-    "create": {
-      "title": "New document type",
-      "submit": "Create",
-      "codeHint": "Lowercase latin: the code goes into the storage path and never changes",
-      "validityHint": "Empty means the document never expires"
-    },
-    "edit": {
-      "title": "Type “{name}”",
-      "submit": "Save"
-    },
-    "archiveConfirm": {
-      "title": "Archive type “{name}”?",
-      "description": "The type disappears from the move-in list. Uploaded documents stay: nothing is deleted."
-    },
-    "done": {
-      "saved": "Document type saved",
-      "archived": "Document type archived"
-    },
-    "errors": {
-      "codeInvalid": "Code: lowercase latin, digits and underscore, at least two characters",
-      "codeTaken": "A type with this code already exists",
-      "nameRequired": "The name is required in all three locales",
-      "validityInvalid": "Validity is 1 to 120 months, or empty",
-      "forbidden": "Only a superadmin edits document types",
-      "not_found": "Document type not found",
-      "unauthorized": "Session expired, sign in again",
-      "validation_error": "Check the fields you filled in"
-    }
-  },
-  "chartOfAccounts": {
-    "title": "Chart of accounts",
-    "subtitle": "Network accounts and house funds with balances",
-    "empty": "No accounts",
-    "columns": {
-      "name": "Name",
-      "code": "Code",
-      "type": "Type",
-      "house": "House",
-      "balance": "Balance",
-      "status": "Status",
-      "actions": "Actions"
-    },
-    "types": {
-      "cash": "Cash",
-      "kaspi": "Kaspi",
-      "common_fund": "Common fund",
-      "deposit_fund": "Deposit fund",
-      "utility_fund": "Utility fund",
-      "house_fund": "House fund"
-    },
-    "values": {
-      "network": "Whole network"
-    },
-    "statuses": {
-      "active": "Active",
-      "system": "System",
-      "archived": "Archived"
-    },
-    "actions": {
-      "rename": "Rename",
-      "archive": "Archive"
-    },
-    "create": {
-      "title": "New account",
-      "submit": "Create",
-      "codeHint": "Lowercase latin: the code shows up in ledger entries and never changes"
-    },
-    "rename": {
-      "title": "Account “{name}”",
-      "submit": "Save"
-    },
-    "archiveConfirm": {
-      "title": "Archive account “{name}”?",
-      "description": "The account leaves the pickers. Its ledger entries stay: nothing is deleted."
-    },
-    "done": {
-      "saved": "Account saved",
-      "archived": "Account archived"
-    },
-    "errors": {
-      "codeInvalid": "Code: lowercase latin, digits and underscore, at least two characters",
-      "codeTaken": "An account with this code already exists",
-      "nameRequired": "The name is required",
-      "typeInvalid": "This account type is not created by hand",
-      "systemAccount": "A system account cannot be archived: typical entries rely on it",
-      "forbidden": "Only a superadmin edits the chart of accounts",
-      "not_found": "Account not found",
-      "unauthorized": "Session expired, sign in again",
-      "validation_error": "Check the fields you filled in"
-    }
-  },
-  "contractTemplate": {
-    "title": "Contract template",
-    "subtitle": "The tenancy contract text and its token palette",
-    "missing": "No active template. Restore the network skeleton: pnpm db:seed --skeleton",
-    "fields": {
-      "name": "Template name",
-      "body": "Contract text (HTML)",
-      "bodyHint": "Tokens are filled in when the contract is built: {{resident.full_name}} and the rest of the palette"
-    },
-    "palette": {
-      "title": "Token palette",
-      "hint": "Click a token and it lands where the cursor is"
-    },
-    "preview": {
-      "title": "Preview",
-      "hint": "Sample data: checking the layout needs no real resident"
-    },
-    "actions": {
-      "save": "Save",
-      "preview": "Preview"
-    },
-    "done": {
-      "saved": "Contract template saved"
-    },
-    "errors": {
-      "unknownTokens": "The template uses tokens that are not in the palette:",
-      "nameRequired": "The template name is required",
-      "bodyRequired": "The contract text cannot be empty",
-      "forbidden": "Only a superadmin edits the contract template",
-      "not_found": "No active contract template",
-      "unauthorized": "Session expired, sign in again",
-      "validation_error": "Check the fields you filled in"
-    },
-    "version": "Version {version}. Editing starts the next one; earlier versions stay, so contracts never change retroactively."
-  },
-  "contract": {
-    "title": "Contract",
-    "subtitle": "Read the contract and sign it",
-    "adminSubtitle": "Contracts of residents in your house and key handover marks",
-    "open": "Open the contract",
-    "statusSigned": "Signed",
-    "statusUnsigned": "Not signed",
-    "keysIssued": "Keys handed over",
-    "keysNotIssued": "Keys not handed over",
-    "issueKeys": "Mark keys as handed over",
-    "build": "Build the contract",
-    "rebuild": "Build again",
-    "built": "The contract is built",
-    "signed": "The contract is signed",
-    "keysIssuedDone": "Keys are marked as handed over",
-    "sign": "Sign",
-    "prepare": "Save the signature",
-    "sending": "Sending",
-    "clear": "Clear",
-    "signHint": "Draw your signature in the field below, save it and sign the contract",
-    "signedHint": "The contract is signed. The PDF below contains your signature",
-    "notBuilt": "The contract is not built yet",
-    "notBuiltHint": "It appears here once the admin builds it from your data",
-    "noResidency": "Residency is not set up yet",
-    "noResidencyHint": "The contract appears once the admin sets up your move-in",
-    "listEmpty": "No residencies",
-    "listEmptyHint": "Contracts appear here once move-in is set up",
-    "unknownTokens": "The contract template contains unknown tokens",
-    "signatureMustBePng": "The signature must be a PNG image",
-    "errors": {
-      "unauthorized": "Sign-in required",
-      "unknown": "The action could not be completed",
-      "upload": "The signature could not be sent",
-      "emptySignature": "Draw your signature first"
-    }
-  },
-  "deposit": {
-    "title": "Deposit",
-    "subtitle": "Deposit balance and its movement over the year",
-    "adminSubtitle": "Deposits of residents in your house: invoices and payments",
-    "invoice": "Deposit invoice",
-    "noInvoice": "The invoice is not issued yet",
-    "total": "Invoice total",
-    "paid": "Paid",
-    "remaining": "Left to pay",
-    "movements": "Movement in {year}",
-    "noMovements": "No movement yet",
-    "amount": "Deposit amount",
-    "amountHint": "Empty — the house default is used",
-    "issue": "Issue the invoice",
-    "paymentAmount": "Payment amount",
-    "method": "Payment method",
-    "cash": "Cash",
-    "record": "Record the payment",
-    "invoiceIssued": "The invoice is issued",
-    "paymentRecorded": "The payment is recorded",
-    "empty": "No residencies",
-    "emptyHint": "Deposits appear here once move-in is set up",
-    "noResidency": "Residency is not set up yet",
-    "noResidencyHint": "The deposit appears once the admin sets up your move-in",
-    "status": {
-      "pending": "Pending",
-      "issued": "Issued",
-      "partially_paid": "Partially paid",
-      "paid": "Paid",
-      "cancelled": "Cancelled",
-      "returned": "Returned",
-      "burned": "Burned"
-    },
-    "movement": {
-      "charge": "Deposit top-up",
-      "damage_share": "Damage deduction",
-      "damage_reversal": "Damage reversal",
-      "refund": "Deposit refund",
-      "burn": "Deposit burn",
-      "adjustment": "Adjustment"
-    },
-    "errors": {
-      "unauthorized": "Sign-in required",
-      "unknown": "The action could not be completed",
-      "method": "Choose a payment method"
-    },
-    "participants": "split by {count}"
-  },
-  "deposits": {
-    "amountInvalid": "The amount must be a whole number of tenge",
-    "overpayment": "The amount exceeds what is left on the invoice"
-  },
-  "beds": {
-    "title": "Beds",
-    "subtitle": "Your room and bed",
-    "adminSubtitle": "House layout: rooms, beds and occupancy",
-    "assign": "Assign a bed",
-    "assignHint": "Room, bed, price and start date",
-    "resident": "Resident",
-    "room": "Room",
-    "bed": "Bed",
-    "price": "Price",
-    "priceHint": "Defaults to the bed price; can be changed individually",
-    "priceInvalid": "The price must be a whole number of tenge",
-    "bedFromAnotherHouse": "This bed belongs to another house",
-    "from": "Start date",
-    "confirm": "Assign",
-    "assigned": "The bed is assigned",
-    "free": "free",
-    "occupancy": "{taken} of {total} taken",
-    "unplaced": "without a bed: {count}",
-    "empty": "No rooms yet",
-    "emptyHint": "Areas and beds are set up in the house settings",
-    "noPlacement": "No bed assigned yet",
-    "noPlacementHint": "The house admin assigns it",
-    "errors": {
-      "unauthorized": "Sign-in required",
-      "unknown": "The action could not be completed",
-      "date": "The date is invalid"
-    },
-    "chooseHouse": "House"
-  },
-  "onboarding": {
-    "title": "Move-in",
-    "progress": "steps done: {done} of {total}",
-    "open": "Open",
-    "done": "Done",
-    "now": "Now",
-    "waiting": "Waiting",
-    "blockedHint": "Until the deposit is paid, only the profile, documents and your invoices are available",
-    "steps": {
-      "profile": "Profile filled in",
-      "bed": "Bed assigned",
-      "contract": "Contract signed",
-      "documents": "Documents accepted",
-      "deposit": "Deposit paid"
-    }
-  },
-  "residents": {
-    "title": "Residents",
-    "subtitle": "Residents of your house: bed, status, debts and documents",
-    "search": "Search",
-    "status": "Status",
-    "room": "Room",
-    "price": "Price",
-    "debt": "Debt",
-    "documents": "Documents",
-    "any": "Any",
-    "withDebt": "Has debt",
-    "withDocumentProblems": "Has problems",
-    "apply": "Apply",
-    "empty": "No residents found",
-    "emptyHint": "Change the filters or set up a move-in",
-    "noRoom": "no bed assigned",
-    "debtMark": "Debt",
-    "documentsMark": "Documents",
-    "summary": "Summary",
-    "roleTitle": "Role",
-    "role": "Role",
-    "changeRole": "Change the role",
-    "roleChanged": "The role is changed",
-    "house": "House",
-    "houseHint": "An admin needs a house, a resident does not",
-    "chooseHouse": "Choose a house",
-    "statuses": {
-      "created": "Created",
-      "profile_pending": "Filling in the profile",
-      "docs_pending": "Submitting documents",
-      "deposit_pending": "Awaiting deposit payment",
-      "active": "Moved in",
-      "terminating": "Terminating",
-      "archived": "Archived"
-    },
-    "roles": {
-      "resident": "Resident",
-      "admin": "Admin",
-      "superadmin": "Superadmin"
-    },
-    "links": {
-      "documents": "Documents",
-      "contract": "Contract",
-      "deposit": "Deposit"
-    },
-    "errors": {
-      "unauthorized": "Sign-in required",
-      "unknown": "The action could not be completed",
-      "role": "Choose a role"
-    }
-  },
-  "terminations": {
-    "title": "Contract termination",
-    "hint": "Every module except the profile and the deposit closes immediately. Sign-in stays available.",
-    "terminate": "Terminate contract",
-    "modalTitle": "Contract termination",
-    "modalHint": "After confirmation the resident keeps only the profile and the deposit. The bed is freed from the move-out date.",
-    "moveOutDate": "Move-out date",
-    "moveOutHint": "Today by default. A future date is allowed: the bed is freed from it.",
-    "reason": "Reason",
-    "confirm": "Confirm termination",
-    "settlementTitle": "Move-out settlement",
-    "balance": "Deposit balance",
-    "damages": "Damages charged",
-    "fullMonths": "Full months",
-    "deadline": "Refund deadline",
-    "daysLeft": "Until refund",
-    "days": "{days, plural, one {# day} other {# days}}",
-    "overdue": "Overdue by {days, plural, one {# day} other {# days}}",
-    "outcome": "Deposit decision",
-    "outcomes": {
-      "refund": "Refund",
-      "burn": "Forfeited",
-      "nothing": "Nothing to refund",
-      "debt": "Resident owes"
-    },
-    "debt": "Debt",
-    "refundInvoice": "Refund invoice",
-    "refundStatus": {
-      "pending": "Pending",
-      "returned": "Returned",
-      "burned": "Forfeited",
-      "cancelled": "Cancelled"
-    },
-    "createRefund": "Create refund invoice",
-    "settle": "Mark as paid out",
-    "archive": "Finish move-out",
-    "terminated": "Contract terminated",
-    "refundIssued": "Refund invoice created",
-    "nothingToRefund": "Nothing to refund: the deposit balance is not positive",
-    "refunded": "Refund recorded",
-    "archived": "Residency archived",
-    "noticeTitle": "Contract is being terminated",
-    "noticeHint": "Only the profile and the deposit stay open. Other sections are closed until the settlement is done.",
-    "statusTerminating": "Terminating",
-    "links": {
-      "profile": "Profile",
-      "deposit": "Deposit"
-    },
-    "errors": {
-      "unauthorized": "Sign-in required",
-      "unknown": "The action could not be completed",
-      "notActive": "Only an active residency can be terminated",
-      "notTerminating": "Available only after termination",
-      "refundExists": "The refund invoice already exists",
-      "refundClosed": "The refund invoice is already closed",
-      "notRefundInvoice": "This is not a deposit refund invoice",
-      "moveOutNotReached": "The move-out date has not come yet",
-      "depositNotSettled": "The deposit has not been refunded yet",
-      "notUpdated": "The record was not updated",
-      "reasonRequired": "State the reason for termination",
-      "moveOutDate": {
-        "invalid": "Invalid move-out date",
-        "inPast": "The move-out date cannot be in the past",
-        "beforeMoveIn": "The move-out date cannot precede the move-in date"
-      }
-    }
-  },
   "houseSetup": {
     "title": "House settings",
     "subtitle": "Areas, beds and default prices",
@@ -1002,140 +837,115 @@
     },
     "toRotations": "Checklists and eligibility groups"
   },
-  "accounting": {
-    "title": "Accounting",
-    "subtitle": "Chart of accounts, ledger entries and network reports",
+  "houses": {
+    "title": "Houses",
+    "subtitle": "Houses are created and archived by the superadmin. An admin sees only their own.",
+    "empty": "No houses yet",
+    "columns": {
+      "name": "Name",
+      "slug": "Slug",
+      "address": "Address",
+      "curfew": "Curfew",
+      "deposit": "Default deposit",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "statuses": {
+      "active": "Active",
+      "archived": "Archived"
+    },
+    "actions": {
+      "edit": "Edit",
+      "archive": "Archive"
+    },
+    "create": {
+      "title": "Add house",
+      "submit": "Add",
+      "curfewHint": "23:00 by default",
+      "depositHint": "Whole tenge, 45,000 by default"
+    },
+    "edit": {
+      "title": "House {name}",
+      "submit": "Save"
+    },
+    "archiveConfirm": {
+      "title": "Archive house {name}?",
+      "description": "The house disappears from lists. Its slug stays taken: documents are stored under it and it cannot be reused."
+    },
+    "done": {
+      "created": "House added",
+      "updated": "House saved",
+      "archived": "House archived"
+    },
     "errors": {
       "unauthorized": "Sign-in required",
-      "unknown": "The action could not be completed",
-      "unbalanced": "Debit and credit of the entry are not equal",
-      "tooFewLines": "An entry needs at least two lines",
-      "amountInvalid": "A line amount is a positive whole number of tenge",
-      "alreadyReversed": "The entry has already been reversed",
-      "forbidden": "This action is not available to your role",
+      "forbidden": "Action not available to this role",
       "not_found": "Not found",
-      "category": "Choose an expense category from the list",
-      "descriptionRequired": "Enter an expense description"
-    },
-    "trialBalance": "Trial balance",
-    "account": "Account",
-    "code": "Code",
-    "balance": "Balance",
-    "noAccounts": "Chart of accounts is empty",
-    "noAccountsHint": "The network has no accounts: restore the skeleton with pnpm db:seed --skeleton or create the accounts in network settings. Until then there are no entries, reports or reconciliation.",
-    "reconciliation": "Deposit fund reconciliation",
-    "matches": "Matches",
-    "mismatch": "Mismatch",
-    "fundBalance": "Fund balance",
-    "depositsTotal": "Deposits total",
-    "difference": "Difference",
-    "journal": "Ledger journal",
-    "noEntries": "No entries",
-    "noEntriesHint": "There were no entries in the selected period",
-    "reverse": "Reverse",
-    "reversed": "Reversed",
-    "expense": "Expense",
-    "recordExpense": "Record expense",
-    "categoryField": "Category",
-    "amount": "Amount",
-    "writeOffAccount": "Write-off account",
-    "paidFrom": "Paid from",
-    "cash": "Cash",
-    "date": "Date",
-    "description": "Description",
-    "tax": "Tax calculator",
-    "from": "From",
-    "to": "To",
-    "taxRate": "Tax, %",
-    "acquiringRate": "Acquiring, %",
-    "percentHint": "Defaults are 3% and 0.95%",
-    "recalculate": "Recalculate",
-    "kaspiIncome": "Income via Kaspi",
-    "kaspiTurnover": "Turnover via Kaspi",
-    "taxAmount": "Tax",
-    "acquiringAmount": "Acquiring fee",
-    "deduction": "Total deduction",
-    "net": "Net",
-    "byHouse": "By house",
-    "house": "House",
-    "taxDisclaimer": "The calculation is for reference only, creates no entries and is not tax advice",
-    "closed": "Superadmin section",
-    "closedHint": "The ledger is kept for the whole network, not for one house",
-    "direction": {
-      "debit": "debit",
-      "credit": "credit"
-    },
-    "source": {
-      "invoice": "Invoice",
-      "deposit": "Deposit",
-      "damage": "Damage",
-      "utilities": "Utilities",
-      "expense": "Expense",
-      "manual": "Manual"
-    },
-    "category": {
-      "rent": "Rent",
-      "equipment": "Equipment",
-      "chemicals": "Cleaning supplies",
-      "depreciation": "Depreciation",
-      "repair": "Repair",
-      "other": "Other"
-    },
-    "done": {
-      "expense": "Expense recorded",
-      "reversed": "Entry reversed"
-    },
-    "noAccountsLink": "Open the chart of accounts"
-  },
-  "damages": {
-    "title": "Damage",
-    "subtitle": "Repairs charged to residents’ deposits",
-    "errors": {
-      "amountInvalid": "Damage amount must be a whole number of tenge above zero",
-      "titleRequired": "Enter a damage title",
-      "noParticipants": "No participants selected for the split",
-      "alreadyReversed": "This damage has already been reversed",
-      "notUpdated": "Damage was not updated",
-      "unauthorized": "Sign in required",
-      "forbidden": "This action is not available to your role",
-      "not_found": "Not found",
-      "unknown": "The action could not be completed"
-    },
-    "create": "Record damage",
-    "titleField": "Title",
-    "descriptionField": "Description",
-    "amountField": "Damage amount",
-    "amountHint": "Whole tenge",
-    "mode": "How to split",
-    "modes": {
-      "single": "One person",
-      "room": "By room",
-      "all": "Everyone in the house",
-      "all_except": "Everyone except selected",
-      "custom": "Custom list"
-    },
-    "room": "Room",
-    "participants": "Participants",
-    "exclude": "Who to leave out",
-    "preview": "Preview",
-    "previewEmpty": "Enter an amount and participants — the split appears here",
-    "participantsCount": "Participants: {count}, each pays",
-    "surplus": "Rounding surplus",
-    "surplusHint": "The surplus stays in the house fund",
-    "charged": "Charged to deposits",
-    "submit": "Record and charge",
-    "reverse": "Reverse",
-    "reversed": "Reversed",
-    "empty": "No damage recorded yet",
-    "emptyHint": "Recorded repairs and charges will appear here",
-    "noHouse": "No house selected",
-    "noHouseHint": "Add a house in the network settings",
-    "residentTitle": "Admin section",
-    "residentHint": "Your own charges are in the Deposit section",
-    "done": {
-      "created": "Damage recorded",
-      "reversed": "Damage reversed"
+      "validation_error": "Check the entered data",
+      "conflict": "Such a house already exists",
+      "rate_limited": "Too often, try later",
+      "internal": "Something went wrong"
     }
+  },
+  "inventory": {
+    "actual": "Counted",
+    "add": "Add to inventory",
+    "added": "Item added",
+    "area": "Zone",
+    "areaSaved": "Zone saved",
+    "areaTotal": "Zone value",
+    "auditClose": "Close the sheet",
+    "auditClosed": "Sheet closed: lines adjusted — {count}",
+    "auditNone": "No open sheet",
+    "auditStart": "Start a stocktake",
+    "auditTitle": "Stocktake",
+    "comment": "Comment",
+    "consume": "Write down",
+    "consumed": "Movement recorded",
+    "difference": "Difference",
+    "empty": "No items yet",
+    "errors": {
+      "areaNotInHouse": "The zone belongs to another house",
+      "auditClosed": "The sheet is already closed",
+      "format": "Unknown export format",
+      "houseRequired": "House is not specified",
+      "nameRequired": "Name and unit are required",
+      "notEnough": "There is not that much on record",
+      "qtyPositive": "Quantity must be greater than zero",
+      "sameHouse": "The item is already in this house",
+      "unknown": "It did not work. Try again"
+    },
+    "expected": "On record",
+    "export": "Export",
+    "exportCsv": "CSV",
+    "exportXlsx": "XLSX",
+    "history": "History",
+    "movements": {
+      "in": "Receipt",
+      "out": "Usage",
+      "write_off": "Write-off",
+      "transfer": "Transfer",
+      "audit_adjust": "Adjustment"
+    },
+    "name": "Name",
+    "note": "Note",
+    "qty": "Quantity",
+    "save": "Save",
+    "saved": "Line saved",
+    "status": "Status",
+    "statuses": {
+      "in_use": "In use",
+      "written_off": "Written off"
+    },
+    "subtitle": "House property: receipts, usage, transfers",
+    "title": "Inventory",
+    "toHouse": "To house",
+    "transfer": "Transfer",
+    "transferred": "Item transferred",
+    "unit": "Unit",
+    "unitCost": "Unit cost",
+    "withoutArea": "No zone",
+    "writeOff": "Write off fully"
   },
   "invoices": {
     "title": "Invoices",
@@ -1260,415 +1070,192 @@
     "paidAt": "Payment date",
     "paidAtHint": "Empty means today"
   },
-  "utilities": {
-    "title": "Utilities",
-    "subtitle": "House period: lines, split by days, closing",
-    "lines": "Period lines",
-    "noLines": "No lines yet",
-    "lineTitle": "Title",
-    "lineAmount": "Amount",
-    "addLine": "Add line",
-    "previewAllocation": "Preview split",
-    "allocation": "Split",
-    "allocationCaption": "Utilities split across residents",
-    "resident": "Resident",
-    "days": "Days",
-    "share": "Share",
-    "surplus": "Rounding surplus",
-    "surplusHint": "The surplus stays in the house fund",
-    "undistributed": "Nobody to split with",
-    "noParticipants": "Nobody to split with",
-    "noParticipantsHint": "Nobody lived in the house that month",
-    "close": "Close period",
-    "reopen": "Reopen period",
-    "closedHint": "The period is closed: shares are fixed and sent to invoices",
-    "residentTitle": "Admin section",
-    "residentHint": "Your share appears as a line on the monthly invoice",
-    "noHouse": "No house selected",
-    "noHouseHint": "Add a house in the network settings",
-    "status": {
-      "draft": "Draft",
-      "closed": "Closed"
+  "language": {
+    "label": "Language",
+    "ru": "Русский",
+    "kk": "Қазақша",
+    "en": "English"
+  },
+  "nav": {
+    "label": "Main navigation",
+    "dashboard": "Dashboard",
+    "rotations": "Rotations",
+    "invoices": "Invoices",
+    "absences": "Absences",
+    "residents": "Residents",
+    "beds": "Beds",
+    "utilities": "Utilities",
+    "damages": "Damages",
+    "rating": "Rating",
+    "accounting": "Accounting",
+    "inventory": "Inventory",
+    "settings": "Settings",
+    "documents": "Documents",
+    "contract": "Contract",
+    "deposit": "Deposit",
+    "notifications": "Notifications"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "subtitle": "What the system told you personally",
+    "unreadOnly": "Unread only",
+    "all": "All",
+    "allTypes": "Any type",
+    "filterType": "Type",
+    "markRead": "Mark read",
+    "markAllRead": "Mark all read",
+    "empty": "No notifications",
+    "emptyUnread": "Nothing unread",
+    "unreadCount": "Unread: {count}",
+    "push": {
+      "title": "Push on this device",
+      "hint": "Notifications arrive even when the app is closed",
+      "enable": "Enable",
+      "disable": "Disable",
+      "enabled": "Push enabled",
+      "disabled": "Push disabled",
+      "unavailable": "This browser does not support push",
+      "notConfigured": "Push is not configured in this installation",
+      "denied": "Notifications are blocked in browser settings",
+      "active": "Push is on for this device",
+      "inactive": "Push is off"
+    },
+    "types": {
+      "rotationReminder": "Cleaning reminder",
+      "rotationMissed": "Cleaning not confirmed",
+      "invoiceIssued": "Invoice issued",
+      "absenceReviewed": "Absence decision",
+      "documentExpiring": "Document expires soon",
+      "depositRefund": "Deposit refund",
+      "utilitiesRemind": "Monthly utilities",
+      "scheduleRemind": "Monthly schedule",
+      "curfewCheck": "Curfew",
+      "unknown": "Notification"
+    },
+    "errors": {
+      "unknown": "It did not work. Try again",
+      "subscription": "Subscription was not saved"
+    },
+    "messages": {
+      "rotationToday": {
+        "title": "Your cleaning is today",
+        "body": "Mark it done in the app"
+      },
+      "rotationTomorrow": {
+        "title": "Your cleaning is tomorrow",
+        "body": "Date: {date}"
+      },
+      "rotationMissed": {
+        "title": "Cleaning not confirmed",
+        "body": "Cleaning for {date} is still not marked done"
+      },
+      "curfew": {
+        "title": "No curfew notice submitted",
+        "body": "Did not report being late on {date}: {count}"
+      },
+      "utilities": {
+        "title": "Utilities for {month}",
+        "body": "Fill in the amounts and close the period"
+      },
+      "schedule": {
+        "title": "Schedule for {month}",
+        "body": "Prepare the cleaning schedule for the month"
+      },
+      "documentExpiring": {
+        "title": "Document expires soon",
+        "body": "{document}: valid until {date}"
+      },
+      "documentExpiresToday": {
+        "title": "Document expires today",
+        "body": "{document}"
+      },
+      "depositDeadline": {
+        "title": "Deposit refund",
+        "body": "{days} days until the deadline, house {house}"
+      },
+      "depositOverdue": {
+        "title": "Deposit refund overdue",
+        "body": "The deadline was {date}, house {house}"
+      }
+    }
+  },
+  "onboarding": {
+    "title": "Move-in",
+    "progress": "steps done: {done} of {total}",
+    "open": "Open",
+    "done": "Done",
+    "now": "Now",
+    "waiting": "Waiting",
+    "blockedHint": "Until the deposit is paid, only the profile, documents and your invoices are available",
+    "steps": {
+      "profile": "Profile filled in",
+      "bed": "Bed assigned",
+      "contract": "Contract signed",
+      "documents": "Documents accepted",
+      "deposit": "Deposit paid"
+    }
+  },
+  "profile": {
+    "title": "My profile",
+    "subtitle": "Room, bed and price are assigned by the admin. The rest is yours to fill in.",
+    "submit": "Save",
+    "reveal": "Show in full",
+    "revealed": "Revealed, written to the log",
+    "sections": {
+      "personal": "Personal data",
+      "documents": "Documents",
+      "study": "Study",
+      "emergency": "Emergency contact",
+      "other": "Other"
+    },
+    "placement": {
+      "title": "Room and bed",
+      "room": "Room",
+      "bed": "Bed",
+      "notAssigned": "Not assigned"
+    },
+    "fields": {
+      "lastName": "Last name",
+      "firstName": "First name",
+      "middleName": "Middle name",
+      "sex": "Sex",
+      "birthDate": "Date of birth",
+      "phone": "Phone",
+      "iin": "IIN",
+      "iinHint": "Twelve digits. Entered once, then shown masked.",
+      "idDocNumber": "ID document number",
+      "idDocHint": "Entered once, then shown masked.",
+      "idDocIssuer": "Document issued by",
+      "registrationAddress": "Registration address",
+      "university": "University",
+      "course": "Year",
+      "major": "Major",
+      "emergencyName": "Name",
+      "emergencyPhone": "Phone",
+      "emergencyRelation": "Relation",
+      "preferredPayment": "Preferred payment method",
+      "noEpilepsy": "I confirm: no epilepsy",
+      "noAsthma": "I confirm: no asthma",
+      "notChosen": "Not chosen"
+    },
+    "sex": {
+      "male": "Male",
+      "female": "Female"
+    },
+    "payment": {
+      "cash": "Cash"
     },
     "done": {
-      "opened": "Period opened",
-      "lineAdded": "Line added",
-      "lineRemoved": "Line removed",
-      "closed": "Period closed",
-      "reopened": "Period reopened"
+      "saved": "Profile saved"
     },
     "errors": {
-      "unauthorized": "Sign in required",
-      "forbidden": "This action is not available to your role",
+      "unauthorized": "Sign-in required",
+      "forbidden": "Action not available",
       "not_found": "Not found",
-      "unknown": "The action could not be completed",
-      "month": "Choose the period month",
-      "amountInvalid": "The amount must be a whole non-negative number of tenge",
-      "titleRequired": "Enter a line title",
-      "closed": "The period is closed: lines cannot be edited",
-      "notClosed": "The period is already open",
-      "nothingToDistribute": "The period has no lines: nothing to split",
-      "noParticipants": "Nobody lived in the house that month",
-      "notUpdated": "The period was not updated"
-    },
-    "history": "House history",
-    "month": "Month",
-    "total": "Total",
-    "residents": "Residents",
-    "averageShare": "Average share",
-    "noHistory": "No closed periods",
-    "noHistoryHint": "Months with a closed period will appear here"
-  },
-  "files": {
-    "receipt": "Receipt",
-    "receiptHint": "Optional: a photo or PDF up to 10 MB",
-    "receiptReady": "Receipt uploaded",
-    "errors": {
-      "upload": "The file could not be uploaded"
-    },
-    "unknownPurpose": "Unknown file purpose",
-    "photo": "Cleaning photo",
-    "photoHint": "Optional",
-    "photoReady": "Photo uploaded",
-    "rotationPhotoWithoutResident": "The rotation has no assignee to attach a photo to"
-  },
-  "rotationSetup": {
-    "title": "Rotations setup",
-    "noHouse": "No house selected",
-    "noHouseHint": "Create a house in network settings to manage checklists and groups",
-    "chooseHouse": "House",
-    "backToHouse": "Back to areas and beds",
-    "groupsTitle": "Eligibility groups",
-    "addGroupTitle": "New group",
-    "addGroup": "Add group",
-    "groupName": "Name",
-    "groupBase": "Base",
-    "groupRoom": "Room",
-    "chooseRoom": "Choose a room",
-    "include": "Add on top of the base",
-    "exclude": "Exclude",
-    "checklistTitle": "Checklist title",
-    "items": "Items",
-    "itemsHint": "One item per line",
-    "peopleNeeded": "People",
-    "peopleShort": "People: {count}",
-    "notSet": "Not set",
-    "save": "Save",
-    "archiveChecklist": "Remove checklist",
-    "saveEligibility": "Save eligibility",
-    "eligibility": "Who cleans: {kind}",
-    "empty": "The house has no areas",
-    "emptyHint": "Create areas in house settings to describe cleaning",
-    "saved": "Saved",
-    "archived": "Checklist removed",
-    "types": {
-      "regular": "Regular cleaning",
-      "general": "Deep cleaning"
-    },
-    "bases": {
-      "all": "All residents",
-      "male": "Men",
-      "female": "Women",
-      "room": "Room residents"
-    },
-    "errors": {
-      "titleRequired": "Title cannot be empty",
-      "peopleNeededInvalid": "People count must be a whole number from one",
-      "ruleInvalid": "The group rule is incomplete",
-      "unknown": "Could not save"
-    },
-    "rowArchived": "Row turned off"
-  },
-  "rotationRows": {
-    "title": "Rotation rows",
-    "addRowTitle": "New row",
-    "addRow": "Add row",
-    "save": "Save",
-    "archiveRow": "Turn row off",
-    "name": "Name",
-    "type": "Type",
-    "weekday": "Weekday",
-    "startDate": "First rotation date",
-    "startDateHint": "Week number is counted from it",
-    "types": {
-      "common": "Common zones",
-      "room": "Room"
-    },
-    "weekdays": {
-      "0": "Sunday",
-      "1": "Monday",
-      "2": "Tuesday",
-      "3": "Wednesday",
-      "4": "Thursday",
-      "5": "Friday",
-      "6": "Saturday"
-    },
-    "errors": {
-      "nameRequired": "Name cannot be empty",
-      "weekdayInvalid": "A week has seven days",
-      "roomRowSunday": "A room row runs on Sundays",
-      "startDateWeekday": "The first rotation date must fall on the row weekday",
-      "startDateInvalid": "Set the first rotation date",
-      "roomRowLivingArea": "A room row zone must be a living room",
-      "roomRequired": "Choose the room for the room row"
-    },
-    "hint": "A row is a weekday and the date of its first rotation. Who takes part and which zones are cleaned is set below, in the rosters and day norms.",
-    "room": "Room",
-    "roomHint": "A room row cleans its own room in turns"
-  },
-  "rotationDaySetup": {
-    "title": "Rosters and day norms",
-    "hint": "The roster says who takes part; the day norm says which zones are cleaned and by how many people. Both take effect from a date: past weeks stay on the previous version.",
-    "roster": "Roster",
-    "norm": "Day norm",
-    "effectiveFrom": "In effect from",
-    "effectiveFromHint": "The new version applies from this date; past weeks stay unchanged",
-    "position": "Position",
-    "people": "People",
-    "saveRoster": "Save roster",
-    "saveNorm": "Save norm",
-    "rosterSaved": "Roster saved",
-    "normSaved": "Norm saved",
-    "preview": "Preview",
-    "previewHint": "Counts what is in the fields right now and saves nothing",
-    "previewEmpty": "Nothing to show: the row has no roster or no norm",
-    "week": "week {week}",
-    "rest": "Resting: {names}",
-    "versions": "Versions: {list}",
-    "rosterVersion": "from {date} — {count} beds",
-    "normVersion": "from {date} — {count} zones",
-    "noVersions": "No versions yet",
-    "bedsOutside": "Beds outside rows: {beds}",
-    "bedInSeveralRows": "The bed is also in another row: {beds}",
-    "holes": {
-      "empty_bed": "bed is empty",
-      "absent": "resident is away",
-      "not_eligible": "not allowed for the zone",
-      "no_one": "no one to assign"
-    },
-    "rebuilt": "Future occurrences rebuilt: {count}",
-    "kept": "Left as they were (edited by hand): {dates}",
-    "errors": {
-      "effectiveBeforeStart": "A version cannot start before the row's first rotation",
-      "rosterEmpty": "A roster needs at least one bed",
-      "bedTwice": "The same bed is in the roster twice",
-      "bedOtherHouse": "The bed belongs to another house",
-      "roomRosterBeds": "A room row roster uses beds of that same room",
-      "normEmpty": "A day norm needs at least one zone",
-      "roomNormSingleZone": "A room row has one zone — the room itself",
-      "areaOtherHouse": "The zone belongs to another house",
-      "checklistArea": "The checklist belongs to another zone",
-      "zoneTwice": "The same zone is in the norm twice",
-      "peopleInvalid": "People per zone must be a whole number from one",
-      "effectiveInvalid": "Set the date the version starts"
-    }
-  },
-  "rotationSchedule": {
-    "title": "Schedule",
-    "until": "Generate until",
-    "untilHint": "Occurrences will appear in the calendar",
-    "generate": "Generate",
-    "generated": "Schedule extended",
-    "nothingNew": "Nothing new to add",
-    "scheduled": "Upcoming occurrences: {count}",
-    "errors": {
-      "untilInvalid": "Set the date to generate until"
-    }
-  },
-  "rotationCalendar": {
-    "title": "Rotations",
-    "view": "View",
-    "empty": "No rotations in this period",
-    "emptyHint": "The schedule is generated in the house rotation setup",
-    "modes": {
-      "day": "Day",
-      "week": "Week",
-      "month": "Month"
-    },
-    "previous": "Back",
-    "today": "Today",
-    "next": "Forward",
-    "statuses": {
-      "scheduled": "Scheduled",
-      "done": "Done",
-      "missed": "Missed",
-      "cancelled": "Cancelled"
-    },
-    "types": {
-      "regular": "Regular",
-      "room": "Room",
-      "general": "Deep",
-      "extra": "Extra"
-    },
-    "moved": "Moved",
-    "nobody": "Unassigned",
-    "needsDecision": "Needs a decision",
-    "mine": "Mine",
-    "assign": "Assign",
-    "moveTo": "Move to",
-    "move": "Move",
-    "cancel": "Cancel",
-    "periodTitle": "Extra rotation and holidays",
-    "extraZone": "Zone",
-    "extraDate": "Date",
-    "extraWho": "Assignee",
-    "extraWhoHint": "May be left empty: the rotation will wait for a decision",
-    "extraCreate": "Add rotation",
-    "holidaysFrom": "Holidays from",
-    "holidaysTo": "to",
-    "holidaysCancel": "Cancel rotations",
-    "moved_done": "Rotation moved",
-    "cancelled": "Rotation cancelled",
-    "reassigned": "Assignee changed",
-    "extraCreated": "Extra rotation added",
-    "rangeCancelled": "Rotations in the period cancelled",
-    "confirm": "Confirm",
-    "confirmed": "Rotation confirmed",
-    "confirmedShort": "Confirmed",
-    "missedShort": "Missed",
-    "doneAt": "Cleaned at",
-    "note": "Comment",
-    "mark": "Mark",
-    "marked": "Mark saved",
-    "markDone": "Done",
-    "markMissed": "Missed",
-    "markScheduled": "Back to plan",
-    "score": "Score: {score}",
-    "scorePlaceholder": "1–10",
-    "setStatus": "Change status",
-    "statusChanged": "Status changed",
-    "toStats": "Statistics",
-    "remove": "Remove",
-    "removed": "Assignee removed: one person fewer on this zone that day",
-    "placeTitle": "Put on the zone",
-    "placeWho": "Who to put",
-    "place": "Put",
-    "placed": "Put on the zone",
-    "writeOffDebt": "Write off an extra rotation",
-    "writeOffBadge": "write-off",
-    "errors": {
-      "dateInvalid": "Set the date",
-      "dateTaken": "This rotation already exists on that date",
-      "checklistArea": "The checklist belongs to another zone",
-      "unknown": "Could not complete",
-      "lastAssignment": "The last assignee cannot be removed: cancel the zone for this date instead",
-      "notScheduled": "The rotation is no longer scheduled",
-      "alreadyAssigned": "This resident is already on this zone that day",
-      "assignmentSettled": "The assignment is already confirmed or closed: change the mark instead",
-      "whoRequired": "Choose who to put",
-      "notHole": "This assignment is not a gap: it has an assignee",
-      "swapSameDay": "A swap works only within one day and one house",
-      "swapSameZone": "Moving onto the same zone changes nothing"
-    }
-  },
-  "generalCleaning": {
-    "title": "Deep cleaning",
-    "date": "Date",
-    "dateHint": "Defaults to the last Sunday of the month",
-    "plan": "Distribute randomly",
-    "planned": "Deep cleaning distributed",
-    "nothingNew": "Cleaning for this date is already distributed",
-    "cancelRegular": "Cancel the regular Sunday rotation",
-    "save": "Save",
-    "settingSaved": "Setting saved",
-    "errors": {
-      "dateInvalid": "Set the cleaning date"
-    }
-  },
-  "rotationConfirmation": {
-    "errors": {
-      "cancelled": "A cancelled rotation cannot be confirmed",
-      "scoreRange": "The score is a whole number from 1 to 10"
-    }
-  },
-  "rotationTemplates": {
-    "title": "Day template for the group",
-    "hint": "The text is written in the interface language and goes to the message as is",
-    "header": "Header",
-    "footer": "Footer",
-    "save": "Save",
-    "saved": "Template saved",
-    "types": {
-      "regular": "Regular cleaning",
-      "general": "Deep cleaning"
-    },
-    "copy": "Copy",
-    "copied": "Text copied",
-    "templateTitle": "Text for the group",
-    "empty": "No rotations today",
-    "unassigned": "unassigned"
-  },
-  "rotationStats": {
-    "title": "Rotation statistics",
-    "toCalendar": "Back to calendar",
-    "byPerson": "By resident",
-    "byArea": "By zone",
-    "byWeekday": "By weekday",
-    "byMonth": "By month",
-    "person": "Resident",
-    "area": "Zone",
-    "weekday": "Weekday",
-    "month": "Month",
-    "done": "Done",
-    "missed": "Missed",
-    "average": "Average score",
-    "missRate": "Miss rate",
-    "total": "Rotations counted: {count}",
-    "empty": "No data for the period",
-    "noHouse": "No house selected",
-    "noHouseHint": "Statistics are calculated per house",
-    "weekdays": {
-      "0": "Sunday",
-      "1": "Monday",
-      "2": "Tuesday",
-      "3": "Wednesday",
-      "4": "Thursday",
-      "5": "Friday",
-      "6": "Saturday"
-    }
-  },
-  "absences": {
-    "title": "Absences",
-    "subtitle": "Tell in advance: a trip needs at least one day",
-    "submitTitle": "Report an absence",
-    "mineTitle": "My notices",
-    "mineEmpty": "No notices yet",
-    "queueTitle": "Awaiting a decision",
-    "queueEmpty": "Nothing is awaiting a decision",
-    "calendarTitle": "House calendar",
-    "calendarEmpty": "No absences in the house",
-    "nothing": "The section is empty",
-    "type": "Type",
-    "startDate": "Start date",
-    "endDate": "End date",
-    "returnAt": "Back at",
-    "reason": "Reason",
-    "reasonHint": "Required for every type",
-    "longHint": "Tomorrow at the earliest",
-    "submit": "Send",
-    "submitted": "Notice sent",
-    "approve": "Approve",
-    "approved": "Absence approved",
-    "reject": "Reject",
-    "rejected": "Absence rejected",
-    "rejectNote": "Rejection reason",
-    "types": {
-      "short": "Late tonight",
-      "long": "Away",
-      "sick": "Sick"
-    },
-    "statuses": {
-      "pending": "Awaiting",
-      "approved": "Approved",
-      "rejected": "Rejected"
-    },
-    "errors": {
-      "reasonRequired": "A reason is required",
-      "longTooLate": "A trip is reported at least one day ahead",
-      "endBeforeStart": "The end date is before the start",
-      "rejectReasonRequired": "Rejection needs a reason",
-      "startRequired": "Set the start date",
-      "unknown": "Could not complete"
+      "validation_error": "Check the entered data",
+      "conflict": "Data changed, try again",
+      "rate_limited": "Too often",
+      "internal": "Something went wrong"
     }
   },
   "rating": {
@@ -1760,172 +1347,611 @@
     },
     "debtsReserve": "Extra rotation reserve: {count}"
   },
-  "notifications": {
-    "title": "Notifications",
-    "subtitle": "What the system told you personally",
-    "unreadOnly": "Unread only",
-    "all": "All",
-    "allTypes": "Any type",
-    "filterType": "Type",
-    "markRead": "Mark read",
-    "markAllRead": "Mark all read",
-    "empty": "No notifications",
-    "emptyUnread": "Nothing unread",
-    "unreadCount": "Unread: {count}",
-    "push": {
-      "title": "Push on this device",
-      "hint": "Notifications arrive even when the app is closed",
-      "enable": "Enable",
-      "disable": "Disable",
-      "enabled": "Push enabled",
-      "disabled": "Push disabled",
-      "unavailable": "This browser does not support push",
-      "notConfigured": "Push is not configured in this installation",
-      "denied": "Notifications are blocked in browser settings",
-      "active": "Push is on for this device",
-      "inactive": "Push is off"
+  "residents": {
+    "title": "Residents",
+    "subtitle": "Residents of your house: bed, status, debts and documents",
+    "search": "Search",
+    "status": "Status",
+    "room": "Room",
+    "price": "Price",
+    "debt": "Debt",
+    "documents": "Documents",
+    "any": "Any",
+    "withDebt": "Has debt",
+    "withDocumentProblems": "Has problems",
+    "apply": "Apply",
+    "empty": "No residents found",
+    "emptyHint": "Change the filters or set up a move-in",
+    "noRoom": "no bed assigned",
+    "debtMark": "Debt",
+    "documentsMark": "Documents",
+    "summary": "Summary",
+    "roleTitle": "Role",
+    "role": "Role",
+    "changeRole": "Change the role",
+    "roleChanged": "The role is changed",
+    "house": "House",
+    "houseHint": "An admin needs a house, a resident does not",
+    "chooseHouse": "Choose a house",
+    "statuses": {
+      "created": "Created",
+      "profile_pending": "Filling in the profile",
+      "docs_pending": "Submitting documents",
+      "deposit_pending": "Awaiting deposit payment",
+      "active": "Moved in",
+      "terminating": "Terminating",
+      "archived": "Archived"
     },
-    "types": {
-      "rotationReminder": "Cleaning reminder",
-      "rotationMissed": "Cleaning not confirmed",
-      "invoiceIssued": "Invoice issued",
-      "absenceReviewed": "Absence decision",
-      "documentExpiring": "Document expires soon",
-      "depositRefund": "Deposit refund",
-      "utilitiesRemind": "Monthly utilities",
-      "scheduleRemind": "Monthly schedule",
-      "curfewCheck": "Curfew",
-      "unknown": "Notification"
+    "roles": {
+      "resident": "Resident",
+      "admin": "Admin",
+      "superadmin": "Superadmin"
+    },
+    "links": {
+      "documents": "Documents",
+      "contract": "Contract",
+      "deposit": "Deposit"
     },
     "errors": {
-      "unknown": "It did not work. Try again",
-      "subscription": "Subscription was not saved"
+      "unauthorized": "Sign-in required",
+      "unknown": "The action could not be completed",
+      "role": "Choose a role"
+    }
+  },
+  "rotationCalendar": {
+    "assign": "Assign",
+    "cancel": "Cancel",
+    "cancelled": "Rotation cancelled",
+    "confirm": "Confirm",
+    "confirmed": "Rotation confirmed",
+    "confirmedShort": "Confirmed",
+    "doneAt": "Cleaned at",
+    "empty": "No rotations in this period",
+    "emptyHint": "The schedule is generated in the house rotation setup",
+    "errors": {
+      "dateInvalid": "Set the date",
+      "dateTaken": "This rotation already exists on that date",
+      "checklistArea": "The checklist belongs to another zone",
+      "unknown": "Could not complete",
+      "lastAssignment": "The last assignee cannot be removed: cancel the zone for this date instead",
+      "notScheduled": "The rotation is no longer scheduled",
+      "alreadyAssigned": "This resident is already on this zone that day",
+      "assignmentSettled": "The assignment is already confirmed or closed: change the mark instead",
+      "whoRequired": "Choose who to put",
+      "notHole": "This assignment is not a gap: it has an assignee",
+      "swapSameDay": "A swap works only within one day and one house",
+      "swapSameZone": "Moving onto the same zone changes nothing"
     },
-    "messages": {
-      "rotationToday": {
-        "title": "Your cleaning is today",
-        "body": "Mark it done in the app"
-      },
-      "rotationTomorrow": {
-        "title": "Your cleaning is tomorrow",
-        "body": "Date: {date}"
-      },
-      "rotationMissed": {
-        "title": "Cleaning not confirmed",
-        "body": "Cleaning for {date} is still not marked done"
-      },
-      "curfew": {
-        "title": "No curfew notice submitted",
-        "body": "Did not report being late on {date}: {count}"
-      },
-      "utilities": {
-        "title": "Utilities for {month}",
-        "body": "Fill in the amounts and close the period"
-      },
-      "schedule": {
-        "title": "Schedule for {month}",
-        "body": "Prepare the cleaning schedule for the month"
-      },
-      "documentExpiring": {
-        "title": "Document expires soon",
-        "body": "{document}: valid until {date}"
-      },
-      "documentExpiresToday": {
-        "title": "Document expires today",
-        "body": "{document}"
-      },
-      "depositDeadline": {
-        "title": "Deposit refund",
-        "body": "{days} days until the deadline, house {house}"
-      },
-      "depositOverdue": {
-        "title": "Deposit refund overdue",
-        "body": "The deadline was {date}, house {house}"
+    "extraCreate": "Add rotation",
+    "extraCreated": "Extra rotation added",
+    "extraDate": "Date",
+    "extraWho": "Assignee",
+    "extraWhoHint": "May be left empty: the rotation will wait for a decision",
+    "extraZone": "Zone",
+    "holidaysCancel": "Cancel rotations",
+    "holidaysFrom": "Holidays from",
+    "holidaysTo": "to",
+    "mark": "Mark",
+    "markDone": "Done",
+    "markMissed": "Missed",
+    "markScheduled": "Back to plan",
+    "marked": "Mark saved",
+    "mine": "Mine",
+    "missedShort": "Missed",
+    "modes": {
+      "day": "Day",
+      "week": "Week",
+      "month": "Month"
+    },
+    "move": "Move",
+    "moveTo": "Move to",
+    "moved": "Moved",
+    "moved_done": "Rotation moved",
+    "needsDecision": "Needs a decision",
+    "next": "Forward",
+    "nobody": "Unassigned",
+    "note": "Comment",
+    "periodTitle": "Extra rotation and holidays",
+    "place": "Put",
+    "placeTitle": "Put on the zone",
+    "placeWho": "Who to put",
+    "placed": "Put on the zone",
+    "previous": "Back",
+    "rangeCancelled": "Rotations in the period cancelled",
+    "reassigned": "Assignee changed",
+    "remove": "Remove",
+    "removed": "Assignee removed: one person fewer on this zone that day",
+    "score": "Score: {score}",
+    "scorePlaceholder": "1–10",
+    "setStatus": "Change status",
+    "statusChanged": "Status changed",
+    "statuses": {
+      "scheduled": "Scheduled",
+      "done": "Done",
+      "missed": "Missed",
+      "cancelled": "Cancelled"
+    },
+    "title": "Rotations",
+    "toStats": "Statistics",
+    "today": "Today",
+    "types": {
+      "regular": "Regular",
+      "room": "Room",
+      "general": "Deep",
+      "extra": "Extra"
+    },
+    "unconfirmedShort": "Unconfirmed",
+    "view": "View",
+    "writeOffBadge": "write-off",
+    "writeOffDebt": "Write off an extra rotation"
+  },
+  "rotationConfirmation": {
+    "errors": {
+      "cancelled": "A cancelled rotation cannot be confirmed",
+      "scoreRange": "The score is a whole number from 1 to 10"
+    }
+  },
+  "rotationDaySetup": {
+    "title": "Rosters and day norms",
+    "hint": "The roster says who takes part; the day norm says which zones are cleaned and by how many people. Both take effect from a date: past weeks stay on the previous version.",
+    "roster": "Roster",
+    "norm": "Day norm",
+    "effectiveFrom": "In effect from",
+    "effectiveFromHint": "The new version applies from this date; past weeks stay unchanged",
+    "position": "Position",
+    "people": "People",
+    "saveRoster": "Save roster",
+    "saveNorm": "Save norm",
+    "rosterSaved": "Roster saved",
+    "normSaved": "Norm saved",
+    "preview": "Preview",
+    "previewHint": "Counts what is in the fields right now and saves nothing",
+    "previewEmpty": "Nothing to show: the row has no roster or no norm",
+    "week": "week {week}",
+    "rest": "Resting: {names}",
+    "versions": "Versions: {list}",
+    "rosterVersion": "from {date} — {count} beds",
+    "normVersion": "from {date} — {count} zones",
+    "noVersions": "No versions yet",
+    "bedsOutside": "Beds outside rows: {beds}",
+    "bedInSeveralRows": "The bed is also in another row: {beds}",
+    "holes": {
+      "empty_bed": "bed is empty",
+      "absent": "resident is away",
+      "not_eligible": "not allowed for the zone",
+      "no_one": "no one to assign"
+    },
+    "rebuilt": "Future occurrences rebuilt: {count}",
+    "kept": "Left as they were (edited by hand): {dates}",
+    "errors": {
+      "effectiveBeforeStart": "A version cannot start before the row's first rotation",
+      "rosterEmpty": "A roster needs at least one bed",
+      "bedTwice": "The same bed is in the roster twice",
+      "bedOtherHouse": "The bed belongs to another house",
+      "roomRosterBeds": "A room row roster uses beds of that same room",
+      "normEmpty": "A day norm needs at least one zone",
+      "roomNormSingleZone": "A room row has one zone — the room itself",
+      "areaOtherHouse": "The zone belongs to another house",
+      "checklistArea": "The checklist belongs to another zone",
+      "zoneTwice": "The same zone is in the norm twice",
+      "peopleInvalid": "People per zone must be a whole number from one",
+      "effectiveInvalid": "Set the date the version starts"
+    }
+  },
+  "rotationRows": {
+    "title": "Rotation rows",
+    "addRowTitle": "New row",
+    "addRow": "Add row",
+    "save": "Save",
+    "archiveRow": "Turn row off",
+    "name": "Name",
+    "type": "Type",
+    "weekday": "Weekday",
+    "startDate": "First rotation date",
+    "startDateHint": "Week number is counted from it",
+    "types": {
+      "common": "Common zones",
+      "room": "Room"
+    },
+    "weekdays": {
+      "0": "Sunday",
+      "1": "Monday",
+      "2": "Tuesday",
+      "3": "Wednesday",
+      "4": "Thursday",
+      "5": "Friday",
+      "6": "Saturday"
+    },
+    "errors": {
+      "nameRequired": "Name cannot be empty",
+      "weekdayInvalid": "A week has seven days",
+      "roomRowSunday": "A room row runs on Sundays",
+      "startDateWeekday": "The first rotation date must fall on the row weekday",
+      "startDateInvalid": "Set the first rotation date",
+      "roomRowLivingArea": "A room row zone must be a living room",
+      "roomRequired": "Choose the room for the room row"
+    },
+    "hint": "A row is a weekday and the date of its first rotation. Who takes part and which zones are cleaned is set below, in the rosters and day norms.",
+    "room": "Room",
+    "roomHint": "A room row cleans its own room in turns"
+  },
+  "rotationSchedule": {
+    "title": "Schedule",
+    "until": "Generate until",
+    "untilHint": "Occurrences will appear in the calendar",
+    "generate": "Generate",
+    "generated": "Schedule extended",
+    "nothingNew": "Nothing new to add",
+    "scheduled": "Upcoming occurrences: {count}",
+    "errors": {
+      "untilInvalid": "Set the date to generate until"
+    }
+  },
+  "rotationSetup": {
+    "title": "Rotations setup",
+    "noHouse": "No house selected",
+    "noHouseHint": "Create a house in network settings to manage checklists and groups",
+    "chooseHouse": "House",
+    "backToHouse": "Back to areas and beds",
+    "groupsTitle": "Eligibility groups",
+    "addGroupTitle": "New group",
+    "addGroup": "Add group",
+    "groupName": "Name",
+    "groupBase": "Base",
+    "groupRoom": "Room",
+    "chooseRoom": "Choose a room",
+    "include": "Add on top of the base",
+    "exclude": "Exclude",
+    "checklistTitle": "Checklist title",
+    "items": "Items",
+    "itemsHint": "One item per line",
+    "peopleNeeded": "People",
+    "peopleShort": "People: {count}",
+    "notSet": "Not set",
+    "save": "Save",
+    "archiveChecklist": "Remove checklist",
+    "saveEligibility": "Save eligibility",
+    "eligibility": "Who cleans: {kind}",
+    "empty": "The house has no areas",
+    "emptyHint": "Create areas in house settings to describe cleaning",
+    "saved": "Saved",
+    "archived": "Checklist removed",
+    "types": {
+      "regular": "Regular cleaning",
+      "general": "Deep cleaning"
+    },
+    "bases": {
+      "all": "All residents",
+      "male": "Men",
+      "female": "Women",
+      "room": "Room residents"
+    },
+    "errors": {
+      "titleRequired": "Title cannot be empty",
+      "peopleNeededInvalid": "People count must be a whole number from one",
+      "ruleInvalid": "The group rule is incomplete",
+      "unknown": "Could not save"
+    },
+    "rowArchived": "Row turned off"
+  },
+  "rotationStats": {
+    "title": "Rotation statistics",
+    "toCalendar": "Back to calendar",
+    "byPerson": "By resident",
+    "byArea": "By zone",
+    "byWeekday": "By weekday",
+    "byMonth": "By month",
+    "person": "Resident",
+    "area": "Zone",
+    "weekday": "Weekday",
+    "month": "Month",
+    "done": "Done",
+    "missed": "Missed",
+    "average": "Average score",
+    "missRate": "Miss rate",
+    "total": "Rotations counted: {count}",
+    "empty": "No data for the period",
+    "noHouse": "No house selected",
+    "noHouseHint": "Statistics are calculated per house",
+    "weekdays": {
+      "0": "Sunday",
+      "1": "Monday",
+      "2": "Tuesday",
+      "3": "Wednesday",
+      "4": "Thursday",
+      "5": "Friday",
+      "6": "Saturday"
+    }
+  },
+  "rotationTemplates": {
+    "title": "Day template for the group",
+    "hint": "The text is written in the interface language and goes to the message as is",
+    "header": "Header",
+    "footer": "Footer",
+    "save": "Save",
+    "saved": "Template saved",
+    "types": {
+      "regular": "Regular cleaning",
+      "general": "Deep cleaning"
+    },
+    "copy": "Copy",
+    "copied": "Text copied",
+    "templateTitle": "Text for the group",
+    "empty": "No rotations today",
+    "unassigned": "unassigned"
+  },
+  "settings": {
+    "personal": {
+      "title": "Personal settings",
+      "subtitle": "Language, theme and password. The choice lives in the account and survives a device change.",
+      "localeHint": "Interface language",
+      "themeHint": "Light, dark or follow the system",
+      "submit": "Save",
+      "changePassword": "Change password"
+    },
+    "network": {
+      "title": "Network settings",
+      "subtitle": "Apply to every house. Only the superadmin can change them.",
+      "ratingVisible": "Show rating to residents",
+      "ratingVisibleHint": "Turning this off hides the rating number from every resident in the network.",
+      "defaultLocale": "Default language",
+      "defaultLocaleHint": "Assigned to new accounts",
+      "submit": "Save"
+    },
+    "done": {
+      "personalSaved": "Settings saved",
+      "networkSaved": "Network settings saved",
+      "phoneChanged": "Number changed. Sign in with the new number."
+    },
+    "errors": {
+      "unauthorized": "Sign-in required",
+      "forbidden": "Action not available to this role",
+      "not_found": "Not found",
+      "validation_error": "Check the entered data",
+      "conflict": "Data changed, try again",
+      "rate_limited": "Too often, try later",
+      "internal": "Something went wrong",
+      "wrongPassword": "Wrong current password",
+      "phoneTaken": "This number is already used by another account"
+    },
+    "phone": {
+      "title": "Phone number",
+      "hint": "This is your login: after the change, sign in with the new number. The password stays the same.",
+      "newPhone": "New number",
+      "currentPassword": "Current password",
+      "submit": "Change number"
+    }
+  },
+  "temporaryResidents": {
+    "add": "Add a temporary resident",
+    "added": "Temporary resident added",
+    "empty": "No temporary residents",
+    "errors": {
+      "nameRequired": "Enter a name",
+      "periodEmpty": "The end must be after the start",
+      "bedTaken": "The bed is taken on these dates — by a residency or another temporary resident",
+      "unknown": "Could not save"
+    },
+    "female": "Female",
+    "from": "From",
+    "male": "Male",
+    "name": "Name",
+    "note": "Note",
+    "open": "Open-ended",
+    "remove": "Release the bed",
+    "removed": "Released",
+    "save": "Save",
+    "sex": "Sex",
+    "title": "Temporary residents",
+    "to": "To",
+    "updated": "Changes saved"
+  },
+  "terminations": {
+    "title": "Contract termination",
+    "hint": "Every module except the profile and the deposit closes immediately. Sign-in stays available.",
+    "terminate": "Terminate contract",
+    "modalTitle": "Contract termination",
+    "modalHint": "After confirmation the resident keeps only the profile and the deposit. The bed is freed from the move-out date.",
+    "moveOutDate": "Move-out date",
+    "moveOutHint": "Today by default. A future date is allowed: the bed is freed from it.",
+    "reason": "Reason",
+    "confirm": "Confirm termination",
+    "settlementTitle": "Move-out settlement",
+    "balance": "Deposit balance",
+    "damages": "Damages charged",
+    "fullMonths": "Full months",
+    "deadline": "Refund deadline",
+    "daysLeft": "Until refund",
+    "days": "{days, plural, one {# day} other {# days}}",
+    "overdue": "Overdue by {days, plural, one {# day} other {# days}}",
+    "outcome": "Deposit decision",
+    "outcomes": {
+      "refund": "Refund",
+      "burn": "Forfeited",
+      "nothing": "Nothing to refund",
+      "debt": "Resident owes"
+    },
+    "debt": "Debt",
+    "refundInvoice": "Refund invoice",
+    "refundStatus": {
+      "pending": "Pending",
+      "returned": "Returned",
+      "burned": "Forfeited",
+      "cancelled": "Cancelled"
+    },
+    "createRefund": "Create refund invoice",
+    "settle": "Mark as paid out",
+    "archive": "Finish move-out",
+    "terminated": "Contract terminated",
+    "refundIssued": "Refund invoice created",
+    "nothingToRefund": "Nothing to refund: the deposit balance is not positive",
+    "refunded": "Refund recorded",
+    "archived": "Residency archived",
+    "noticeTitle": "Contract is being terminated",
+    "noticeHint": "Only the profile and the deposit stay open. Other sections are closed until the settlement is done.",
+    "statusTerminating": "Terminating",
+    "links": {
+      "profile": "Profile",
+      "deposit": "Deposit"
+    },
+    "errors": {
+      "unauthorized": "Sign-in required",
+      "unknown": "The action could not be completed",
+      "notActive": "Only an active residency can be terminated",
+      "notTerminating": "Available only after termination",
+      "refundExists": "The refund invoice already exists",
+      "refundClosed": "The refund invoice is already closed",
+      "notRefundInvoice": "This is not a deposit refund invoice",
+      "moveOutNotReached": "The move-out date has not come yet",
+      "depositNotSettled": "The deposit has not been refunded yet",
+      "notUpdated": "The record was not updated",
+      "reasonRequired": "State the reason for termination",
+      "moveOutDate": {
+        "invalid": "Invalid move-out date",
+        "inPast": "The move-out date cannot be in the past",
+        "beforeMoveIn": "The move-out date cannot precede the move-in date"
       }
     }
   },
-  "inventory": {
-    "actual": "Counted",
-    "add": "Add to inventory",
-    "added": "Item added",
-    "area": "Zone",
-    "areaSaved": "Zone saved",
-    "areaTotal": "Zone value",
-    "auditClose": "Close the sheet",
-    "auditClosed": "Sheet closed: lines adjusted — {count}",
-    "auditNone": "No open sheet",
-    "auditStart": "Start a stocktake",
-    "auditTitle": "Stocktake",
-    "comment": "Comment",
-    "consume": "Write down",
-    "consumed": "Movement recorded",
-    "difference": "Difference",
-    "empty": "No items yet",
-    "errors": {
-      "areaNotInHouse": "The zone belongs to another house",
-      "auditClosed": "The sheet is already closed",
-      "format": "Unknown export format",
-      "houseRequired": "House is not specified",
-      "nameRequired": "Name and unit are required",
-      "notEnough": "There is not that much on record",
-      "qtyPositive": "Quantity must be greater than zero",
-      "sameHouse": "The item is already in this house",
-      "unknown": "It did not work. Try again"
-    },
-    "expected": "On record",
-    "export": "Export",
-    "exportCsv": "CSV",
-    "exportXlsx": "XLSX",
-    "history": "History",
-    "movements": {
-      "in": "Receipt",
-      "out": "Usage",
-      "write_off": "Write-off",
-      "transfer": "Transfer",
-      "audit_adjust": "Adjustment"
-    },
-    "name": "Name",
-    "note": "Note",
-    "qty": "Quantity",
-    "save": "Save",
-    "saved": "Line saved",
-    "status": "Status",
-    "statuses": {
-      "in_use": "In use",
-      "written_off": "Written off"
-    },
-    "subtitle": "House property: receipts, usage, transfers",
-    "title": "Inventory",
-    "toHouse": "To house",
-    "transfer": "Transfer",
-    "transferred": "Item transferred",
-    "unit": "Unit",
-    "unitCost": "Unit cost",
-    "withoutArea": "No zone",
-    "writeOff": "Write off fully"
+  "theme": {
+    "label": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
   },
-  "apiTokens": {
-    "title": "API tokens",
-    "subtitle": "Keys for bots: a scope narrows the issuer's rights",
-    "name": "Name",
-    "scopes": "Scopes",
-    "house": "House",
-    "wholeNetwork": "Whole network",
-    "issue": "Issue a token",
-    "issued": "Token issued. The value is shown once",
-    "value": "Token value",
-    "copyHint": "Copy it now: only a hash is stored, there is nowhere to show it again",
-    "revoke": "Revoke",
-    "revoked": "Token revoked",
-    "empty": "No tokens",
-    "expires": "Valid until",
-    "lastUsed": "Last used",
-    "never": "never used",
+  "users": {
+    "title": "Users",
+    "subtitle": "Accounts are created by the superadmin. There is no deletion, only archiving.",
+    "empty": "No accounts yet",
+    "columns": {
+      "phone": "Phone",
+      "role": "Role",
+      "house": "House",
+      "status": "Status",
+      "lastLogin": "Last sign-in",
+      "actions": "Actions"
+    },
+    "roles": {
+      "superadmin": "Superadmin",
+      "admin": "Admin",
+      "resident": "Resident"
+    },
+    "statuses": {
+      "active": "Active",
+      "archived": "Archived"
+    },
+    "actions": {
+      "allowReset": "Allow reset",
+      "archive": "Archive",
+      "openResidency": "Open residency",
+      "changePhone": "Change phone"
+    },
+    "create": {
+      "title": "Create account",
+      "submit": "Create",
+      "houseHint": "Required for an admin and for a resident: a resident's house comes from their residency",
+      "noHouse": "No house",
+      "passwordOnce": "Temporary password. Shown once, it cannot be recovered later."
+    },
+    "archiveConfirm": {
+      "title": "Archive {phone}?",
+      "description": "The account will no longer sign in and open sessions end. Data and history are kept, nothing is deleted."
+    },
+    "done": {
+      "resetAllowed": "Reset allowed for 24 hours. One sign-in will pass with any password.",
+      "archived": "Account archived",
+      "residencyOpened": "Residency opened: a bed can now be assigned",
+      "phoneChanged": "Number changed"
+    },
     "errors": {
-      "unknown": "It did not work. Try again",
-      "nameRequired": "Name is required",
-      "scopesRequired": "Choose at least one scope",
-      "unknownScope": "Unknown scope"
+      "unauthorized": "Sign-in required",
+      "forbidden": "Action not available to this role",
+      "not_found": "Not found",
+      "validation_error": "Check the entered data",
+      "conflict": "An account with this phone already exists",
+      "rate_limited": "Too often, try later",
+      "internal": "Something went wrong"
+    },
+    "changePhone": {
+      "title": "Change phone {phone}",
+      "description": "The new number becomes the account login. The password stays the same and active sessions continue.",
+      "newPhone": "New number",
+      "submit": "Change"
+    }
+  },
+  "utilities": {
+    "title": "Utilities",
+    "subtitle": "House period: lines, split by days, closing",
+    "lines": "Period lines",
+    "noLines": "No lines yet",
+    "lineTitle": "Title",
+    "lineAmount": "Amount",
+    "addLine": "Add line",
+    "previewAllocation": "Preview split",
+    "allocation": "Split",
+    "allocationCaption": "Utilities split across residents",
+    "resident": "Resident",
+    "days": "Days",
+    "share": "Share",
+    "surplus": "Rounding surplus",
+    "surplusHint": "The surplus stays in the house fund",
+    "undistributed": "Nobody to split with",
+    "noParticipants": "Nobody to split with",
+    "noParticipantsHint": "Nobody lived in the house that month",
+    "close": "Close period",
+    "reopen": "Reopen period",
+    "closedHint": "The period is closed: shares are fixed and sent to invoices",
+    "residentTitle": "Admin section",
+    "residentHint": "Your share appears as a line on the monthly invoice",
+    "noHouse": "No house selected",
+    "noHouseHint": "Add a house in the network settings",
+    "status": {
+      "draft": "Draft",
+      "closed": "Closed"
+    },
+    "done": {
+      "opened": "Period opened",
+      "lineAdded": "Line added",
+      "lineRemoved": "Line removed",
+      "closed": "Period closed",
+      "reopened": "Period reopened"
+    },
+    "errors": {
+      "unauthorized": "Sign in required",
+      "forbidden": "This action is not available to your role",
+      "not_found": "Not found",
+      "unknown": "The action could not be completed",
+      "month": "Choose the period month",
+      "amountInvalid": "The amount must be a whole non-negative number of tenge",
+      "titleRequired": "Enter a line title",
+      "closed": "The period is closed: lines cannot be edited",
+      "notClosed": "The period is already open",
+      "nothingToDistribute": "The period has no lines: nothing to split",
+      "noParticipants": "Nobody lived in the house that month",
+      "notUpdated": "The period was not updated"
+    },
+    "history": "House history",
+    "month": "Month",
+    "total": "Total",
+    "residents": "Residents",
+    "averageShare": "Average share",
+    "noHistory": "No closed periods",
+    "noHistoryHint": "Months with a closed period will appear here"
+  },
+  "validation": {
+    "password": {
+      "tooShort": "Password is shorter than 10 characters",
+      "tooLong": "Password is longer than 128 characters",
+      "sameAsPhone": "Password cannot match the phone number",
+      "reused": "This password was already used"
+    },
+    "files": {
+      "mimeNotAllowed": "This file type cannot be uploaded: use JPEG, PNG, WebP or PDF",
+      "tooLarge": "The file is larger than 10 MB",
+      "empty": "The file is empty",
+      "sizeMismatch": "The file size did not match the declared one",
+      "mimeMismatch": "The file contents did not match the declared type",
+      "invalidBody": "The upload request is filled in incorrectly"
     }
   }
 }

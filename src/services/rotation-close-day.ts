@@ -122,6 +122,19 @@ export async function closeRotationDay(deps: CloseDayDeps = {}): Promise<CloseDa
         }
 
         for (const assignment of pending) {
+          /*
+           * Ротация временного жильца не становится пропуском (D23):
+           * подтвердить её может только админ вручную, а спрашивать
+           * с человека без учётной записи не с кого. Статус `unconfirmed`
+           * выпадает из статистики, долга и рейтинга сам собой — свод
+           * пускает только `confirmed` и `missed`.
+           */
+          if (assignment.temporaryResidentId !== null) {
+            await updateAssignment(assignment.id, { state: 'unconfirmed' }, executor);
+            closed += 1;
+            continue;
+          }
+
           const marked = await updateAssignment(
             assignment.id,
             { state: 'missed', score: 1, scoredAt: instant },
@@ -152,7 +165,19 @@ export async function closeRotationDay(deps: CloseDayDeps = {}): Promise<CloseDa
           }
         }
 
-        await updateOccurrence(actor.context, occurrence.id, { status: 'missed' }, executor);
+        /*
+         * Занятие считается пропущенным, только если пропуск случился
+         * по-настоящему. День, где были одни временные жильцы, остаётся
+         * в плане: подтвердить его админ может и завтра, а «не выполнено»
+         * оно не заслужило (D23).
+         */
+        const missedSomething = pending.some(
+          (assignment) => assignment.temporaryResidentId === null,
+        );
+
+        if (missedSomething) {
+          await updateOccurrence(actor.context, occurrence.id, { status: 'missed' }, executor);
+        }
 
         await recordAudit(
           { context: actor.context, requestId: actor.requestId },

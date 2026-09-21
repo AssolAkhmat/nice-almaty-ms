@@ -42,7 +42,12 @@ function executorOf(deps: CalendarDeps): Executor {
   return deps.executor ?? getDb();
 }
 
-const EMPTY_DICTIONARIES: CalendarDictionaries = { areas: [], checklists: [], members: [] };
+const EMPTY_DICTIONARIES: CalendarDictionaries = {
+  areas: [],
+  checklists: [],
+  members: [],
+  temporary: [],
+};
 
 export interface CalendarView {
   houseId: string | null;

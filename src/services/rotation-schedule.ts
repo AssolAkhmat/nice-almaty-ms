@@ -15,6 +15,10 @@ import {
   requireRotationRow,
   updateAssignment,
 } from '@/db/repositories/rotations';
+import {
+  listTemporaryBedOccupantsOn,
+  listTemporaryEligibilityMembers,
+} from '@/db/repositories/temporary-residents';
 import { parseEligibilityRule, resolveEligibility } from '@/domain/eligibility';
 import { dayPlan, effectiveVersion, type PlannedAssignment } from '@/domain/rotation-day';
 import { assertCan } from '@/lib/authz';
@@ -138,19 +142,37 @@ function rowDates(
  * открытой для всех. Групп у зоны может быть несколько — они складываются,
  * потому что каждая говорит «эти вправе», а не «только эти».
  */
+/**
+ * Допуск к зонам по группам дома.
+ *
+ * Временные жильцы участвуют наравне с настоящими (T11.3): комнату даёт
+ * их место, пол — обязательное поле записи, поэтому предустановленные
+ * фильтры «парни», «девушки» и «жильцы комнаты» работают для них сами.
+ * Не работают только группы, составленные поимённо: туда временного
+ * не включить, и такая зона честно отдаёт дырку `not_eligible`.
+ */
 export async function eligibilityOfHouse(
   actor: UserActor,
   houseId: string,
   executor: Executor,
+  from: BusinessDate = todayInAlmaty(),
 ): Promise<Record<string, string[]>> {
-  const [groups, links, members] = await Promise.all([
+  const [groups, links, members, temporaryMembers] = await Promise.all([
     listEligibilityGroups(actor.context, houseId, executor),
     listAreaEligibility(actor.context, houseId, executor),
     listEligibilityMembers(actor.context, houseId, executor),
+    listTemporaryEligibilityMembers(actor.context, houseId, from, executor),
   ]);
 
   const groupById = new Map(groups.map((group) => [group.id, group]));
-  const people = members.map((member) => ({
+  const people = [
+    ...temporaryMembers.map((member) => ({
+      userId: member.temporaryResidentId,
+      sex: member.sex,
+      areaId: member.areaId,
+    })),
+    ...members,
+  ].map((member) => ({
     userId: member.userId,
     sex: member.sex,
     areaId: member.areaId,
@@ -261,14 +283,25 @@ async function generateRow(
         continue;
       }
 
-      // Кто где живёт — на дату занятия, а не на день генерации: место может
-      // освободиться между ними, и тогда назначение сразу ждёт решения админа.
-      const occupants = Object.fromEntries(
-        (await listBedOccupantsOn(actor.context, houseId, date, executor)).map((occupant) => [
-          occupant.bedId,
-          occupant.userId,
-        ]),
-      );
+      /*
+       * Кто где живёт — на дату занятия, а не на день генерации: место может
+       * освободиться между ними, и тогда назначение сразу ждёт решения админа.
+       *
+       * Временные жильцы идут тем же перечнем (T11.3): ряд привязан к месту,
+       * и генератору безразлично, кто на нём стоит. Различает их только
+       * запись назначения — по множеству `temporaryIds` ниже.
+       */
+      const [living, temporary] = await Promise.all([
+        listBedOccupantsOn(actor.context, houseId, date, executor),
+        listTemporaryBedOccupantsOn(actor.context, houseId, date, executor),
+      ]);
+
+      const occupants = Object.fromEntries([
+        ...living.map((occupant) => [occupant.bedId, occupant.userId] as const),
+        ...temporary.map((occupant) => [occupant.bedId, occupant.temporaryResidentId] as const),
+      ]);
+
+      const temporaryIds = new Set(temporary.map((occupant) => occupant.temporaryResidentId));
 
       /*
        * Отсутствующий не убирает только общую зону (§9): комнатную и генеральную
@@ -341,18 +374,35 @@ async function generateRow(
         created += 1;
 
         for (const assignment of group) {
+          /*
+           * Исполнитель приходит одной строкой, а колонки у него две:
+           * у временного жильца нет учётной записи, и в `user_id` он лечь
+           * не может (check «исполнитель ровно один», миграция 0027).
+           */
+          const temporaryId =
+            assignment.userId !== null && temporaryIds.has(assignment.userId)
+              ? assignment.userId
+              : null;
+          const userId = temporaryId === null ? assignment.userId : null;
+          const queuedTemporaryId =
+            assignment.queuedUserId !== null && temporaryIds.has(assignment.queuedUserId)
+              ? assignment.queuedUserId
+              : null;
+
           await createAssignment(
             actor.context,
             {
               occurrenceId: occurrence.id,
-              userId: assignment.userId,
+              userId,
+              temporaryResidentId: temporaryId,
               slotPosition: assignment.position,
               source: 'auto',
               // Дырка не исчезает из расписания: админ видит задачу
               // «отмени или назначь вручную» (§6.3), а не молчаливую дыру.
-              state: assignment.userId === null ? 'needs_reassignment' : 'assigned',
+              state: userId === null && temporaryId === null ? 'needs_reassignment' : 'assigned',
               emptyReason: assignment.emptyReason,
-              queuedUserId: assignment.queuedUserId,
+              queuedUserId: queuedTemporaryId === null ? assignment.queuedUserId : null,
+              queuedTemporaryResidentId: queuedTemporaryId,
             },
             executor,
           );
