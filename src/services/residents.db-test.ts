@@ -155,6 +155,53 @@ describe('список жильцов дома', () => {
     });
   });
 
+  /*
+   * Сводный список сети (указание владельца, 22 сентября 2026). Суперадмин
+   * и раньше получал всех жильцов, но в каком доме кто живёт, список
+   * не говорил, и отобрать один дом было нечем.
+   */
+  it('суперадмин видит всю сеть, и у каждой строки назван дом', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '1121');
+
+      const rows = await listHouseResidents(fixture.superadmin, {}, { executor: tx, today: TODAY });
+
+      expect(rows.length).toBeGreaterThanOrEqual(2);
+      expect(rows.every((row) => row.houseName !== '')).toBe(true);
+      expect(new Set(rows.map((row) => row.houseId)).size).toBeGreaterThan(1);
+    });
+  });
+
+  it('фильтр по дому оставляет только его жильцов', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '1122');
+
+      const rows = await listHouseResidents(
+        fixture.superadmin,
+        { houseId: fixture.houseB },
+        { executor: tx, today: TODAY },
+      );
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.fullName).toBe('Борисов Имя');
+      expect(rows[0]?.houseId).toBe(fixture.houseB);
+    });
+  });
+
+  it('админ чужой дом фильтром не достаёт', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '1123');
+
+      await expect(
+        listHouseResidents(
+          fixture.admin,
+          { houseId: fixture.houseB },
+          { executor: tx, today: TODAY },
+        ),
+      ).rejects.toThrow();
+    });
+  });
+
   it('показывает комнату, место и цену из назначения', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '1102');

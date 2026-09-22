@@ -1352,6 +1352,9 @@
   "residents": {
     "title": "Residents",
     "subtitle": "Residents of your house: bed, status, debts and documents",
+    "house": "House",
+    "allHouses": "All houses",
+    "networkSubtitle": "Residents across the network: {count}",
     "search": "Search",
     "status": "Status",
     "room": "Room",
@@ -1372,7 +1375,6 @@
     "role": "Role",
     "changeRole": "Change the role",
     "roleChanged": "The role is changed",
-    "house": "House",
     "houseHint": "An admin needs a house, a resident does not",
     "chooseHouse": "Choose a house",
     "statuses": {

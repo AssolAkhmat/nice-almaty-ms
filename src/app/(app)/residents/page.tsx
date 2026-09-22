@@ -3,6 +3,7 @@ import { getTranslations } from 'next-intl/server';
 import { redirect } from 'next/navigation';
 
 import { listAreas } from '@/db/repositories/areas';
+import { listHouses } from '@/db/repositories/houses';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -29,7 +30,13 @@ const STATUSES: readonly Residency['status'][] = [
 ];
 
 /**
- * Список жильцов дома (docs/04-MODULES/01-onboarding.md).
+ * Список жильцов (docs/04-MODULES/01-onboarding.md).
+ *
+ * Админ видит свой дом, суперадмин — всю сеть с колонкой дома и фильтром
+ * по дому (указание владельца, 22 сентября 2026). Прежде суперадмин тоже
+ * получал всех жильцов сети, но в каком доме кто живёт, список не говорил,
+ * а фильтр по комнате у него был пуст: комнаты брались у дома из контекста,
+ * которого у суперадмина нет.
  *
  * Фильтры идут параметрами адреса, а не состоянием на клиенте: ссылку
  * на отфильтрованный список можно переслать, и она откроется так же.
@@ -51,9 +58,22 @@ export default async function ResidentsPage({
   const params = await searchParams;
   const single = (key: string): string => (typeof params[key] === 'string' ? params[key] : '');
 
+  const isNetwork = context.role === 'superadmin';
+  const houses = isNetwork ? await listHouses(context) : [];
+
+  /*
+   * Комнаты показываются только по выбранному дому: имена комнат в домах
+   * совпадают. Дом из адреса сверяется со списком видимых — иначе опечатка
+   * в ссылке роняла бы экран отказом в доступе к чужому дому.
+   */
+  const selectedHouse = isNetwork
+    ? (houses.find((house) => house.id === single('house'))?.id ?? '')
+    : (context.houseId ?? '');
+
   const status = STATUSES.find((candidate) => candidate === single('status'));
   const filter: ResidentFilter = {
     ...(status === undefined ? {} : { status }),
+    ...(selectedHouse === '' ? {} : { houseId: selectedHouse }),
     ...(single('area') === '' ? {} : { areaId: single('area') }),
     ...(single('debt') === '1' ? { withDebt: true } : {}),
     ...(single('docs') === '1' ? { withDocumentProblems: true } : {}),
@@ -61,16 +81,31 @@ export default async function ResidentsPage({
   };
 
   const rows = await listHouseResidents(actor, filter);
-  const areas = context.houseId === null ? [] : await listAreas(context, context.houseId);
+  const areas = selectedHouse === '' ? [] : await listAreas(context, selectedHouse);
 
   return (
     <section className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
         <h1>{t('title')}</h1>
-        <p className="text-text-muted text-[13px]">{t('subtitle')}</p>
+        <p className="text-text-muted text-[13px]">
+          {isNetwork ? t('networkSubtitle', { count: rows.length }) : t('subtitle')}
+        </p>
       </div>
 
       <form className="grid gap-3 md:grid-cols-5" method="get">
+        {isNetwork && (
+          <Field htmlFor="filter-house" label={t('house')}>
+            <Select defaultValue={selectedHouse} id="filter-house" name="house">
+              <option value="">{t('allHouses')}</option>
+              {houses.map((house) => (
+                <option key={house.id} value={house.id}>
+                  {house.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
+
         <Field htmlFor="filter-q" label={t('search')}>
           <Input defaultValue={single('q')} id="filter-q" name="q" type="search" />
         </Field>
@@ -137,6 +172,8 @@ export default async function ResidentsPage({
               </CardHeader>
 
               <div className="flex flex-col gap-1 p-4 pt-0 text-[13px]">
+                {isNetwork && <span className="text-text font-medium">{row.houseName}</span>}
+
                 <span className="text-text-muted">
                   {row.room === null ? t('noRoom') : `${row.room}, ${row.bed ?? ''}`}
                 </span>

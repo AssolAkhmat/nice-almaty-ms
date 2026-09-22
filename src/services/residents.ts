@@ -1,6 +1,7 @@
 import { getDb, type Executor } from '@/db/client';
 import { findPlacementOfResidency } from '@/db/repositories/areas';
 import { listDocuments, listDocumentTypes } from '@/db/repositories/documents';
+import { listHouses } from '@/db/repositories/houses';
 import { listInvoices } from '@/db/repositories/invoices';
 import { listResidencies, requireResidency } from '@/db/repositories/residencies';
 import { findProfile } from '@/db/repositories/resident-profiles';
@@ -26,6 +27,9 @@ import type { UserActor } from './users';
 export interface ResidentRow {
   residencyId: string;
   userId: string;
+  houseId: string;
+  /** Название дома: сводный список сети читает человек, а не машина. */
+  houseName: string;
   fullName: string;
   phone: string;
   status: Residency['status'];
@@ -41,6 +45,8 @@ export interface ResidentRow {
 
 export interface ResidentFilter {
   status?: Residency['status'];
+  /** Дом: у суперадмина список идёт по всей сети, админ видит только свой. */
+  houseId?: string;
   /** Идентификатор зоны: фильтр «по комнате» из модуля 1. */
   areaId?: string;
   withDebt?: boolean;
@@ -81,6 +87,7 @@ async function buildRow(
   actor: UserActor,
   residency: Residency,
   today: BusinessDate,
+  houseNames: ReadonlyMap<string, string>,
   executor: Executor,
 ): Promise<ResidentRow> {
   const [user, profile, placement, invoices, types, documents] = await Promise.all([
@@ -122,6 +129,8 @@ async function buildRow(
   return {
     residencyId: residency.id,
     userId: residency.userId,
+    houseId: residency.houseId,
+    houseName: houseNames.get(residency.houseId) ?? residency.houseId,
     fullName: fullNameOf(
       [profile?.lastName ?? null, profile?.firstName ?? null, profile?.middleName ?? null],
       user.phone,
@@ -147,14 +156,25 @@ export async function listHouseResidents(
 
   const residencies = await listResidencies(
     actor.context,
-    filter.status === undefined ? {} : { status: filter.status },
+    {
+      ...(filter.status === undefined ? {} : { status: filter.status }),
+      ...(filter.houseId === undefined || filter.houseId === '' ? {} : { houseId: filter.houseId }),
+    },
     executor,
+  );
+
+  /*
+   * Названия домов берутся одним запросом на весь список: сводный список сети
+   * без колонки дома отвечает на вопрос «кто есть», но не на вопрос «где он».
+   */
+  const houseNames = new Map(
+    (await listHouses(actor.context, {}, executor)).map((house) => [house.id, house.name]),
   );
 
   const rows: ResidentRow[] = [];
 
   for (const residency of residencies) {
-    const row = await buildRow(actor, residency, today, executor);
+    const row = await buildRow(actor, residency, today, houseNames, executor);
 
     if (filter.withDebt === true && !row.hasDebt) {
       continue;
@@ -201,5 +221,9 @@ export async function readResidentCard(
     userId: residency.userId,
   });
 
-  return { residency, row: await buildRow(actor, residency, today, executor) };
+  const houseNames = new Map(
+    (await listHouses(actor.context, {}, executor)).map((house) => [house.id, house.name]),
+  );
+
+  return { residency, row: await buildRow(actor, residency, today, houseNames, executor) };
 }
