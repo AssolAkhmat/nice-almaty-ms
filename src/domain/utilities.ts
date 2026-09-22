@@ -1,5 +1,6 @@
 import {
   addDays,
+  addMonths,
   compareBusinessDates,
   daysInMonth,
   businessDate,
@@ -7,6 +8,7 @@ import {
   differenceInDays,
   endOfMonth,
   startOfMonth,
+  tryParseBusinessDate,
   type BusinessDate,
 } from '@/lib/time';
 
@@ -120,6 +122,46 @@ export function monthOf(date: BusinessDate): BusinessDate {
   const { year, month } = businessDateToParts(date);
 
   return businessDate(year, month, 1);
+}
+
+/**
+ * Месяц из строки экрана: `2026-09` от `<input type="month">` либо полная
+ * дата из ссылки. Возвращает первое число месяца или `null`, если строка
+ * месяцем не является.
+ *
+ * Нужна оттого, что месяц периода приходит с экрана двумя видами: поле
+ * выбора месяца в браузере отдаёт `ГГГГ-ММ`, а ссылки переключателя несут
+ * полную дату. Разбирать их в двух местах по-разному — значит однажды
+ * разобрать по-разному.
+ */
+export function parseMonthInput(value: string): BusinessDate | null {
+  const trimmed = value.trim();
+  const withDay = /^\d{4}-\d{2}$/.test(trimmed) ? `${trimmed}-01` : trimmed;
+  const parsed = tryParseBusinessDate(withDay);
+
+  return parsed === null ? null : monthOf(parsed);
+}
+
+/**
+ * Месяцы переключателя на экране коммуналки: текущий, прошлый и все, по
+ * которым период уже заведён, от нового к старому.
+ *
+ * Текущий месяц входит всегда — на этом экран и сломался: список считался
+ * как «прошлый и два до него», поэтому 22 сентября в нём не было самого
+ * сентября, и завести период за текущий месяц было нечем (указание
+ * владельца, 22 сентября 2026). Правило закреплено тестом, а не намерением.
+ */
+export function monthOptions(
+  thisMonth: BusinessDate,
+  existing: readonly BusinessDate[],
+): BusinessDate[] {
+  const months = new Set<BusinessDate>([monthOf(thisMonth), addMonths(monthOf(thisMonth), -1)]);
+
+  for (const month of existing) {
+    months.add(monthOf(month));
+  }
+
+  return [...months].sort().reverse();
 }
 
 /**

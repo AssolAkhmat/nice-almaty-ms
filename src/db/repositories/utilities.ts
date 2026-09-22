@@ -106,16 +106,35 @@ export async function createUtilityPeriod(
 ): Promise<UtilityPeriod> {
   assertHouseVisible(context, input.houseId);
 
+  /*
+   * Два заведения одного месяца — не ошибка, а гонка: уникальный ключ
+   * `utility_periods_house_month_unique` арбитр, и проигравший получает
+   * чужую строку, а не отказ. `onConflictDoNothing` вместо перехвата
+   * исключения: в транзакции упавшая вставка обрывает всю транзакцию,
+   * и повторное чтение после неё уже невозможно.
+   */
   const [period] = await executor
     .insert(utilityPeriods)
     .values({ ...input, orgId: context.orgId })
+    .onConflictDoNothing({ target: [utilityPeriods.houseId, utilityPeriods.month] })
     .returning();
 
-  if (period === undefined) {
+  if (period !== undefined) {
+    return period;
+  }
+
+  const existing = await findUtilityPeriod(
+    context,
+    input.houseId,
+    input.month as BusinessDate,
+    executor,
+  );
+
+  if (existing === null) {
     throw new Error('Период коммуналки не создан');
   }
 
-  return period;
+  return existing;
 }
 
 export async function updateUtilityPeriod(

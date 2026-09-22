@@ -14,6 +14,8 @@ import { generateMonthlyInvoices } from './monthly-invoices';
 import {
   addPeriodLine,
   closeUtilityPeriod,
+  findPeriodOfMonth,
+  listPeriodsOfHouse,
   openUtilityPeriod,
   readUtilityHistory,
   readUtilityPeriod,
@@ -381,12 +383,82 @@ describe('закрытие периода', () => {
     });
   });
 
-  it('период без строк не закрывается: делить нечего', async () => {
+  /*
+   * Дом мог за месяц не платить вовсе (указание владельца, 22 сентября 2026).
+   * Раньше такой период не закрывался, и прошлые месяцы оставались висеть
+   * незакрытыми навсегда.
+   */
+  it('период без строк закрывается: ноль — это тоже итог месяца', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '9916');
       const period = await openUtilityPeriod(fixture.admin, fixture.houseA, OCTOBER, {
         executor: tx,
       });
+
+      const closed = await closeUtilityPeriod(fixture.admin, period.id, {
+        executor: tx,
+        today: IN_NOVEMBER,
+        instant: INSTANT,
+      });
+
+      expect(closed.period.status).toBe('closed');
+      // Снимок есть, и он честный: три жильца, у каждого ноль.
+      expect(closed.allocations).toHaveLength(3);
+      expect(closed.allocations.map((row) => row.amount)).toEqual([0, 0, 0]);
+    });
+  });
+
+  it('нулевой период не дописывает в счёт строку на ноль тенге', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9926');
+      const period = await openUtilityPeriod(fixture.admin, fixture.houseA, OCTOBER, {
+        executor: tx,
+      });
+
+      const invoice = await createInvoice(
+        fixture.admin,
+        {
+          residencyId: fixture.residents[0]?.residencyId ?? '',
+          type: 'monthly',
+          periodMonth: NOVEMBER,
+          lines: [{ kind: 'rent', title: 'Проживание', amount: 90_000 }],
+        },
+        { executor: tx, today: IN_NOVEMBER },
+      );
+
+      const closed = await closeUtilityPeriod(fixture.admin, period.id, {
+        executor: tx,
+        today: IN_NOVEMBER,
+        instant: INSTANT,
+      });
+
+      expect(closed.invoiced).toBe(0);
+
+      const view = await readInvoice(fixture.admin, invoice.id, { executor: tx });
+
+      expect(view.invoice.total).toBe(90_000);
+      expect(view.lines.map((line) => line.kind)).not.toContain('utilities');
+    });
+  });
+
+  /*
+   * Сумма, которую не на кого разложить, — по-прежнему отказ: она потерялась
+   * бы молча. Отличие от нулевого периода в том, что делить там нечего,
+   * а здесь есть что.
+   */
+  it('сумма без единого жильца месяца не закрывается', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9936', ['2026-12-01']);
+      const period = await openUtilityPeriod(fixture.admin, fixture.houseA, OCTOBER, {
+        executor: tx,
+      });
+
+      await addPeriodLine(
+        fixture.admin,
+        period.id,
+        { title: 'Свет', amount: 30_000 },
+        { executor: tx },
+      );
 
       await expect(
         closeUtilityPeriod(fixture.admin, period.id, {
@@ -395,6 +467,45 @@ describe('закрытие периода', () => {
           instant: INSTANT,
         }),
       ).rejects.toBeInstanceOf(ConflictError);
+    });
+  });
+
+  it('период заводится за любой месяц, включая текущий и давно прошедший', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9946');
+
+      for (const month of ['2026-09-01', '2025-01-01', '2026-12-01'] as const) {
+        const period = await openUtilityPeriod(
+          fixture.admin,
+          fixture.houseA,
+          parseBusinessDate(month),
+          { executor: tx },
+        );
+
+        expect(period.month).toBe(month);
+      }
+
+      const months = (
+        await listPeriodsOfHouse(fixture.admin, fixture.houseA, { executor: tx })
+      ).map((period) => period.month);
+
+      expect(months).toEqual(['2026-12-01', '2026-09-01', '2025-01-01']);
+    });
+  });
+
+  it('показ месяца ничего не создаёт: черновик заводится только действием', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9956');
+
+      expect(
+        await findPeriodOfMonth(fixture.admin, fixture.houseA, OCTOBER, { executor: tx }),
+      ).toBeNull();
+
+      await openUtilityPeriod(fixture.admin, fixture.houseA, OCTOBER, { executor: tx });
+
+      expect(
+        await findPeriodOfMonth(fixture.admin, fixture.houseA, OCTOBER, { executor: tx }),
+      ).not.toBeNull();
     });
   });
 });

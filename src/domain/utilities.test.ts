@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import { parseBusinessDate } from '@/lib/time';
 
-import { absentDaysInMonth, daysLivedInMonth, distributeUtilities } from './utilities';
+import {
+  absentDaysInMonth,
+  daysLivedInMonth,
+  distributeUtilities,
+  monthOptions,
+  parseMonthInput,
+} from './utilities';
 
 /**
  * Коммунальные услуги: числовые примеры из docs/03-BUSINESS-RULES.md §4.2.
@@ -152,5 +158,64 @@ describe('распределение коммуналки (§4.2)', () => {
 
     expect(result.allocations).toEqual([{ userId: 'a', days: 10, amount: 0 }]);
     expect(result.surplus).toBe(0);
+  });
+});
+
+describe('месяц периода из строки экрана', () => {
+  it('поле выбора месяца отдаёт ГГГГ-ММ — это первое число месяца', () => {
+    expect(parseMonthInput('2026-09')).toBe('2026-09-01');
+  });
+
+  it('полная дата из ссылки сводится к первому числу', () => {
+    expect(parseMonthInput('2026-09-22')).toBe('2026-09-01');
+  });
+
+  it('пробелы по краям не мешают', () => {
+    expect(parseMonthInput('  2026-09  ')).toBe('2026-09-01');
+  });
+
+  it('не месяц — пусто, а не догадка', () => {
+    expect(parseMonthInput('')).toBeNull();
+    expect(parseMonthInput('сентябрь')).toBeNull();
+    expect(parseMonthInput('2026-13')).toBeNull();
+    expect(parseMonthInput('2026')).toBeNull();
+  });
+});
+
+/*
+ * Негативная фикстура к сломанному месту: список месяцев на экране коммуналки
+ * не содержал текущего месяца, поэтому 22 сентября сентябрь завести было
+ * нельзя. Любая попытка снова вычислить список «на сколько-то назад»
+ * краснеет здесь.
+ */
+describe('месяцы переключателя коммуналки', () => {
+  it('текущий месяц есть всегда, даже когда ни одного периода не заведено', () => {
+    expect(monthOptions(parseBusinessDate('2026-09-22'), [])).toEqual(['2026-09-01', '2026-08-01']);
+  });
+
+  it('текущий месяц есть и тогда, когда все периоды старые', () => {
+    const months = monthOptions(parseBusinessDate('2026-09-22'), [
+      parseBusinessDate('2026-06-01'),
+      parseBusinessDate('2026-07-01'),
+      parseBusinessDate('2026-08-01'),
+    ]);
+
+    expect(months).toContain('2026-09-01');
+  });
+
+  it('заведённый период не теряется, как бы давно он ни был', () => {
+    const months = monthOptions(parseBusinessDate('2026-09-22'), [parseBusinessDate('2024-01-01')]);
+
+    expect(months).toContain('2024-01-01');
+  });
+
+  it('порядок — от нового к старому, повторов нет', () => {
+    const months = monthOptions(parseBusinessDate('2026-01-15'), [
+      parseBusinessDate('2025-12-01'),
+      parseBusinessDate('2026-01-01'),
+      parseBusinessDate('2025-11-30'),
+    ]);
+
+    expect(months).toEqual(['2026-01-01', '2025-12-01', '2025-11-01']);
   });
 });

@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { actionErrorKey } from '@/lib/action-failure';
 import { AppError, ConflictError, ValidationError } from '@/lib/errors';
 import { getCurrentSession } from '@/lib/session';
-import { tryParseBusinessDate } from '@/lib/time';
+import { parseMonthInput } from '@/domain/utilities';
 import {
   addPeriodLine,
   closeUtilityPeriod,
@@ -70,7 +70,7 @@ export async function openPeriodAction(
     return { error: 'utilities.errors.unauthorized' };
   }
 
-  const month = tryParseBusinessDate(text(formData, 'month'));
+  const month = parseMonthInput(text(formData, 'month'));
   if (month === null) {
     return { error: 'utilities.errors.month' };
   }

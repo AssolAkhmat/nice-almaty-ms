@@ -191,6 +191,24 @@ export async function openUtilityPeriod(
   return createUtilityPeriod(actor.context, { houseId, month: first, status: 'draft' }, executor);
 }
 
+/**
+ * Период дома за месяц, если он заведён. Отличается от `openUtilityPeriod`
+ * тем, что ничего не создаёт: экран открывают и просто посмотреть, а показ
+ * месяца не должен оставлять за собой пустой черновик периода.
+ */
+export async function findPeriodOfMonth(
+  actor: UserActor,
+  houseId: string,
+  month: BusinessDate,
+  deps: UtilityDeps = {},
+): Promise<UtilityPeriod | null> {
+  const { executor } = resolve(deps);
+
+  assertCan(actor.context, 'utility.read', { houseId });
+
+  return findUtilityPeriod(actor.context, houseId, startOfMonth(month), executor);
+}
+
 /** Период вместе с правом на него: права на период — это права на его дом. */
 async function periodFor(
   actor: UserActor,
@@ -347,17 +365,23 @@ export async function closeUtilityPeriod(
   const lines = await listUtilityLines(period.id, executor);
   const total = totalOf(lines);
 
-  if (total <= 0) {
-    throw new ConflictError('utilities.errors.nothingToDistribute');
-  }
-
   const participants = await participantsOf(actor, period.houseId, month, executor);
   const distribution = distributeUtilities(
     total,
     participants.map((entry) => ({ userId: entry.userId, days: entry.days })),
   );
 
-  if (distribution.allocations.length === 0) {
+  /*
+   * Ноль — законный итог месяца, а не ошибка: дом мог не платить вовсе
+   * (указание владельца, 22 сентября 2026). Закрытый нулевой период говорит
+   * «за этот месяц коммуналки не было» — это утверждение, и оно должно
+   * попадать в историю. Долей по нулю никому не пишется: строка счёта
+   * на ноль тенге — мусор в документе жильца, а не запись о нуле.
+   *
+   * Делить не на кого — по-прежнему отказ, но только когда делить есть что:
+   * сумма, которую не на кого разложить, потерялась бы молча.
+   */
+  if (total > 0 && distribution.allocations.length === 0) {
     throw new ConflictError('utilities.errors.noParticipants');
   }
 
@@ -404,7 +428,7 @@ export async function closeUtilityPeriod(
     for (const allocation of distribution.allocations) {
       const residency = byUser.get(allocation.userId);
 
-      if (residency === undefined) {
+      if (residency === undefined || allocation.amount <= 0) {
         continue;
       }
 

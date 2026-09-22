@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import { E2E_ACCOUNTS } from './global-setup';
 import { login } from './support/login';
@@ -10,11 +10,26 @@ import { login } from './support/login';
  * периода — в `src/services/utilities.db-test.ts`. Здесь — что экран
  * открывается на прошлом месяце, форма строки читается, а предварительное
  * распределение показывает излишек, а не прячет его.
+ *
+ * Показ месяца период больше не создаёт (22 сентября 2026): раньше он
+ * заводился сам при отрисовке, и приёмки этим пользовались, ничего не нажимая.
  */
+
+/** Открыть месяц и завести период, если его ещё нет. */
+async function openPeriod(page: Page, month?: string): Promise<void> {
+  await page.goto(month === undefined ? '/utilities' : `/utilities?month=${month}`);
+
+  const start = page.getByTestId('start-period');
+
+  if ((await start.count()) > 0) {
+    await start.click();
+    await expect(page.getByTestId('utility-title')).toBeVisible();
+  }
+}
 test.describe('экран коммуналки', () => {
   test('админ видит период своего дома', async ({ page }) => {
     await login(page, E2E_ACCOUNTS.adminHouse1);
-    await page.goto('/utilities');
+    await openPeriod(page);
 
     const main = page.locator('main');
     await expect(main).toContainText('Коммунальные услуги');
@@ -24,7 +39,7 @@ test.describe('экран коммуналки', () => {
 
   test('форма строки периода на месте', async ({ page }) => {
     await login(page, E2E_ACCOUNTS.adminHouse1);
-    await page.goto('/utilities');
+    await openPeriod(page);
 
     await expect(page.getByTestId('utility-title')).toBeVisible();
     await expect(page.getByTestId('utility-amount')).toBeVisible();
@@ -33,7 +48,7 @@ test.describe('экран коммуналки', () => {
 
   test('история по дому на месте (модуль 6, «Отчёты»)', async ({ page }) => {
     await login(page, E2E_ACCOUNTS.adminHouse1);
-    await page.goto('/utilities');
+    await openPeriod(page);
 
     const main = page.locator('main');
     await expect(main).toContainText('История по дому');
@@ -52,10 +67,43 @@ test.describe('экран коммуналки', () => {
 
   test('излишек округления назван и объяснён', async ({ page }) => {
     await login(page, E2E_ACCOUNTS.adminHouse1);
-    await page.goto('/utilities');
+    await openPeriod(page);
 
     const main = page.locator('main');
     await expect(main).toContainText('Излишек округления');
     await expect(main).toContainText('Излишек остаётся в фонде дома');
+  });
+
+  /*
+   * Тот самый отказ: список месяцев считался как «прошлый и два до него»,
+   * поэтому текущего месяца в нём не было и завести его было нечем.
+   * Первая ссылка переключателя — самый новый месяц, то есть текущий.
+   */
+  test('период за текущий месяц заводится с экрана', async ({ page }) => {
+    await login(page, E2E_ACCOUNTS.adminHouse1);
+    await page.goto('/utilities');
+
+    const months = page.getByTestId('month-link');
+    await expect(months.first()).toBeVisible();
+
+    await months.first().click();
+
+    const start = page.getByTestId('start-period');
+
+    if ((await start.count()) > 0) {
+      await start.click();
+    }
+
+    await expect(page.getByTestId('utility-title')).toBeVisible();
+    await expect(page.getByTestId('close-period')).toBeVisible();
+  });
+
+  test('период без строк закрывается: дом мог не платить', async ({ page }) => {
+    await login(page, E2E_ACCOUNTS.adminHouse1);
+    await openPeriod(page, '2025-02');
+
+    await page.getByTestId('close-period').click();
+
+    await expect(page.locator('main')).toContainText('Период закрыт');
   });
 });

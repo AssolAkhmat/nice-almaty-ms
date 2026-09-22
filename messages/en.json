@@ -1882,6 +1882,11 @@
   "utilities": {
     "title": "Utilities",
     "subtitle": "House period: lines, split by days, closing",
+    "chooseMonth": "Another month",
+    "openMonth": "Open",
+    "notStarted": "Period not started",
+    "notStartedHint": "Utilities for this month have not been started yet",
+    "startPeriod": "Start period for {month}",
     "lines": "Period lines",
     "noLines": "No lines yet",
     "lineTitle": "Title",
@@ -1926,7 +1931,6 @@
       "titleRequired": "Enter a line title",
       "closed": "The period is closed: lines cannot be edited",
       "notClosed": "The period is already open",
-      "nothingToDistribute": "The period has no lines: nothing to split",
       "noParticipants": "Nobody lived in the house that month",
       "notUpdated": "The period was not updated"
     },
