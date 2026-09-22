@@ -536,7 +536,12 @@ describe('отдача содержимого', () => {
     });
   });
 
-  it('чтение собственного файла журнал не засоряет', async () => {
+  /*
+   * Прежде своё чтение в журнал не попадало, и по журналу нельзя было сказать,
+   * сколько раз документ вообще доставали. Владелец потребовал записывать
+   * каждый просмотр, как раскрытие ИИН (22 сентября 2026).
+   */
+  it('чтение собственного файла тоже попадает в журнал', async () => {
     await inRollback(async (tx) => {
       const { fixture, storage, fileId } = await readyFile(tx, '3204');
 
@@ -547,7 +552,38 @@ describe('отдача содержимого', () => {
         .select()
         .from(schema.auditLog)
         .where(eq(schema.auditLog.orgId, fixture.orgId));
-      expect(entries.map((entry) => entry.action)).not.toContain('file.read');
+
+      const read = entries.filter((entry) => entry.action === 'file.read');
+
+      expect(read).toHaveLength(1);
+      expect((read[0]?.after as { own?: boolean } | null)?.own).toBe(true);
+    });
+  });
+
+  it('журнал различает показ во вкладке и скачивание к себе', async () => {
+    await inRollback(async (tx) => {
+      const { fixture, storage, fileId } = await readyFile(tx, '3214');
+
+      const shown = await readFileContent(fixture.adminA, fileId, {
+        executor: tx,
+        storage,
+        disposition: 'inline',
+      });
+      await shown.stream.cancel();
+
+      const saved = await readFileContent(fixture.adminA, fileId, { executor: tx, storage });
+      await saved.stream.cancel();
+
+      const entries = await tx
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.orgId, fixture.orgId));
+
+      const dispositions = entries
+        .filter((entry) => entry.action === 'file.read')
+        .map((entry) => (entry.after as { disposition?: string } | null)?.disposition);
+
+      expect(dispositions).toEqual(['inline', 'attachment']);
     });
   });
 

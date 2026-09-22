@@ -55,7 +55,8 @@ POST   /documents/{id}/review            approve | reject
 
 POST   /files/upload-session
 POST   /files/{id}/complete
-GET    /files/{id}/content
+GET    /files/{id}/view          # открыть: права + пропуск на 5 минут, ?download=1 — скачать
+GET    /files/{id}/content       # содержимое; человеку — только с пропуском с /view
 
 GET    /invoices                         ?house_id&month&status&user_id
 POST   /invoices

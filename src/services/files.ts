@@ -15,6 +15,8 @@ import {
 } from '@/domain/files';
 import { assertCan } from '@/lib/authz';
 import { ConflictError, NotFoundError, ValidationError } from '@/lib/errors';
+import { getViewGrantKey, issueViewGrant, type FileDisposition } from '@/lib/files/view-grant';
+import { now } from '@/lib/time';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
 
@@ -539,7 +541,7 @@ export async function completeUpload(
 export async function readFileContent(
   actor: UserActor,
   fileId: string,
-  deps: FileDeps = {},
+  deps: FileDeps & { disposition?: FileDisposition } = {},
 ): Promise<FileContent> {
   const { executor, storage } = resolve(deps);
 
@@ -557,22 +559,28 @@ export async function readFileContent(
   }
 
   /*
-   * Документы жильца — медицинские справки и удостоверение. Кто их открывал,
-   * кроме самого владельца, видно в журнале: в ТЗ такого требования нет,
-   * но из двух прочтений выбрано более осторожное (docs/08-DECISIONS.md).
+   * Документы жильца — медицинские справки и удостоверение. Каждое открытие
+   * идёт в журнал, как раскрытие ИИН (указание владельца, 22 сентября 2026).
+   * Прежде записывались только чужие открытия: свой просмотр молчал, и по
+   * журналу нельзя было сказать, сколько раз документ вообще доставали.
+   * Способ отдачи записывается рядом — просмотр в браузере и скачивание
+   * к себе различаются последствиями, и в журнале они не должны сливаться.
    */
-  if (file.uploadedBy !== actor.context.userId) {
-    await recordAudit(
-      { context: actor.context, ip: actor.ip, requestId: actor.requestId },
-      {
-        action: AUDIT_ACTIONS.fileRead,
-        entityType: 'file',
-        entityId: file.id,
-        after: { residencyId: file.residencyId, scope: file.scope },
+  await recordAudit(
+    { context: actor.context, ip: actor.ip, requestId: actor.requestId },
+    {
+      action: AUDIT_ACTIONS.fileRead,
+      entityType: 'file',
+      entityId: file.id,
+      after: {
+        residencyId: file.residencyId,
+        scope: file.scope,
+        disposition: deps.disposition ?? 'attachment',
+        own: file.uploadedBy === actor.context.userId,
       },
-      executor,
-    );
-  }
+    },
+    executor,
+  );
 
   return {
     stream,
@@ -580,4 +588,36 @@ export async function readFileContent(
     sizeBytes: file.sizeBytes,
     originalName: file.originalName,
   };
+}
+
+/**
+ * Пропуск на содержимое файла для этого человека (указание владельца,
+ * 22 сентября 2026). Права проверяются здесь, ровно те же, что у отдачи:
+ * пропуск выдаётся только тому, кто и так вправе открыть файл, и живёт
+ * пять минут (`src/lib/files/view-grant.ts`).
+ *
+ * Сам пропуск ничего не открывает: отдача всё равно спросит сессию и права.
+ * Он лишь делает адрес, оставшийся в истории браузера, недействительным
+ * через пять минут.
+ */
+export async function grantFileView(
+  actor: UserActor,
+  fileId: string,
+  disposition: FileDisposition,
+  deps: FileDeps & { instant?: Date } = {},
+): Promise<string> {
+  const { executor } = resolve(deps);
+
+  const file = await requireFile(actor.context, fileId, executor);
+  await assertFileAccess(actor, 'file.read', file, executor);
+
+  if (file.status !== 'ready') {
+    throw new NotFoundError('Файл не найден');
+  }
+
+  return issueViewGrant(
+    { fileId: file.id, userId: actor.context.userId, disposition },
+    deps.instant ?? now(),
+    await getViewGrantKey(),
+  );
 }

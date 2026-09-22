@@ -187,7 +187,15 @@ export const API_OPERATIONS: Readonly<Record<string, Operation[]>> = {
   '/files/{id}/content': [
     {
       method: 'get',
-      summary: 'Содержимое файла',
+      summary: 'Содержимое файла (человеку в браузере — только по пропуску с /view)',
+      parameters: [{ name: 'id', in: 'path', required: true, description: 'Файл' }],
+      response: z.object({}),
+    },
+  ],
+  '/files/{id}/view': [
+    {
+      method: 'get',
+      summary: 'Открыть документ: пропуск на пять минут, ?download=1 — скачиванием',
       parameters: [{ name: 'id', in: 'path', required: true, description: 'Файл' }],
       response: z.object({}),
     },

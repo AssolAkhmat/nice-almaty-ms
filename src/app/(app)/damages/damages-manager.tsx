@@ -3,6 +3,7 @@
 import { useFormatter, useTranslations } from 'next-intl';
 import { useActionState, useMemo, useState } from 'react';
 
+import { FileLinks } from '@/components/files/file-links';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
@@ -299,14 +300,7 @@ function DamageCard({ canReverse, damage }: { canReverse: boolean; damage: Damag
         {damage.description !== null && <p>{damage.description}</p>}
 
         {damage.receiptFileId !== null && (
-          <a
-            className="text-text-muted hover:text-text underline-offset-2 hover:underline"
-            href={`/api/v1/files/${damage.receiptFileId}/content`}
-            rel="noreferrer"
-            target="_blank"
-          >
-            {t('files.receipt')}
-          </a>
+          <FileLinks fileId={damage.receiptFileId} label={t('files.receipt')} />
         )}
 
         <ul className="flex flex-col gap-1">

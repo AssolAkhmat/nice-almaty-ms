@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -294,14 +295,59 @@ describe('коммунальные периоды', () => {
     });
   });
 
-  it('на дом и месяц период один: второй не заводится', async () => {
+  /*
+   * Второе заведение того же месяца — не ошибка, а гонка двух админов:
+   * уникальный ключ решает спор, проигравший получает ту же строку.
+   * Раньше он получал исключение, и экран коммуналки падал на ровном месте.
+   */
+  it('на дом и месяц период один: второй вызов отдаёт тот же', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '5021');
 
-      await createUtilityPeriod(fixture.admin, { houseId: fixture.houseA, month: MONTH }, tx);
+      const first = await createUtilityPeriod(
+        fixture.admin,
+        { houseId: fixture.houseA, month: MONTH },
+        tx,
+      );
+      const second = await createUtilityPeriod(
+        fixture.admin,
+        { houseId: fixture.houseA, month: MONTH },
+        tx,
+      );
+
+      expect(second.id).toBe(first.id);
+
+      const rows = await tx
+        .select()
+        .from(schema.utilityPeriods)
+        .where(eq(schema.utilityPeriods.houseId, fixture.houseA));
+
+      expect(rows).toHaveLength(1);
+    });
+  });
+
+  /*
+   * Негативная фикстура к самому запрету: вставка мимо репозитория обязана
+   * разбиться о ключ базы. Без неё «период один» держался бы на вежливости
+   * одного метода.
+   */
+  it('вторую строку того же месяца не пускает сама база', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '5121');
+
+      const period = await createUtilityPeriod(
+        fixture.admin,
+        { houseId: fixture.houseA, month: MONTH },
+        tx,
+      );
 
       await expect(
-        createUtilityPeriod(fixture.admin, { houseId: fixture.houseA, month: MONTH }, tx),
+        tx.insert(schema.utilityPeriods).values({
+          orgId: period.orgId,
+          houseId: fixture.houseA,
+          month: MONTH,
+          status: 'draft',
+        }),
       ).rejects.toThrow();
     });
   });

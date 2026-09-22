@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { useActionState } from 'react';
 
+import { FileLinks } from '@/components/files/file-links';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,14 +43,7 @@ function ContractRow({ row }: { row: ContractRowView }) {
 
       <div className="flex flex-col gap-3 p-4 pt-0">
         {row.contractFileId !== null && (
-          <a
-            className="text-accent text-[13px] underline"
-            href={`/api/v1/files/${row.contractFileId}/content`}
-            rel="noreferrer"
-            target="_blank"
-          >
-            {t('contract.open')}
-          </a>
+          <FileLinks fileId={row.contractFileId} label={t('contract.open')} />
         )}
 
         {buildState.error !== undefined && (

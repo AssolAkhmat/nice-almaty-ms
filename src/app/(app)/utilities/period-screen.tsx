@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { useActionState } from 'react';
 
+import { FileLinks } from '@/components/files/file-links';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
@@ -210,14 +211,7 @@ export function PeriodScreen({
                   <span>{line.title}</span>
                   <span className="flex items-center gap-3">
                     {line.receiptFileId !== null && (
-                      <a
-                        className="text-text-muted hover:text-text underline-offset-2 hover:underline"
-                        href={`/api/v1/files/${line.receiptFileId}/content`}
-                        rel="noreferrer"
-                        target="_blank"
-                      >
-                        {t('files.receipt')}
-                      </a>
+                      <FileLinks fileId={line.receiptFileId} label={t('files.receipt')} />
                     )}
                     <Money amount={line.amount} />
                     {canManage && !closed && <RemoveLine lineId={line.id} />}

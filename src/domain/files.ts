@@ -19,6 +19,41 @@ export const ALLOWED_MIME_TYPES = [
 
 export type AllowedMime = (typeof ALLOWED_MIME_TYPES)[number];
 
+/** Как отдаётся файл: показом в браузере или скачиванием к себе. */
+export type FileDisposition = 'inline' | 'attachment';
+
+/**
+ * Типы, которые браузер показывает сам и при показе ничего не исполняет
+ * (указание владельца, 22 сентября 2026: смотреть справку во вкладке,
+ * а не копить их в «Загрузках»).
+ *
+ * Список свой, а не `ALLOWED_MIME_TYPES`: разрешённое к загрузке и безопасное
+ * к показу — разные вопросы, и отвечать на второй первым значит согласиться
+ * показывать всё, что когда-нибудь разрешат загружать. Стоит в этот список
+ * попасть `text/html`, и чужой документ станет страницей на нашем домене.
+ */
+const INLINE_SAFE_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'application/pdf',
+] as const;
+
+/**
+ * Чем отдавать файл на самом деле. Просьба показать выполняется только для
+ * безопасного типа; для всех прочих остаётся скачивание, а не отказ —
+ * документ должен доставаться в любом случае.
+ */
+export function dispositionFor(mime: string, requested: FileDisposition): FileDisposition {
+  if (requested !== 'inline') {
+    return 'attachment';
+  }
+
+  return (INLINE_SAFE_MIME_TYPES as readonly string[]).includes(normalizeMime(mime))
+    ? 'inline'
+    : 'attachment';
+}
+
 /** Причина отказа — код, а не готовый текст: перевод подставляет интерфейс. */
 export type UploadRejection = 'files.mimeNotAllowed' | 'files.tooLarge' | 'files.empty';
 

@@ -639,6 +639,8 @@
     }
   },
   "files": {
+    "open": "Открыть",
+    "download": "Скачать",
     "receipt": "Чек",
     "receiptHint": "Необязательно: фото или PDF до 10 МБ",
     "receiptReady": "Чек загружен",

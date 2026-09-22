@@ -4,6 +4,7 @@ import {
   ALLOWED_MIME_TYPES,
   MAX_UPLOAD_BYTES,
   checkUpload,
+  dispositionFor,
   documentStorageKey,
   extensionForMime,
   houseFileStorageKey,
@@ -189,5 +190,53 @@ describe('путь хранения файла дома', () => {
     ]) {
       expect(() => houseFileStorageKey(parts)).toThrow(RangeError);
     }
+  });
+});
+
+/**
+ * Показ документа во вкладке (указание владельца, 22 сентября 2026).
+ * Список безопасных к показу типов держится отдельно от списка разрешённых
+ * к загрузке; последняя проверка здесь — негативная фикстура на это.
+ */
+describe('способ отдачи файла', () => {
+  it('просьба скачать выполняется всегда', () => {
+    for (const mime of ALLOWED_MIME_TYPES) {
+      expect(dispositionFor(mime, 'attachment')).toBe('attachment');
+    }
+  });
+
+  it('картинки и PDF показываются во вкладке', () => {
+    for (const mime of ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']) {
+      expect(dispositionFor(mime, 'inline')).toBe('inline');
+    }
+  });
+
+  it('тип с параметрами и в верхнем регистре — тот же тип', () => {
+    expect(dispositionFor('APPLICATION/PDF', 'inline')).toBe('inline');
+    expect(dispositionFor('image/jpeg; charset=binary', 'inline')).toBe('inline');
+  });
+
+  it('исполняемое во вкладке не показывается, а скачивается', () => {
+    for (const mime of [
+      'text/html',
+      'image/svg+xml',
+      'application/xhtml+xml',
+      'text/xml',
+      'application/octet-stream',
+      '',
+    ]) {
+      expect(dispositionFor(mime, 'inline')).toBe('attachment');
+    }
+  });
+
+  /*
+   * Негативная фикстура к «список безопасных не выводится из разрешённых
+   * к загрузке»: расширение загрузки само по себе не должно открывать
+   * новому типу показ во вкладке.
+   */
+  it('разрешение загружать тип не делает его безопасным к показу', () => {
+    const uploadable: readonly string[] = [...ALLOWED_MIME_TYPES, 'text/html'];
+
+    expect(uploadable.every((mime) => dispositionFor(mime, 'inline') === 'inline')).toBe(false);
   });
 });

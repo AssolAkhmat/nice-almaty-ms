@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { useActionState, useRef, useState } from 'react';
 
+import { FileLinks } from '@/components/files/file-links';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -103,15 +104,11 @@ export function ContractCard({ contract }: { contract: ContractView }) {
       </CardHeader>
 
       <div className="flex flex-col gap-4 p-4 pt-0">
-        <a
-          className="text-accent text-[13px] underline"
-          data-testid="contract-file"
-          href={`/api/v1/files/${contract.contractFileId}/content`}
-          rel="noreferrer"
-          target="_blank"
-        >
-          {t('contract.open')}
-        </a>
+        <FileLinks
+          fileId={contract.contractFileId}
+          label={t('contract.open')}
+          testId="contract-file"
+        />
 
         {contract.isSigned ? (
           <p className="text-text-muted text-[13px]">{t('contract.signedHint')}</p>

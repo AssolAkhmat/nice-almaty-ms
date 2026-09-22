@@ -52,6 +52,7 @@ vi.mock('@/adapters/storage', async (importOriginal) => {
 const { PUT: putBlob } = await import('./[id]/blob/route');
 const { POST: postComplete } = await import('./[id]/complete/route');
 const { GET: getContent } = await import('./[id]/content/route');
+const { GET: getView } = await import('./[id]/view/route');
 const { POST: postUploadSession } = await import('./upload-session/route');
 
 const roots: string[] = [];
@@ -167,6 +168,32 @@ function sessionBody(residencyId: string, overrides: Record<string, unknown> = {
 
 function route(id: string) {
   return { params: Promise.resolve({ id }) };
+}
+
+/**
+ * Путь человека в браузере: `/view` проверяет права и переводит на содержимое
+ * с пятиминутным пропуском (указание владельца, 22 сентября 2026). Прямой
+ * запрос содержимого без пропуска отвергается, поэтому проверки ходят так же,
+ * как ходит браузер.
+ */
+async function openContent(token: string, fileId: string, query = ''): Promise<Response> {
+  const viewed = await getView(
+    new Request(`http://localhost/api/v1/files/${fileId}/view${query}`, {
+      headers: { cookie: `${SESSION_COOKIE_NAME}=${token}` },
+    }),
+    route(fileId),
+  );
+
+  if (viewed.status !== 302) {
+    return viewed;
+  }
+
+  return getContent(
+    new Request(`http://localhost${viewed.headers.get('location') ?? ''}`, {
+      headers: { cookie: `${SESSION_COOKIE_NAME}=${token}` },
+    }),
+    route(fileId),
+  );
 }
 
 /** Сессия загрузки, дошедшие байты и подтверждение — исходное состояние для чтения. */
@@ -478,7 +505,7 @@ describe('GET /api/v1/files/{id}/content', () => {
       const fixture = await seed(tx, '4040');
       const fileId = await uploadReadyFile(fixture.a.token, fixture.a.residencyId);
 
-      const response = await getContent(authorized(fixture.a.token), route(fileId));
+      const response = await openContent(fixture.a.token, fileId);
 
       expect(response.status).toBe(200);
       expect(response.headers.get('content-type')).toBe('image/jpeg');
@@ -497,7 +524,7 @@ describe('GET /api/v1/files/{id}/content', () => {
       const fixture = await seed(tx, '4041');
       const fileId = await uploadReadyFile(fixture.a.token, fixture.a.residencyId);
 
-      const response = await getContent(authorized(fixture.a.token), route(fileId));
+      const response = await openContent(fixture.a.token, fileId, '?download=1');
       const disposition = response.headers.get('content-disposition') ?? '';
 
       expect(disposition).toContain('attachment');
@@ -511,7 +538,7 @@ describe('GET /api/v1/files/{id}/content', () => {
       const fixture = await seed(tx, '4042');
       const fileId = await uploadReadyFile(fixture.a.token, fixture.a.residencyId);
 
-      const response = await getContent(authorized(fixture.b.token), route(fileId));
+      const response = await openContent(fixture.b.token, fileId);
 
       expect(response.status).toBe(404);
     });
@@ -529,7 +556,7 @@ describe('GET /api/v1/files/{id}/content', () => {
       );
       const { file_id: fileId } = (await created.json()) as { file_id: string };
 
-      const response = await getContent(authorized(fixture.a.token), route(fileId));
+      const response = await openContent(fixture.a.token, fileId);
 
       expect(response.status).toBe(404);
     });
@@ -546,6 +573,73 @@ describe('GET /api/v1/files/{id}/content', () => {
       );
 
       expect(response.status).toBe(401);
+    });
+  });
+
+  /*
+   * Пропуск — то самое требование владельца от 22 сентября 2026: адрес,
+   * оставшийся в истории браузера, обязан перестать работать. Проверки ниже
+   * ломают его по одной составляющей.
+   */
+  it('прямая ссылка на содержимое без пропуска не работает', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '4045');
+      const fileId = await uploadReadyFile(fixture.a.token, fixture.a.residencyId);
+
+      const response = await getContent(authorized(fixture.a.token), route(fileId));
+
+      expect(response.status).toBe(403);
+    });
+  });
+
+  it('пропуск одного человека не открывает файл другому', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '4046');
+      const fileId = await uploadReadyFile(fixture.a.token, fixture.a.residencyId);
+
+      const viewed = await getView(
+        new Request(`http://localhost/api/v1/files/${fileId}/view`, {
+          headers: { cookie: `${SESSION_COOKIE_NAME}=${fixture.a.token}` },
+        }),
+        route(fileId),
+      );
+
+      const stolen = await getContent(
+        new Request(`http://localhost${viewed.headers.get('location') ?? ''}`, {
+          headers: { cookie: `${SESSION_COOKIE_NAME}=${fixture.b.token}` },
+        }),
+        route(fileId),
+      );
+
+      expect(stolen.status).toBe(403);
+    });
+  });
+
+  it('открытие во вкладке идёт показом, а не вложением', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '4047');
+      const fileId = await uploadReadyFile(fixture.a.token, fixture.a.residencyId);
+
+      const response = await openContent(fixture.a.token, fileId);
+
+      expect(response.headers.get('content-disposition')).toContain('inline');
+      expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+    });
+  });
+
+  it('чужой файл не выдаёт даже пропуска', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '4048');
+      const fileId = await uploadReadyFile(fixture.a.token, fixture.a.residencyId);
+
+      const viewed = await getView(
+        new Request(`http://localhost/api/v1/files/${fileId}/view`, {
+          headers: { cookie: `${SESSION_COOKIE_NAME}=${fixture.b.token}` },
+        }),
+        route(fileId),
+      );
+
+      expect(viewed.status).toBe(404);
     });
   });
 });

@@ -3,6 +3,7 @@
 import { useFormatter, useTranslations } from 'next-intl';
 import { useActionState, useState } from 'react';
 
+import { FileLinks } from '@/components/files/file-links';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
@@ -217,14 +218,7 @@ export function Journal({ rows }: { rows: readonly JournalRowView[] }) {
             </ul>
 
             {row.receiptFileId !== null && (
-              <a
-                className="text-text-muted hover:text-text underline-offset-2 hover:underline"
-                href={`/api/v1/files/${row.receiptFileId}/content`}
-                rel="noreferrer"
-                target="_blank"
-              >
-                {t('files.receipt')}
-              </a>
+              <FileLinks fileId={row.receiptFileId} label={t('files.receipt')} />
             )}
 
             {row.sourceType === 'manual' && !row.reversed && <ReverseEntry entryId={row.id} />}

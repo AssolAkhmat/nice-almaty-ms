@@ -639,6 +639,8 @@
     }
   },
   "files": {
+    "open": "Open",
+    "download": "Download",
     "receipt": "Receipt",
     "receiptHint": "Optional: a photo or PDF up to 10 MB",
     "receiptReady": "Receipt uploaded",

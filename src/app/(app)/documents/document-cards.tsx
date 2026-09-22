@@ -3,6 +3,7 @@
 import { useFormatter, useTranslations } from 'next-intl';
 import { useActionState, useState } from 'react';
 
+import { FileLinks } from '@/components/files/file-links';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
@@ -147,6 +148,13 @@ function DocumentCard({ card, residencyId }: { card: DocumentCardView; residency
             {t('documents.rejectedBecause', { reason: card.rejectReason })}
           </p>
         )}
+
+        {/*
+          Свой загруженный документ жилец видел только как «загружено»:
+          открыть его было нельзя вовсе, и проверить, тот ли файл ушёл,
+          он не мог. Ссылка та же, что у админа, и права те же.
+        */}
+        {card.fileId !== null && <FileLinks fileId={card.fileId} label={t('documents.openFile')} />}
 
         <form action={action} className="flex flex-col gap-3">
           <input name="residencyId" type="hidden" value={residencyId} />

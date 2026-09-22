@@ -3,6 +3,7 @@
 import { useFormatter, useTranslations } from 'next-intl';
 import { useActionState, useState } from 'react';
 
+import { FileLinks } from '@/components/files/file-links';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -48,14 +49,7 @@ function ReviewItem({ item }: { item: ReviewItemView }) {
           })}
         </p>
 
-        <a
-          className="text-accent text-[13px] underline"
-          href={`/api/v1/files/${item.fileId}/content`}
-          rel="noreferrer"
-          target="_blank"
-        >
-          {t('documents.openFile')}
-        </a>
+        <FileLinks fileId={item.fileId} label={t('documents.openFile')} />
 
         <form action={action} className="flex flex-col gap-3">
           <input name="documentId" type="hidden" value={item.id} />
