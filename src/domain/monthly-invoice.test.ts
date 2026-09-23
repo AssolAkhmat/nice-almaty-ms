@@ -65,7 +65,7 @@ describe('состав месячного счёта', () => {
     const invoice = buildMonthlyInvoice({
       month: SEPTEMBER,
       rent: 70_000,
-      utilities: { amount: 5_410, title: 'Коммунальные услуги за август' },
+      utilities: [{ amount: 5_410, title: 'Коммунальные услуги за август' }],
     });
 
     expect(invoice.lines[1]).toEqual({
@@ -128,7 +128,7 @@ describe('состав месячного счёта', () => {
     const invoice = buildMonthlyInvoice({
       month: SEPTEMBER,
       rent: 70_000,
-      utilities: { amount: 5_410, title: 'Коммунальные услуги за август' },
+      utilities: [{ amount: 5_410, title: 'Коммунальные услуги за август' }],
       depositDebt: 1_000,
       manualLines: [{ title: 'Замок', amount: 3_000 }],
     });
@@ -186,7 +186,7 @@ describe('штрафы и скидка за рейтинг (§3, §5.4)', () => 
     const draft = buildMonthlyInvoice({
       month: parseBusinessDate('2026-10-01'),
       rent: 2_000,
-      utilities: { amount: 12_000, title: 'Коммуналка' },
+      utilities: [{ amount: 12_000, title: 'Коммуналка' }],
       discount: { title: 'Скидка за рейтинг', amount: 5_000 },
     });
 
@@ -203,5 +203,27 @@ describe('штрафы и скидка за рейтинг (§3, §5.4)', () => 
     });
 
     expect(draft.lines.map((line) => line.kind)).toEqual(['rent']);
+  });
+
+  /*
+   * Месяц переселения: человек прожил часть дней в одном доме, часть
+   * в другом, и должен обоим (решение D26). Прежний сборщик умел ровно
+   * одну строку коммуналки, и доля покинутого дома в счёт не попадала.
+   */
+  it('в месяц переселения коммуналка идёт двумя строками', () => {
+    const invoice = buildMonthlyInvoice({
+      month: SEPTEMBER,
+      rent: 70_000,
+      utilities: [
+        { amount: 3_000, title: 'Коммунальные услуги за август, Дом 1' },
+        { amount: 6_000, title: 'Коммунальные услуги за август, Дом 2' },
+      ],
+    });
+
+    const utilities = invoice.lines.filter((line) => line.kind === 'utilities');
+
+    expect(utilities).toHaveLength(2);
+    expect(utilities.reduce((sum, line) => sum + line.amount, 0)).toBe(9_000);
+    expect(invoice.total).toBe(79_000);
   });
 });

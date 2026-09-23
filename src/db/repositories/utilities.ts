@@ -6,6 +6,7 @@ import { now, type BusinessDate } from '@/lib/time';
 import { assertHouseVisible, visibleHouseIds, type AccessContext } from '../access';
 import { getDb, type Executor } from '../client';
 import {
+  houses,
   utilityAllocations,
   utilityLines,
   utilityPeriods,
@@ -302,6 +303,42 @@ export async function findClosedAllocation(
     .limit(1);
 
   return row?.allocation ?? null;
+}
+
+/**
+ * Все закрытые доли месяца у этого жильца — по всем домам, которые видны
+ * читающему (решение D26).
+ *
+ * После переселения долей за один месяц бывает две: по одной за дни,
+ * прожитые в каждом доме. Прежний поиск брал «дом сейчас» и терял долю
+ * старого дома совсем — строка коммуналки просто исчезала из счёта.
+ */
+export async function listClosedAllocationsOfMonth(
+  context: AccessContext,
+  filter: { month: BusinessDate; userId: string },
+  executor: Executor = getDb(),
+): Promise<{ houseId: string; houseName: string; amount: number; days: number }[]> {
+  const rows = await executor
+    .select({
+      houseId: utilityPeriods.houseId,
+      houseName: houses.name,
+      amount: utilityAllocations.amount,
+      days: utilityAllocations.days,
+    })
+    .from(utilityAllocations)
+    .innerJoin(utilityPeriods, eq(utilityPeriods.id, utilityAllocations.periodId))
+    .innerJoin(houses, eq(houses.id, utilityPeriods.houseId))
+    .where(
+      and(
+        periodScope(context),
+        eq(utilityPeriods.month, filter.month),
+        eq(utilityPeriods.status, 'closed'),
+        eq(utilityAllocations.userId, filter.userId),
+      ),
+    )
+    .orderBy(asc(houses.name), asc(utilityPeriods.houseId), asc(utilityAllocations.id));
+
+  return rows;
 }
 
 export async function saveUtilityAllocations(

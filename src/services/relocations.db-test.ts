@@ -11,6 +11,7 @@ import { NotFoundError, ValidationError } from '@/lib/errors';
 import { parseBusinessDate } from '@/lib/time';
 
 import { assignBedToResidency } from './beds';
+import { generateMonthlyInvoices } from './monthly-invoices';
 import { groupsNamingUser, relocateResidency } from './relocations';
 import {
   closeUtilityPeriod,
@@ -410,6 +411,63 @@ describe('коммуналка после переселения', () => {
       expect(closed.allocations).toHaveLength(1);
       expect(closed.allocations[0]?.userId).toBe(fixture.userId);
       expect(closed.allocations[0]?.days).toBe(9);
+    });
+  });
+});
+
+describe('счёт 1 числа после переселения', () => {
+  /*
+   * Проверка ровно того случая, ради которого коммуналка чинилась: жилец
+   * переехал 10 сентября, оба дома закрыли сентябрь, и 1 октября счёт
+   * обязан нести обе доли. Прежний расчёт нашёл бы долю только «дома
+   * сейчас», и деньги старого дома пропали бы из счёта молча.
+   */
+  it('несёт доли обоих домов двумя строками', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '7030');
+
+      await relocate(tx, fixture);
+
+      for (const houseId of [fixture.houseA, fixture.houseB]) {
+        const period = await openUtilityPeriod(fixture.superadmin, houseId, SEPTEMBER, {
+          executor: tx,
+        });
+
+        await addPeriodLine(
+          fixture.superadmin,
+          period.id,
+          { title: 'Свет', amount: houseId === fixture.houseA ? 9_000 : 21_000 },
+          { executor: tx },
+        );
+
+        await closeUtilityPeriod(fixture.superadmin, period.id, {
+          executor: tx,
+          today: parseBusinessDate('2026-09-30'),
+          instant: new Date('2026-09-30T10:00:00+05:00'),
+        });
+      }
+
+      await generateMonthlyInvoices({
+        executor: tx,
+        instant: new Date('2026-10-01T00:05:00+05:00'),
+      });
+
+      const [invoice] = await tx
+        .select()
+        .from(schema.invoices)
+        .where(eq(schema.invoices.residencyId, fixture.residencyId));
+
+      const lines = await tx
+        .select()
+        .from(schema.invoiceLines)
+        .where(eq(schema.invoiceLines.invoiceId, invoice?.id ?? ''));
+
+      const utilities = lines.filter((line) => line.kind === 'utilities');
+
+      expect(utilities).toHaveLength(2);
+      expect(utilities.reduce((sum, line) => sum + line.amount, 0)).toBe(30_000);
+      // Дом назван в строке, иначе жилец видел бы две одинаковые.
+      expect(utilities.every((line) => line.title.includes('Дом'))).toBe(true);
     });
   });
 });

@@ -38,7 +38,11 @@ export interface MonthlyInvoiceInput {
   /** Цена проживания на первое число месяца; всегда полная сумма (§3). */
   rent: number;
   /** Доля за прошлый месяц; `null` — период ещё не закрыт (§4.2). */
-  utilities?: { amount: number; title: string } | null;
+  /*
+   * Строк коммуналки бывает несколько: в месяц переселения человек должен
+   * обоим домам, каждому за прожитые там дни (решение D26).
+   */
+  utilities?: readonly { amount: number; title: string }[] | null;
   /** Начисленные штрафы (§5.3): каждый своей строкой, в порядке начисления. */
   fines?: readonly ManualLine[];
   /** Непогашенный перерасход депозита (§2.4); ноль — строки нет. */
@@ -84,13 +88,9 @@ export function buildMonthlyInvoice(input: MonthlyInvoiceInput): MonthlyInvoiceD
 
   const lines: MonthlyInvoiceLine[] = [{ kind: 'rent', title: 'Проживание', amount: input.rent }];
 
-  if (input.utilities != null) {
-    assertMoney(input.utilities.amount);
-    lines.push({
-      kind: 'utilities',
-      title: input.utilities.title,
-      amount: input.utilities.amount,
-    });
+  for (const utilities of input.utilities ?? []) {
+    assertMoney(utilities.amount);
+    lines.push({ kind: 'utilities', title: utilities.title, amount: utilities.amount });
   }
 
   for (const fine of input.fines ?? []) {

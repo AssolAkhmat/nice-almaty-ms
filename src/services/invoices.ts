@@ -16,7 +16,7 @@ import {
   type InvoiceFilter,
 } from '@/db/repositories/invoices';
 import { listAssignments, requireResidency } from '@/db/repositories/residencies';
-import { findClosedAllocation } from '@/db/repositories/utilities';
+import { listClosedAllocationsOfMonth } from '@/db/repositories/utilities';
 import {
   allocatePayment,
   depositBalance,
@@ -143,32 +143,36 @@ const KIND_ORDER: readonly InvoiceLineKind[] = [
 const REBUILT_KINDS: readonly InvoiceLineKind[] = ['rent', 'utilities', 'damage_carryover'];
 
 /**
- * Строка коммуналки для счёта за месяц: доля берётся из закрытого периода
+ * Строки коммуналки для счёта за месяц: доли берутся из закрытых периодов
  * **прошлого** месяца (§3 — коммуналка идёт за прошлый месяц, §4).
- * `null` — период не закрыт или жилец в нём не участвовал.
+ * Пусто — период не закрыт или жилец в нём не участвовал.
+ *
+ * Строк бывает несколько: в месяц переселения человек прожил часть дней
+ * в одном доме, часть в другом, и должен обоим (решение D26). Дом ищется
+ * не по «дому сейчас» — иначе доля покинутого дома просто исчезла бы
+ * из счёта, — а по месяцу и жильцу среди всех видимых домов.
  */
-export async function utilitiesLineFor(
+export async function utilitiesLinesFor(
   context: AccessContext,
-  target: { houseId: string; userId: string; invoiceMonth: BusinessDate },
+  target: { userId: string; invoiceMonth: BusinessDate },
   executor: Executor,
-): Promise<InvoiceLineInput | null> {
+): Promise<InvoiceLineInput[]> {
   const month = addMonths(target.invoiceMonth, -1);
 
-  const allocation = await findClosedAllocation(
-    context,
-    { houseId: target.houseId, month, userId: target.userId },
-    executor,
-  );
+  const allocations = (
+    await listClosedAllocationsOfMonth(context, { month, userId: target.userId }, executor)
+  ).filter((allocation) => allocation.amount > 0);
 
-  if (allocation === null || allocation.amount <= 0) {
-    return null;
-  }
+  /* Дом называется в строке только когда домов больше одного: иначе шум. */
+  const named = allocations.length > 1;
 
-  return {
-    kind: 'utilities',
-    title: `Коммунальные услуги за ${month.slice(0, 7)}`,
+  return allocations.map((allocation) => ({
+    kind: 'utilities' as const,
+    title: named
+      ? `Коммунальные услуги за ${month.slice(0, 7)}, ${allocation.houseName}`
+      : `Коммунальные услуги за ${month.slice(0, 7)}`,
     amount: allocation.amount,
-  };
+  }));
 }
 
 function assertMoney(amount: number): void {
@@ -588,10 +592,16 @@ export async function recordPayment(
       input.amount,
     );
 
+    /*
+     * Дом берётся из самого счёта, а не из проживания: в счёте он записан
+     * снимком на момент выставления. После переселения (D26) оплата
+     * сентябрьского счёта старого дома кредитовала бы фонд нового —
+     * деньги ушли бы не тому дому, и никто бы этого не заметил.
+     */
     await postInvoicePayment(
       actor,
       {
-        houseId: residency.houseId,
+        houseId: invoice.houseId ?? residency.houseId,
         invoiceId: invoice.id,
         method: input.method,
         allocation,
@@ -677,15 +687,13 @@ export async function recalculateInvoice(
 
   const rebuilt: InvoiceLineInput[] = [{ kind: 'rent', title: 'Проживание', amount: rent }];
 
-  const utilities = await utilitiesLineFor(
-    actor.context,
-    { houseId: residency.houseId, userId: residency.userId, invoiceMonth: month },
-    executor,
+  rebuilt.push(
+    ...(await utilitiesLinesFor(
+      actor.context,
+      { userId: residency.userId, invoiceMonth: month },
+      executor,
+    )),
   );
-
-  if (utilities !== null) {
-    rebuilt.push(utilities);
-  }
 
   if (balance < 0) {
     rebuilt.push({

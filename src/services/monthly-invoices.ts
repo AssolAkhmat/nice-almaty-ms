@@ -12,7 +12,7 @@ import { buildMonthlyInvoice, rentForMonth } from '@/domain/monthly-invoice';
 import { logger } from '@/lib/logger';
 import { now, startOfMonth, todayInAlmaty, type BusinessDate } from '@/lib/time';
 
-import { createInvoice, utilitiesLineFor } from './invoices';
+import { createInvoice, utilitiesLinesFor } from './invoices';
 import { discountForMonth, pendingFinesForMonth } from './rating';
 
 import type { AccessContext } from '@/db/access';
@@ -115,9 +115,9 @@ async function draftFor(
    * Коммуналка идёт за прошлый месяц и только из закрытого периода (§3, §4).
    * Период, закрытый позже, допишет строку в этот же счёт сам.
    */
-  const utilities = await utilitiesLineFor(
+  const utilities = await utilitiesLinesFor(
     actor.context,
-    { houseId: residency.houseId, userId: residency.userId, invoiceMonth: month },
+    { userId: residency.userId, invoiceMonth: month },
     executor,
   );
 
@@ -134,7 +134,7 @@ async function draftFor(
   const draft = buildMonthlyInvoice({
     month,
     rent,
-    utilities: utilities === null ? null : { amount: utilities.amount, title: utilities.title },
+    utilities,
     fines: fines.map((fine) => ({ title: fineTitle(fine.reason), amount: fine.amount })),
     // Перерасход депозита переносится в ближайший месячный счёт (§2.4).
     depositDebt: balance < 0 ? -balance : 0,
