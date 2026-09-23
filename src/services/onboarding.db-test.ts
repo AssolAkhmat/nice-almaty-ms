@@ -194,6 +194,7 @@ describe('шаги заселения', () => {
       await tx.insert(schema.bedAssignments).values({
         residencyId: fixture.residencyId,
         bedId: bed?.id ?? '',
+        houseId: fixture.houseId,
         price: 100_000,
         period: '[2026-09-15,)',
       });

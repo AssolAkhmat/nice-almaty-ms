@@ -141,6 +141,7 @@ async function seed(tx: Transaction, suffix: string) {
     await tx.insert(schema.bedAssignments).values({
       residencyId: residency?.id ?? '',
       bedId,
+      houseId,
       price: 100_000,
       period: to === undefined ? `[${from},)` : `[${from},${to})`,
     });
@@ -663,6 +664,7 @@ describe('исполнители', () => {
       await tx.insert(schema.bedAssignments).values({
         residencyId: residency?.id ?? '',
         bedId: fixture.beds[0] ?? '',
+        houseId: fixture.houseId,
         price: 100_000,
         period: '[2026-09-01,)',
       });

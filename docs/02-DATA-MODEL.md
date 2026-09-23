@@ -47,10 +47,19 @@ PostgreSQL 16. Все таблицы: `id uuid pk default gen_random_uuid()`, `c
 `deposit_amount bigint`, `keys_issued bool`, `keys_issued_at`,
 `contract_signed_at`, `contract_file_id`, `signature_file_id`.
 
-**bed_assignments** — `residency_id`, `bed_id`, `price bigint`, `period daterange`,
+**bed_assignments** — `residency_id`, `bed_id`, `house_id`, `price bigint`, `period daterange`,
 `created_by`.
 Ограничение: `EXCLUDE USING gist (bed_id WITH =, period WITH &&)` (требуется `btree_gist`)
 — одно место не может быть занято двумя проживаниями одновременно.
+
+`house_id` — дом места на момент назначения, «дом тогда». Из него читается история домов
+жильца, без которой переселение между домами (D26) не отличить от переезда внутри дома;
+«дом сейчас» по-прежнему в `residencies.house_id`. Совпадение с домом места держит составной
+внешний ключ `(bed_id, house_id) → beds(id, house_id)`, совпадение с домом проживания —
+триггер `bed_assignments_house_matches` в момент назначения. Составным ключом на
+`residencies(id, house_id)` второе выразить нельзя: он сверял бы назначение с домом
+проживания всегда и потому запретил бы само переселение — прошлые назначения указывают
+на прежний дом.
 
 **document_types** — `org_id`, `code`, `name_i18n jsonb`, `validity_months int null`
 (null = бессрочно), `requires_issue_date bool`, `is_required bool`, `sort_order`, `archived_at`.

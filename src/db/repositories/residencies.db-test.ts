@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -28,6 +29,8 @@ const db = drizzle(client, { schema }) as unknown as Database;
 afterAll(async () => {
   await client.end();
 });
+
+const SEPTEMBER = businessDate(2026, 9, 1);
 
 class Rollback extends Error {}
 
@@ -114,6 +117,24 @@ async function seed(tx: Transaction, suffix: string) {
     })
     .returning();
 
+  /* Комната и место во втором доме: без них переселение не проверить. */
+  const [roomB] = await tx
+    .insert(schema.areas)
+    .values({ houseId: houseB?.id ?? '', type: 'living', name: 'Комната 1' })
+    .returning();
+
+  const [bedB] = await tx
+    .insert(schema.beds)
+    .values({
+      houseId: houseB?.id ?? '',
+      areaId: roomB?.id ?? '',
+      label: 'верх',
+      tier: 'upper',
+      number: 1,
+      defaultPrice: 80_000,
+    })
+    .returning();
+
   const [first] = await tx
     .insert(schema.users)
     .values({ orgId, phone: `+77061${suffix}`, passwordHash: 'x', role: 'resident' })
@@ -142,6 +163,7 @@ async function seed(tx: Transaction, suffix: string) {
     houseB: houseB?.id ?? '',
     bed: bed?.id ?? '',
     otherBed: otherBed?.id ?? '',
+    bedB: bedB?.id ?? '',
     firstUser: first?.id ?? '',
     secondUser: second?.id ?? '',
     superadmin,
@@ -184,6 +206,7 @@ describe('занятость места', () => {
         inner.insert(schema.bedAssignments).values({
           residencyId: second.id,
           bedId: fixture.bed,
+          houseId: fixture.houseA,
           price: 65_000,
           period: periodLiteral({ from: businessDate(2026, 10, 1), to: null }),
         }),
@@ -211,6 +234,7 @@ describe('занятость места', () => {
       await tx.insert(schema.bedAssignments).values({
         residencyId: first.id,
         bedId: fixture.bed,
+        houseId: fixture.houseA,
         price: 65_000,
         period: periodLiteral({ from: businessDate(2026, 9, 1), to: businessDate(2026, 12, 1) }),
       });
@@ -220,6 +244,7 @@ describe('занятость места', () => {
         tx.insert(schema.bedAssignments).values({
           residencyId: second.id,
           bedId: fixture.bed,
+          houseId: fixture.houseA,
           price: 65_000,
           period: periodLiteral({ from: businessDate(2026, 12, 1), to: null }),
         }),
@@ -256,6 +281,7 @@ describe('занятость места', () => {
         inner.insert(schema.bedAssignments).values({
           residencyId: second.id,
           bedId: fixture.bed,
+          houseId: fixture.houseA,
           price: 65_000,
           period: periodLiteral({ from: businessDate(2030, 1, 1), to: null }),
         }),
@@ -294,6 +320,7 @@ describe('одно проживание — одно место', () => {
         inner.insert(schema.bedAssignments).values({
           residencyId: residency.id,
           bedId: fixture.otherBed,
+          houseId: fixture.houseA,
           price: 70_000,
           period: periodLiteral({ from: businessDate(2026, 10, 1), to: null }),
         }),
@@ -483,6 +510,125 @@ describe('видимость проживаний', () => {
       const visible = await listResidencies(resident, {}, tx);
 
       expect(visible.map((item) => item.id)).toEqual([own.id]);
+    });
+  });
+});
+
+/*
+ * «Место своего дома» — теперь факт базы, а не проверка в сервисе
+ * (указание владельца, 22 сентября 2026). Фикстуры ниже ломают правило
+ * в обход сервиса: если бы защита жила только в `src/services/beds.ts`,
+ * все три прошли бы молча.
+ */
+describe('дом назначения места', () => {
+  it('назначение помнит дом места само', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '8301');
+      const residency = await createResidency(
+        fixture.superadmin,
+        { userId: fixture.firstUser, houseId: fixture.houseA },
+        tx,
+      );
+
+      const assignment = await assignBed(
+        { residencyId: residency.id, bedId: fixture.bed, price: 65_000, from: SEPTEMBER },
+        tx,
+      );
+
+      expect(assignment.houseId).toBe(fixture.houseA);
+    });
+  });
+
+  it('дом назначения, не совпадающий с домом места, база не принимает', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '8302');
+      const residency = await createResidency(
+        fixture.superadmin,
+        { userId: fixture.firstUser, houseId: fixture.houseA },
+        tx,
+      );
+
+      await expect(
+        tx.insert(schema.bedAssignments).values({
+          residencyId: residency.id,
+          bedId: fixture.bed,
+          houseId: fixture.houseB,
+          price: 65_000,
+          period: periodLiteral({ from: SEPTEMBER, to: null }),
+        }),
+      ).rejects.toThrow();
+    });
+  });
+
+  it('место чужого дома отвергает база, а не сервис', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '8303');
+      const residency = await createResidency(
+        fixture.superadmin,
+        { userId: fixture.firstUser, houseId: fixture.houseA },
+        tx,
+      );
+
+      await expect(
+        tx.insert(schema.bedAssignments).values({
+          residencyId: residency.id,
+          bedId: fixture.bedB,
+          houseId: fixture.houseB,
+          price: 80_000,
+          period: periodLiteral({ from: SEPTEMBER, to: null }),
+        }),
+      ).rejects.toThrow();
+    });
+  });
+
+  /*
+   * Ради чего всё это: переселение обязано проходить. Составной ключ
+   * на `residencies(id, house_id)` запретил бы его насовсем — прошлые
+   * назначения указывали бы на прежний дом.
+   */
+  it('переселение проходит, а прошлое назначение остаётся за старым домом', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '8304');
+      const residency = await createResidency(
+        fixture.superadmin,
+        { userId: fixture.firstUser, houseId: fixture.houseA },
+        tx,
+      );
+
+      await assignBed(
+        { residencyId: residency.id, bedId: fixture.bed, price: 65_000, from: SEPTEMBER },
+        tx,
+      );
+
+      await tx
+        .update(schema.residencies)
+        .set({ houseId: fixture.houseB })
+        .where(eq(schema.residencies.id, residency.id));
+
+      const moved = await assignBed(
+        {
+          residencyId: residency.id,
+          bedId: fixture.bedB,
+          price: 80_000,
+          from: businessDate(2026, 10, 1),
+        },
+        tx,
+      );
+
+      expect(moved.houseId).toBe(fixture.houseB);
+
+      const history = await tx
+        .select()
+        .from(schema.bedAssignments)
+        .where(eq(schema.bedAssignments.residencyId, residency.id))
+        .orderBy(schema.bedAssignments.period);
+
+      expect(history).toHaveLength(2);
+      expect(history.map((row) => row.houseId).sort()).toEqual(
+        [fixture.houseA, fixture.houseB].sort(),
+      );
+      // История не переписана: сентябрь остался за первым домом.
+      expect(history.find((row) => row.houseId === fixture.houseA)?.period).toContain('2026-09-01');
     });
   });
 });

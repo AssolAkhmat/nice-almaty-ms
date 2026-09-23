@@ -283,6 +283,7 @@ async function ensureResidents(
     await executor.insert(bedAssignments).values({
       residencyId: residency?.id ?? '',
       bedId: allBeds[index] ?? '',
+      houseId: houseId,
       price: index % BEDS_PER_ROOM === BEDS_PER_ROOM - 1 ? UPPER_PRICE : LOWER_PRICE,
       period: `[${moveInDate},)`,
     });

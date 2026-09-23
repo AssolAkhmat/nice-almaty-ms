@@ -4,6 +4,7 @@ import {
   boolean,
   customType,
   date,
+  foreignKey,
   index,
   pgEnum,
   pgTable,
@@ -105,6 +106,20 @@ const daterange = customType<{ data: string; driverData: string }>({
  * Назначение места. Ограничения исключения добавлены рукописной частью
  * миграции: одно место не занять двумя проживаниями, и одно проживание
  * не занимает два места одновременно (инварианты 1 и 2 из `02-DATA-MODEL.md`).
+ *
+ * Дом назначения хранится колонкой и составным ключом приколочен к дому
+ * места: `(bed_id, house_id) → beds(id, house_id)`. Это не украшение —
+ * из этой колонки читается история домов жильца, без которой переселение
+ * между домами не отличить от переезда внутри дома (указание владельца,
+ * 22 сентября 2026). Слово «дом сейчас» живёт в `residencies.house_id`,
+ * слово «дом тогда» — здесь.
+ *
+ * Правило «место своего дома» держит триггер `bed_assignment_house_matches`
+ * (миграция 0028): он сверяет дом назначения с домом проживания в момент
+ * назначения. Составным ключом на `residencies(id, house_id)` это выразить
+ * нельзя — такой ключ запретил бы саму смену дома, потому что старые
+ * назначения указывали бы на прежний дом, а переписывать их значило бы
+ * переписывать историю.
  */
 export const bedAssignments = pgTable(
   'bed_assignments',
@@ -118,6 +133,10 @@ export const bedAssignments = pgTable(
     bedId: uuid('bed_id')
       .notNull()
       .references(() => beds.id),
+    /** Дом места на момент назначения: «дом тогда», в отличие от «дома сейчас». */
+    houseId: uuid('house_id')
+      .notNull()
+      .references(() => houses.id),
     /** Цена места для этого жильца, целое число тенге. У админа обычно 0. */
     price: bigint('price', { mode: 'number' }).notNull(),
     period: daterange('period').notNull(),
@@ -128,6 +147,12 @@ export const bedAssignments = pgTable(
   (table) => [
     index('bed_assignments_bed_idx').on(table.bedId),
     index('bed_assignments_residency_idx').on(table.residencyId),
+    index('bed_assignments_house_idx').on(table.houseId),
+    foreignKey({
+      columns: [table.bedId, table.houseId],
+      foreignColumns: [beds.id, beds.houseId],
+      name: 'bed_assignments_bed_house_fk',
+    }),
   ],
 );
 

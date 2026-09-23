@@ -134,6 +134,7 @@ async function seed(tx: Transaction, suffix: string, options: { withAdmin?: bool
   await tx.insert(schema.bedAssignments).values({
     residencyId: residency?.id ?? '',
     bedId: bed?.id ?? '',
+    houseId: houseId,
     price: 100_000,
     period: '[2027-03-01,)',
   });

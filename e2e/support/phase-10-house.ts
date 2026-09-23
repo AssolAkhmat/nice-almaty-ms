@@ -205,6 +205,7 @@ async function ensureResident(
     await db.insert(schema.bedAssignments).values({
       residencyId,
       bedId: input.bedId,
+      houseId: input.houseId,
       price: 70_000,
       period: '[2026-09-01,)',
     });

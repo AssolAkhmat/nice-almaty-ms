@@ -141,6 +141,7 @@ async function seed(tx: Transaction, suffix: string, moveIns: readonly string[] 
     await tx.insert(schema.bedAssignments).values({
       residencyId: residency?.id ?? '',
       bedId: bed?.id ?? '',
+      houseId: houseId,
       price: 90_000,
       period: `[${moveIn},)`,
     });

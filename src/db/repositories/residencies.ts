@@ -292,11 +292,24 @@ export async function assignBed(
         .where(eq(bedAssignments.id, open.id));
     }
 
+    /*
+     * Дом назначения берётся у самого места, а не у вызывающего: иначе
+     * однажды его передадут неверно, и «дом тогда» разойдётся с местом.
+     * Составной ключ такую строку и не примет, но лучше не давать ей
+     * возникнуть вовсе.
+     */
+    const [bed] = await tx.select().from(beds).where(eq(beds.id, input.bedId)).limit(1);
+
+    if (bed === undefined) {
+      throw new NotFoundError('Место не найдено');
+    }
+
     const [assignment] = await tx
       .insert(bedAssignments)
       .values({
         residencyId: input.residencyId,
         bedId: input.bedId,
+        houseId: bed.houseId,
         price: input.price,
         period: periodLiteral({ from: input.from, to: null }),
         createdBy: input.createdBy ?? null,
