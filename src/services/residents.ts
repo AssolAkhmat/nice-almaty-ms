@@ -4,7 +4,7 @@ import { listDocuments, listDocumentTypes } from '@/db/repositories/documents';
 import { listHouses } from '@/db/repositories/houses';
 import { listInvoices } from '@/db/repositories/invoices';
 import { listResidencies, requireResidency } from '@/db/repositories/residencies';
-import { findProfile } from '@/db/repositories/resident-profiles';
+import { findProfile, listHistoricNames } from '@/db/repositories/resident-profiles';
 import { requireUser } from '@/db/repositories/users';
 import { documentValidity } from '@/domain/documents';
 import { assertCan } from '@/lib/authz';
@@ -205,6 +205,36 @@ export async function listHouseResidents(
     .filter((entry) => entry.placement?.area.id === filter.areaId)
     .map((entry) => entry.row)
     .sort((first, second) => first.fullName.localeCompare(second.fullName, 'ru'));
+}
+
+/**
+ * Имена для исторических записей дома (указание владельца, 23 сентября 2026).
+ *
+ * Отвечает на один вопрос: как зовут тех, кто занимал места этого дома.
+ * Нужен закрытому коммунальному периоду, счетам, ущербу и ротациям —
+ * строка с суммой и без имени непроверяема, а объясняться за неё придётся
+ * админу дома.
+ *
+ * Это **не** доступ к карточке: телефона, документов, справок, нынешнего
+ * рейтинга и дел уехавшего в новом доме здесь нет и не будет. Уехавший
+ * ушёл из дома, и его сегодняшние данные админа покинутого дома не касаются
+ * (решение D27). Негативная фикстура на это — в `residents.db-test.ts`.
+ */
+export async function houseHistoryNames(
+  actor: UserActor,
+  houseId: string,
+  userIds: readonly string[],
+  deps: ResidentsDeps = {},
+): Promise<Map<string, string>> {
+  const executor = deps.executor ?? getDb();
+
+  assertCan(actor.context, 'user.read', { houseId });
+
+  const rows = await listHistoricNames(actor.context, houseId, userIds, executor);
+
+  return new Map(
+    rows.map((row) => [row.userId, fullNameOf([row.lastName, row.firstName, row.middleName], '')]),
+  );
 }
 
 export async function readResidentCard(

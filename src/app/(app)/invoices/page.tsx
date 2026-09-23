@@ -9,6 +9,7 @@ import { getCurrentSession } from '@/lib/session';
 import { startOfMonth, todayInAlmaty, tryParseBusinessDate } from '@/lib/time';
 import { listInvoicesFor, readInvoice } from '@/services/invoices';
 import { readProfile } from '@/services/resident-profiles';
+import { houseHistoryNames } from '@/services/residents';
 
 import {
   CreateInvoiceForm,
@@ -133,6 +134,19 @@ export default async function InvoicesPage({
       .filter((part) => part !== null && part !== '')
       .join(' ');
     nameOf.set(residency.userId, name.trim() === '' ? residency.userId : name);
+  }
+
+  /*
+   * Счёт мог быть выставлен тому, кто с тех пор переселился в другой дом:
+   * его карточка админу уже не видна, а счёт дома остался. Имя для такой
+   * строки берётся по занятости мест дома — и только имя (решение D27).
+   */
+  const missing = rows.map((row) => row.invoice.userId).filter((userId) => !nameOf.has(userId));
+
+  for (const [userId, name] of await houseHistoryNames(actor, houseId, missing)) {
+    if (name.trim() !== '') {
+      nameOf.set(userId, name);
+    }
   }
 
   const tableRows: InvoiceRowView[] = rows.map((row) => ({

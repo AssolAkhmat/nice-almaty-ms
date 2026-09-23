@@ -3,9 +3,10 @@ import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import { NotFoundError } from '@/lib/errors';
 import { now } from '@/lib/time';
 
-import { visibleHouseIds, type AccessContext } from '../access';
+import { assertHouseVisible, visibleHouseIds, type AccessContext } from '../access';
 import { getDb, type Executor } from '../client';
 import {
+  bedAssignments,
   residencies,
   residentProfiles,
   users,
@@ -49,6 +50,70 @@ function visibleUserIds(context: AccessContext, executor: Executor) {
   );
 
   return and(byOrg, or(byResidency, eq(residentProfiles.userId, context.userId)));
+}
+
+/**
+ * ФИО тех, кто занимал места этого дома, — и только ФИО
+ * (указание владельца, 23 сентября 2026).
+ *
+ * Нужно для исторических записей дома: закрытый коммунальный период, счёт,
+ * ущерб, ротация. Безымянная строка с суммой непроверяема, а объясняться
+ * за неё придётся админу.
+ *
+ * Граница проведена намеренно узко: отдаётся имя, и ничего больше.
+ * Телефон, документы, справки, нынешний рейтинг и дела уехавшего в новом
+ * доме админу покинутого дома не отдаются — для этого есть `findProfile`,
+ * и он по-прежнему не видит человека, чьё проживание числится в чужом доме.
+ *
+ * Право на имя выводится из занятости места, а не из «дома сейчас»:
+ * колонка `bed_assignments.house_id` помнит, где человек стоял тогда.
+ */
+export async function listHistoricNames(
+  context: AccessContext,
+  houseId: string,
+  userIds: readonly string[],
+  executor: Executor = getDb(),
+): Promise<
+  { userId: string; lastName: string | null; firstName: string | null; middleName: string | null }[]
+> {
+  assertHouseVisible(context, houseId);
+
+  /*
+   * Без сортировки намеренно: ответ складывается в словарь «жилец — имя»,
+   * и порядка у него нет. `resident_profiles` опознаётся по `user_id`,
+   * колонки `id` там нет вовсе — устойчивый ключ сортировки взять было бы
+   * неоткуда, а списка, который читает человек, здесь и нет.
+   */
+
+  if (userIds.length === 0) {
+    return [];
+  }
+
+  const occupants = executor
+    .select({ id: residencies.userId })
+    .from(bedAssignments)
+    .innerJoin(residencies, eq(residencies.id, bedAssignments.residencyId))
+    .where(and(eq(residencies.orgId, context.orgId), eq(bedAssignments.houseId, houseId)));
+
+  return executor
+    .select({
+      userId: residentProfiles.userId,
+      lastName: residentProfiles.lastName,
+      firstName: residentProfiles.firstName,
+      middleName: residentProfiles.middleName,
+    })
+    .from(residentProfiles)
+    .where(
+      and(
+        /* Сеть: профили чужой организации не отдаются и по прямому списку. */
+        inArray(
+          residentProfiles.userId,
+          executor.select({ id: users.id }).from(users).where(eq(users.orgId, context.orgId)),
+        ),
+        inArray(residentProfiles.userId, [...userIds]),
+        inArray(residentProfiles.userId, occupants),
+      ),
+    );
 }
 
 export async function findProfile(

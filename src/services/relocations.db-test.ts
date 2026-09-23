@@ -12,7 +12,9 @@ import { parseBusinessDate } from '@/lib/time';
 
 import { assignBedToResidency } from './beds';
 import { generateMonthlyInvoices } from './monthly-invoices';
+import { readProfile } from './resident-profiles';
 import { groupsNamingUser, relocateResidency } from './relocations';
+import { houseHistoryNames, readResidentCard } from './residents';
 import {
   closeUtilityPeriod,
   addPeriodLine,
@@ -468,6 +470,102 @@ describe('счёт 1 числа после переселения', () => {
       expect(utilities.reduce((sum, line) => sum + line.amount, 0)).toBe(30_000);
       // Дом назван в строке, иначе жилец видел бы две одинаковые.
       expect(utilities.every((line) => line.title.includes('Дом'))).toBe(true);
+    });
+  });
+});
+
+/*
+ * Граница права на имя (решение D27, указание владельца 23 сентября 2026):
+ * имя в исторической записи — да, карточка жильца — нет. Обе фикстуры
+ * обязательны: одна доказывает, что имя видно, другая — что карточка нет.
+ */
+describe('имя уехавшего в записях покинутого дома', () => {
+  it('админ старого дома видит имя в своём закрытом периоде', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '7040');
+
+      await tx
+        .insert(schema.residentProfiles)
+        .values({ userId: fixture.userId, lastName: 'Абдуллаев', firstName: 'Ерлан' });
+
+      await relocate(tx, fixture);
+
+      const names = await houseHistoryNames(fixture.admin, fixture.houseA, [fixture.userId], {
+        executor: tx,
+      });
+
+      expect(names.get(fixture.userId)).toBe('Абдуллаев Ерлан');
+    });
+  });
+
+  it('карточку уехавшего админ старого дома не открывает: 404', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '7041');
+
+      await tx
+        .insert(schema.residentProfiles)
+        .values({ userId: fixture.userId, lastName: 'Абдуллаев', firstName: 'Ерлан' });
+
+      await relocate(tx, fixture);
+
+      await expect(readProfile(fixture.admin, fixture.userId, tx)).rejects.toBeInstanceOf(
+        NotFoundError,
+      );
+
+      await expect(
+        readResidentCard(fixture.admin, fixture.residencyId, { executor: tx }),
+      ).rejects.toBeInstanceOf(NotFoundError);
+    });
+  });
+
+  it('имени того, кто в доме не стоял, право не даёт', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '7042');
+
+      const [stranger] = await tx
+        .insert(schema.users)
+        .values({
+          orgId: fixture.orgId,
+          phone: '+77099999042',
+          passwordHash: 'x',
+          role: 'resident',
+        })
+        .returning();
+
+      await tx
+        .insert(schema.residentProfiles)
+        .values({ userId: stranger?.id ?? '', lastName: 'Чужой', firstName: 'Человек' });
+
+      const names = await houseHistoryNames(fixture.admin, fixture.houseA, [stranger?.id ?? ''], {
+        executor: tx,
+      });
+
+      expect(names.size).toBe(0);
+    });
+  });
+
+  it('отдаётся только имя: телефона и документов в ответе нет', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '7043');
+
+      await tx.insert(schema.residentProfiles).values({
+        userId: fixture.userId,
+        lastName: 'Абдуллаев',
+        firstName: 'Ерлан',
+        university: 'КазНУ',
+      });
+
+      await relocate(tx, fixture);
+
+      const names = await houseHistoryNames(fixture.admin, fixture.houseA, [fixture.userId], {
+        executor: tx,
+      });
+
+      const value = names.get(fixture.userId) ?? '';
+
+      expect(value).toBe('Абдуллаев Ерлан');
+      expect(value).not.toContain('КазНУ');
+      expect(value).not.toContain('+7');
     });
   });
 });

@@ -10,7 +10,7 @@ import { monthOptions, parseMonthInput } from '@/domain/utilities';
 import { can } from '@/lib/authz';
 import { getCurrentSession } from '@/lib/session';
 import { addMonths, startOfMonth, todayInAlmaty, type BusinessDate } from '@/lib/time';
-import { readProfile } from '@/services/resident-profiles';
+import { houseHistoryNames } from '@/services/residents';
 import {
   findPeriodOfMonth,
   listPeriodsOfHouse,
@@ -187,22 +187,30 @@ export default async function UtilitiesPage({
       }))
     : view.preview.allocations;
 
-  /** Имена вместо идентификаторов: распределение читает человек. */
-  const rows: AllocationRowView[] = await Promise.all(
-    source.map(async (row) => {
-      const profile = await readProfile(actor, row.userId);
-      const name = [profile.lastName, profile.firstName]
-        .filter((part) => part !== null && part !== '')
-        .join(' ');
-
-      return {
-        userId: row.userId,
-        name: name.trim() === '' ? row.userId : name,
-        days: row.days,
-        amount: row.amount,
-      };
-    }),
+  /*
+   * Имена вместо идентификаторов: распределение читает человек.
+   *
+   * Имена берутся по занятости мест дома, а не по карточке жильца: после
+   * переселения карточка уехавшего админу покинутого дома уже не видна,
+   * и закрытый период остался бы со строкой без имени — суммой, за которую
+   * админу пришлось бы объясняться, не зная, чья она (решение D27).
+   */
+  const names = await houseHistoryNames(
+    actor,
+    houseId,
+    source.map((row) => row.userId),
   );
+
+  const rows: AllocationRowView[] = source.map((row) => {
+    const name = names.get(row.userId) ?? '';
+
+    return {
+      userId: row.userId,
+      name: name.trim() === '' ? row.userId : name,
+      days: row.days,
+      amount: row.amount,
+    };
+  });
 
   return (
     <section className="flex flex-col gap-6">
