@@ -1,7 +1,7 @@
 import { getDb, type Executor } from '@/db/client';
 import { listInvoices } from '@/db/repositories/invoices';
 import { listApprovedAbsences } from '@/db/repositories/rating';
-import { listResidencies } from '@/db/repositories/residencies';
+import { listMonthStaysInHouse, listResidencies } from '@/db/repositories/residencies';
 import {
   addUtilityLine,
   createUtilityPeriod,
@@ -19,7 +19,7 @@ import {
 } from '@/db/repositories/utilities';
 import {
   absentDaysInMonth,
-  daysLivedInMonth,
+  daysLivedInHouseInMonth,
   distributeUtilities,
   monthOf,
   type UtilityDistribution,
@@ -39,7 +39,7 @@ import { AUDIT_ACTIONS, recordAudit } from './audit';
 import { appendInvoiceLine, createInvoice } from './invoices';
 import { postUtilitySurplus } from './ledger';
 
-import type { UtilityAllocation, UtilityLine, UtilityPeriod, Residency } from '@/db/schema';
+import type { UtilityAllocation, UtilityLine, UtilityPeriod } from '@/db/schema';
 import type { UserActor } from './users';
 
 /**
@@ -115,8 +115,8 @@ async function participantsOf(
   houseId: string,
   month: BusinessDate,
   executor: Executor,
-): Promise<{ userId: string; residency: Residency; days: number }[]> {
-  const [residencies, absences] = await Promise.all([
+): Promise<{ userId: string; residencyId: string; days: number }[]> {
+  const [residencies, absences, stays] = await Promise.all([
     listResidencies(actor.context, { houseId }, executor),
     listApprovedAbsences(
       actor.context,
@@ -124,7 +124,41 @@ async function participantsOf(
       { from: startOfMonth(month), to: endOfMonth(month) },
       executor,
     ),
+    listMonthStaysInHouse(actor.context, houseId, startOfMonth(month), executor),
   ]);
+
+  /*
+   * Кто делит коммуналку дома — решает занятость мест, а не «дом сейчас»
+   * (решение D26). Переселившийся числится за новым домом, но за прожитые
+   * в старом дни платит старому; и наоборот, в новом доме он появляется
+   * только с даты переезда, а не задним числом на весь месяц.
+   *
+   * Для всех, кто никуда не переезжал, число дней не меняется ни на день:
+   * это свойство закреплено тестами `daysLivedInHouseInMonth`.
+   */
+  const stayOf = new Map(stays.map((stay) => [stay.residencyId, stay]));
+
+  const known = new Set(residencies.map((residency) => residency.id));
+
+  interface Participant {
+    id: string;
+    userId: string;
+    houseId: string;
+    moveInDate: string | null;
+    moveOutDate: string | null;
+  }
+
+  /* Съехавшие в другой дом: их проживание уже числится не здесь. */
+  const departed: Participant[] = stays
+    .filter((stay) => !known.has(stay.residencyId))
+    .map((stay) => ({
+      id: stay.residencyId,
+      userId: stay.userId,
+      /* Дом чужой — признак `belongsNow` для них ложный, и это верно. */
+      houseId: '',
+      moveInDate: stay.moveInDate,
+      moveOutDate: stay.moveOutDate,
+    }));
 
   /*
    * Из дней вычитается только одобренный отъезд (§4.2): болезнь идёт
@@ -144,19 +178,37 @@ async function participantsOf(
     tripsByUser.set(absence.userId, trips);
   }
 
+  const all: Participant[] = [
+    ...residencies.map((residency) => ({
+      id: residency.id,
+      userId: residency.userId,
+      houseId: residency.houseId,
+      moveInDate: residency.moveInDate,
+      moveOutDate: residency.moveOutDate,
+    })),
+    ...departed,
+  ];
+
   return (
-    residencies
-      .map((residency) => ({
-        userId: residency.userId,
-        residency,
-        days:
-          daysLivedInMonth({
-            month,
-            moveIn: residency.moveInDate === null ? null : (residency.moveInDate as BusinessDate),
-            moveOut:
-              residency.moveOutDate === null ? null : (residency.moveOutDate as BusinessDate),
-          }) - absentDaysInMonth(month, tripsByUser.get(residency.userId) ?? []),
-      }))
+    all
+      .map((residency) => {
+        const stay = stayOf.get(residency.id);
+
+        return {
+          userId: residency.userId,
+          residencyId: residency.id,
+          days:
+            daysLivedInHouseInMonth({
+              month,
+              moveIn: residency.moveInDate === null ? null : (residency.moveInDate as BusinessDate),
+              moveOut:
+                residency.moveOutDate === null ? null : (residency.moveOutDate as BusinessDate),
+              stays: stay?.periods ?? [],
+              elsewhere: stay?.elsewhere ?? false,
+              belongsNow: residency.houseId === houseId,
+            }) - absentDaysInMonth(month, tripsByUser.get(residency.userId) ?? []),
+        };
+      })
       .filter((entry) => entry.days > 0)
       /*
        * Порядок участников — по числу прожитых дней, затем по жильцу. Проживания
@@ -385,7 +437,7 @@ export async function closeUtilityPeriod(
     throw new ConflictError('utilities.errors.noParticipants');
   }
 
-  const byUser = new Map(participants.map((entry) => [entry.userId, entry.residency]));
+  const byUser = new Map(participants.map((entry) => [entry.userId, entry.residencyId]));
   const invoiceMonth = addMonths(month, 1);
 
   return executor.transaction(async (tx) => {
@@ -426,9 +478,9 @@ export async function closeUtilityPeriod(
     let invoiced = 0;
 
     for (const allocation of distribution.allocations) {
-      const residency = byUser.get(allocation.userId);
+      const residencyId = byUser.get(allocation.userId);
 
-      if (residency === undefined || allocation.amount <= 0) {
+      if (residencyId === undefined || allocation.amount <= 0) {
         continue;
       }
 
@@ -440,7 +492,7 @@ export async function closeUtilityPeriod(
 
       const existing = await listInvoices(
         actor.context,
-        { residencyId: residency.id, type: 'monthly', periodMonth: invoiceMonth },
+        { residencyId, type: 'monthly', periodMonth: invoiceMonth },
         tx,
       );
 
@@ -459,7 +511,7 @@ export async function closeUtilityPeriod(
         await createInvoice(
           actor,
           {
-            residencyId: residency.id,
+            residencyId,
             type: 'extra',
             periodMonth: invoiceMonth,
             note: 'Коммунальные услуги: период закрыт после оплаты счёта',

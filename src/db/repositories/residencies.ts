@@ -1,7 +1,7 @@
-import { and, asc, desc, eq, inArray, like, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, like, or, sql } from 'drizzle-orm';
 
 import { NotFoundError } from '@/lib/errors';
-import { now, type BusinessDate } from '@/lib/time';
+import { addMonths, now, startOfMonth, type BusinessDate } from '@/lib/time';
 
 import { assertHouseVisible, visibleHouseIds, type AccessContext } from '../access';
 import { getDb, type Executor } from '../client';
@@ -68,6 +68,100 @@ export async function listResidencies(
     .from(residencies)
     .where(and(...conditions))
     .orderBy(desc(residencies.createdAt), desc(residencies.id));
+}
+
+export interface MonthStay {
+  residencyId: string;
+  userId: string;
+  moveInDate: string | null;
+  moveOutDate: string | null;
+  /** Отрезки занятости мест ЭТОГО дома, пересекающиеся с месяцем. */
+  periods: { from: BusinessDate; to: BusinessDate | null }[];
+  /** В том же месяце у проживания было место в другом доме. */
+  elsewhere: boolean;
+}
+
+/**
+ * Кто занимал места дома в этом месяце (решение D26).
+ *
+ * Отличается от `listResidencies({ houseId })` тем, что смотрит на занятость
+ * мест, а не на «дом сейчас»: переселившийся числится за новым домом, но
+ * коммуналку старого дома за прожитые там дни платить обязан. Область
+ * видимости — сам дом: кто стоял на местах дома, админ этого дома видит
+ * и так, схемой мест.
+ *
+ * Другие дома наружу не называются: возвращается только признак «в этом
+ * месяце было место и где-то ещё». Он нужен, чтобы отличить переселение
+ * от обычного месяца, и больше ни для чего.
+ */
+export async function listMonthStaysInHouse(
+  context: AccessContext,
+  houseId: string,
+  month: BusinessDate,
+  executor: Executor = getDb(),
+): Promise<MonthStay[]> {
+  assertHouseVisible(context, houseId);
+
+  const from = startOfMonth(month);
+  const to = addMonths(from, 1);
+
+  const overlapping = sql`${bedAssignments.period} && daterange(${from}::date, ${to}::date)`;
+
+  const here = executor
+    .select({ residencyId: bedAssignments.residencyId })
+    .from(bedAssignments)
+    .where(and(eq(bedAssignments.houseId, houseId), overlapping));
+
+  const rows = await executor
+    .select({
+      residencyId: bedAssignments.residencyId,
+      userId: residencies.userId,
+      moveInDate: residencies.moveInDate,
+      moveOutDate: residencies.moveOutDate,
+      assignmentHouseId: bedAssignments.houseId,
+      period: bedAssignments.period,
+    })
+    .from(bedAssignments)
+    .innerJoin(residencies, eq(residencies.id, bedAssignments.residencyId))
+    .where(
+      and(
+        eq(residencies.orgId, context.orgId),
+        overlapping,
+        /*
+         * Два источника, и оба нужны. Первый — кто стоял на местах этого дома
+         * в этом месяце: среди них есть уже переселившиеся, и дом они платить
+         * обязаны. Второй — кто числится за домом сейчас: без него дом
+         * не узнал бы, что в этом месяце человек стоял где-то ещё, и записал
+         * бы себе весь месяц целиком.
+         */
+        or(inArray(bedAssignments.residencyId, here), eq(residencies.houseId, houseId)),
+      ),
+    );
+
+  const byResidency = new Map<string, MonthStay>();
+
+  for (const row of rows) {
+    const stay = byResidency.get(row.residencyId) ?? {
+      residencyId: row.residencyId,
+      userId: row.userId,
+      moveInDate: row.moveInDate,
+      moveOutDate: row.moveOutDate,
+      periods: [],
+      elsewhere: false,
+    };
+
+    if (row.assignmentHouseId === houseId) {
+      stay.periods.push(parsePeriod(row.period));
+    } else {
+      stay.elsewhere = true;
+    }
+
+    byResidency.set(row.residencyId, stay);
+  }
+
+  return [...byResidency.values()].sort((left, right) =>
+    left.residencyId.localeCompare(right.residencyId),
+  );
 }
 
 export interface HouseRosterEntry {
@@ -342,6 +436,17 @@ export async function releaseBed(
       updatedAt: now(),
     })
     .where(eq(bedAssignments.id, open.id));
+}
+
+/** Полуоткрытый интервал из литерала базы: `[2026-09-01,2026-10-01)`. */
+function parsePeriod(literal: string): { from: BusinessDate; to: BusinessDate | null } {
+  const match = /^\[(\d{4}-\d{2}-\d{2}),(\d{4}-\d{2}-\d{2})?\)$/.exec(literal);
+
+  if (match?.[1] === undefined) {
+    throw new RangeError(`Не удалось прочитать период: ${literal}`);
+  }
+
+  return { from: match[1] as BusinessDate, to: (match[2] ?? null) as BusinessDate | null };
 }
 
 function parsePeriodStart(literal: string): BusinessDate {

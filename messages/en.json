@@ -1349,6 +1349,19 @@
     },
     "debtsReserve": "Extra rotation reserve: {count}"
   },
+  "relocations": {
+    "title": "Relocation",
+    "errors": {
+      "sameHouse": "Same house: changing a bed within a house is done on the bed map",
+      "beforeMoveIn": "Relocation date is earlier than the move-in date",
+      "archived": "Residency is archived: nobody to relocate",
+      "notUpdated": "Residency was not updated",
+      "unauthorized": "Sign-in required",
+      "forbidden": "This role cannot perform the action",
+      "not_found": "Not found",
+      "unknown": "Could not relocate"
+    }
+  },
   "residents": {
     "title": "Residents",
     "subtitle": "Residents of your house: bed, status, debts and documents",

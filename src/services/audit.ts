@@ -52,6 +52,7 @@ export const AUDIT_ACTIONS = {
   bedArchived: 'bed.archived',
   bedAssigned: 'bed.assigned',
   bedReleased: 'bed.released',
+  residencyRelocated: 'residency.relocated',
   residencyTerminated: 'residency.terminated',
   residencyArchived: 'residency.archived',
   depositRefundIssued: 'deposit.refund_issued',

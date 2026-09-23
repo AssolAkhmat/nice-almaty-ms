@@ -4,6 +4,7 @@ import { parseBusinessDate } from '@/lib/time';
 
 import {
   absentDaysInMonth,
+  daysLivedInHouseInMonth,
   daysLivedInMonth,
   distributeUtilities,
   monthOptions,
@@ -217,5 +218,120 @@ describe('месяцы переключателя коммуналки', () => {
     ]);
 
     expect(months).toEqual(['2026-01-01', '2025-12-01', '2025-11-01']);
+  });
+});
+
+/**
+ * Дни в конкретном доме (решение D26). Главное свойство — для того, кто
+ * никуда не переезжал, ответ обязан совпадать с прежним расчётом день
+ * в день: правка не должна шевельнуть ни один существующий счёт.
+ */
+describe('дни месяца в конкретном доме', () => {
+  const WHOLE = { month: SEPTEMBER, moveIn: parseBusinessDate('2026-01-01'), moveOut: null };
+
+  it('без переезда отвечает ровно то же, что общий расчёт дней', () => {
+    for (const moveIn of ['2026-01-01', '2026-09-01', '2026-09-11', '2026-09-30'] as const) {
+      const range = { month: SEPTEMBER, moveIn: parseBusinessDate(moveIn), moveOut: null };
+
+      expect(
+        daysLivedInHouseInMonth({ ...range, stays: [], elsewhere: false, belongsNow: true }),
+      ).toBe(daysLivedInMonth(range));
+    }
+  });
+
+  it('чужой дом без переезда не получает ни дня', () => {
+    expect(
+      daysLivedInHouseInMonth({ ...WHOLE, stays: [], elsewhere: false, belongsNow: false }),
+    ).toBe(0);
+  });
+
+  /*
+   * Прошлый месяц после переселения: человек весь сентябрь стоял на месте
+   * дома A, а числится теперь за домом B. Прежний расчёт отдал бы сентябрь
+   * дому B, где его не было.
+   */
+  it('дом, где человек стоял на месте, получает месяц, даже если он уже съехал', () => {
+    expect(
+      daysLivedInHouseInMonth({
+        ...WHOLE,
+        stays: [{ from: parseBusinessDate('2026-08-01'), to: parseBusinessDate('2026-10-01') }],
+        elsewhere: false,
+        belongsNow: false,
+      }),
+    ).toBe(30);
+  });
+
+  /*
+   * Месяц переселения. Прежний расчёт дал бы 30 дней и старому дому,
+   * и новому: человек заплатил бы дважды за один сентябрь.
+   */
+  it('месяц переселения режется по отрезкам, и сумма дней равна месяцу', () => {
+    const oldHouse = daysLivedInHouseInMonth({
+      ...WHOLE,
+      stays: [{ from: parseBusinessDate('2026-06-01'), to: parseBusinessDate('2026-09-10') }],
+      elsewhere: true,
+      belongsNow: false,
+    });
+
+    const newHouse = daysLivedInHouseInMonth({
+      ...WHOLE,
+      stays: [{ from: parseBusinessDate('2026-09-10'), to: null }],
+      elsewhere: true,
+      belongsNow: true,
+    });
+
+    expect(oldHouse).toBe(9);
+    expect(newHouse).toBe(21);
+    expect(oldHouse + newHouse).toBe(30);
+  });
+
+  it('день переселения засчитывается новому дому ровно один раз', () => {
+    const on = parseBusinessDate('2026-09-10');
+
+    const oldHouse = daysLivedInHouseInMonth({
+      ...WHOLE,
+      stays: [{ from: parseBusinessDate('2026-06-01'), to: on }],
+      elsewhere: true,
+      belongsNow: false,
+    });
+    const newHouse = daysLivedInHouseInMonth({
+      ...WHOLE,
+      stays: [{ from: on, to: null }],
+      elsewhere: true,
+      belongsNow: true,
+    });
+
+    // 1–9 сентября — старому дому, 10–30 — новому. Десятое не считается дважды.
+    expect(oldHouse).toBe(9);
+    expect(newHouse).toBe(21);
+  });
+
+  it('переезд в месяц заезда считается от дня заезда, а не от первого числа', () => {
+    const range = { month: SEPTEMBER, moveIn: parseBusinessDate('2026-09-05'), moveOut: null };
+
+    const oldHouse = daysLivedInHouseInMonth({
+      ...range,
+      stays: [{ from: parseBusinessDate('2026-09-05'), to: parseBusinessDate('2026-09-20') }],
+      elsewhere: true,
+      belongsNow: false,
+    });
+    const newHouse = daysLivedInHouseInMonth({
+      ...range,
+      stays: [{ from: parseBusinessDate('2026-09-20'), to: null }],
+      elsewhere: true,
+      belongsNow: true,
+    });
+
+    expect(oldHouse).toBe(15);
+    expect(newHouse).toBe(11);
+    expect(oldHouse + newHouse).toBe(daysLivedInMonth(range));
+  });
+
+  it('месяц без единого прожитого дня не даёт дней ни одному дому', () => {
+    const range = { month: SEPTEMBER, moveIn: parseBusinessDate('2026-10-01'), moveOut: null };
+
+    expect(
+      daysLivedInHouseInMonth({ ...range, stays: [], elsewhere: true, belongsNow: true }),
+    ).toBe(0);
   });
 });

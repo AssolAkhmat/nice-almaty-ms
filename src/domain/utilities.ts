@@ -164,6 +164,77 @@ export function monthOptions(
   return [...months].sort().reverse();
 }
 
+/** Отрезок занятости места внутри месяца: полуоткрытый, как в базе. */
+export interface StayRange {
+  from: BusinessDate;
+  /** Пусто — занятость продолжается. */
+  to: BusinessDate | null;
+}
+
+export interface HouseDaysInput extends LivedRange {
+  /** Отрезки занятости мест ЭТОГО дома внутри месяца. */
+  stays: readonly StayRange[];
+  /** В этом же месяце у жильца было место и в другом доме. */
+  elsewhere: boolean;
+  /** Проживание числится за этим домом сейчас. */
+  belongsNow: boolean;
+}
+
+/**
+ * Сколько дней месяца человек прожил ИМЕННО В ЭТОМ ДОМЕ (§4.2 с поправкой
+ * на переселение, решение D26).
+ *
+ * Дни проживания глобальны для проживания: заезд и выезд дому не принадлежат.
+ * Пока человек весь месяц в одном доме, этого достаточно — и тогда функция
+ * отвечает ровно то же, что отвечала прежняя `daysLivedInMonth`. Разница
+ * появляется в двух случаях, и оба раньше считались неверно:
+ *
+ * 1. Месяц переселения. Старый расчёт давал полный месяц дней **обоим**
+ *    домам: человек платил бы дважды, каждому дому за все тридцать дней.
+ * 2. Прошлый месяц, пересчитанный после переселения. Старый расчёт брал
+ *    «дом сейчас» и переносил август в новый дом, где человека в августе
+ *    не было вовсе.
+ *
+ * Поэтому когда месяц чистый (`elsewhere === false`), дни отдаются целиком
+ * тому дому, за которым человек числится или где стоял на месте. Когда
+ * в месяце есть оба дома — дни режутся по отрезкам занятости.
+ */
+export function daysLivedInHouseInMonth(input: HouseDaysInput): number {
+  const lived = daysLivedInMonth(input);
+
+  if (lived === 0) {
+    return 0;
+  }
+
+  if (!input.elsewhere) {
+    return input.belongsNow || input.stays.length > 0 ? lived : 0;
+  }
+
+  const first = startOfMonth(input.month);
+  const last = lastDayOfMonth(input.month);
+
+  const start =
+    input.moveIn !== null && compareBusinessDates(input.moveIn, first) > 0 ? input.moveIn : first;
+  const end =
+    input.moveOut !== null && compareBusinessDates(input.moveOut, last) < 0 ? input.moveOut : last;
+
+  let days = 0;
+
+  for (let day = start; compareBusinessDates(day, end) <= 0; day = addDays(day, 1)) {
+    const inside = input.stays.some(
+      (stay) =>
+        compareBusinessDates(stay.from, day) <= 0 &&
+        (stay.to === null || compareBusinessDates(day, stay.to) < 0),
+    );
+
+    if (inside) {
+      days += 1;
+    }
+  }
+
+  return days;
+}
+
 /**
  * Распределение суммы периода между жильцами пропорционально дням (§4.2).
  * Тот, кто не прожил в месяце ни дня, в распределении не участвует —
