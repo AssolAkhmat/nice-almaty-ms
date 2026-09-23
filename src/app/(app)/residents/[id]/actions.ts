@@ -12,6 +12,7 @@ import {
   settleRefund,
   terminateResidency,
 } from '@/services/terminations';
+import { relocateResidency } from '@/services/relocations';
 import { changeAccountRole } from '@/services/users';
 
 import type { UserActor } from '@/services/users';
@@ -24,6 +25,12 @@ export interface RoleActionState {
 
 /** Расторжение договора и разбор депозита (§2.2–2.3). */
 export interface TerminationActionState {
+  error?: string;
+  done?: string;
+}
+
+/** Переселение в другой дом (решение D26). */
+export interface RelocationActionState {
   error?: string;
   done?: string;
 }
@@ -186,4 +193,51 @@ export async function archiveResidencyAction(
   refreshResident();
 
   return { done: 'terminations.archived' };
+}
+
+/**
+ * Переселение жильца в другой дом.
+ *
+ * Дом приходит вместе с местом одной строкой `дом:место`: на форме дом
+ * отдельно не выбирается, иначе без JavaScript список мест пришлось бы
+ * перерисовывать после выбора дома.
+ */
+export async function relocateAction(
+  _previous: RelocationActionState,
+  formData: FormData,
+): Promise<RelocationActionState> {
+  const current = await actor();
+  if (current === null) {
+    return { error: 'relocations.errors.unauthorized' };
+  }
+
+  const [houseId, bedId] = text(formData, 'target').split(':');
+
+  if (houseId === undefined || bedId === undefined || houseId === '' || bedId === '') {
+    return { error: 'relocations.errors.not_found' };
+  }
+
+  const rawPrice = text(formData, 'price');
+  const from = tryParseBusinessDate(text(formData, 'from'));
+
+  try {
+    await relocateResidency(current, {
+      residencyId: text(formData, 'residencyId'),
+      houseId,
+      bedId,
+      ...(rawPrice === '' ? {} : { price: Number(rawPrice) }),
+      ...(from === null ? {} : { from }),
+      leaveGroupIds: formData
+        .getAll('leaveGroupIds')
+        .filter((value): value is string => typeof value === 'string'),
+    });
+  } catch (error) {
+    return { error: actionErrorKey(error, 'relocations.errors.unknown') };
+  }
+
+  revalidatePath('/residents', 'layout');
+  revalidatePath('/beds');
+  revalidatePath('/rotations', 'layout');
+
+  return { done: 'relocations.done' };
 }

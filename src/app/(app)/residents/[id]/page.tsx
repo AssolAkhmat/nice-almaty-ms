@@ -9,9 +9,12 @@ import { Money } from '@/components/ui/money';
 import { can } from '@/lib/authz';
 import { getCurrentSession } from '@/lib/session';
 import { todayInAlmaty } from '@/lib/time';
+import { houseLayout } from '@/services/beds';
+import { groupsNamingUser } from '@/services/relocations';
 import { readResidentCard } from '@/services/residents';
 import { readTerminationView } from '@/services/terminations';
 
+import { RelocationPanel, type FreeBedView } from './relocation-panel';
 import { RoleForm } from './role-form';
 import { TerminationPanel } from './termination-panel';
 
@@ -57,6 +60,47 @@ export default async function ResidentCardPage({ params }: { params: Promise<{ i
     canTerminate && (card.residency.status === 'active' || card.residency.status === 'terminating');
 
   const termination = withTermination ? await readTerminationView(actor, card.residency.id) : null;
+
+  /*
+   * Переселение — действие сети: права нужны в обоих домах сразу, поэтому
+   * панель видит тот, кому видны другие дома. Показывается только
+   * действующему проживанию: архивному переселяться некуда.
+   */
+  const canRelocate =
+    houses.length > 1 &&
+    (card.residency.status === 'active' || card.residency.status === 'terminating') &&
+    houses.every((house) => can(context, 'bed.assign', { houseId: house.id }));
+
+  const freeBeds: FreeBedView[] = [];
+  let namedGroups: { id: string; name: string }[] = [];
+
+  if (canRelocate) {
+    for (const house of houses) {
+      if (house.id === card.residency.houseId) {
+        continue;
+      }
+
+      for (const area of await houseLayout(actor, house.id)) {
+        for (const bed of area.beds) {
+          if (bed.occupiedBy !== null) {
+            continue;
+          }
+
+          freeBeds.push({
+            houseId: house.id,
+            houseName: house.name,
+            bedId: bed.bedId,
+            label: `${area.area.name}, ${bed.label}`,
+            defaultPrice: bed.defaultPrice,
+          });
+        }
+      }
+    }
+
+    namedGroups = (await groupsNamingUser(actor, card.residency.houseId, card.row.userId)).map(
+      (group) => ({ id: group.id, name: group.name }),
+    );
+  }
 
   return (
     <section className="flex flex-col gap-6">
@@ -131,6 +175,15 @@ export default async function ResidentCardPage({ params }: { params: Promise<{ i
                   },
             canArchive: termination.canArchive,
           }}
+        />
+      )}
+
+      {canRelocate && (
+        <RelocationPanel
+          beds={freeBeds}
+          groups={namedGroups}
+          residencyId={card.residency.id}
+          today={todayInAlmaty()}
         />
       )}
 

@@ -1360,7 +1360,8 @@
       "forbidden": "This role cannot perform the action",
       "not_found": "Not found",
       "unknown": "Could not relocate"
-    }
+    },
+    "done": "Resident relocated"
   },
   "residents": {
     "title": "Residents",
@@ -1413,7 +1414,18 @@
       "unauthorized": "Sign-in required",
       "unknown": "The action could not be completed",
       "role": "Choose a role"
-    }
+    },
+    "relocateTitle": "Relocation to another house",
+    "relocateHint": "The contract is not terminated: deposit, tenure, rating, debts and contract number stay. House, bed and price change as of a date.",
+    "relocateBed": "Bed in another house",
+    "relocateChoose": "Choose a bed",
+    "relocatePrice": "Bed price",
+    "relocatePriceHint": "Empty — the bed default price. The invoice for the month of the move keeps the price in force on the 1st; add any adjustment as a manual invoice line.",
+    "relocateFrom": "As of",
+    "relocateGroups": "By-name eligibility groups of the old house",
+    "relocateGroupsHint": "The resident is named in these groups. Not removed by default: they may come back, and a lost exclusion would become a silent permission.",
+    "relocate": "Relocate",
+    "relocateNoBeds": "No free beds in other houses"
   },
   "rotationCalendar": {
     "assign": "Assign",
