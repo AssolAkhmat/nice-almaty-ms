@@ -6,6 +6,7 @@ import {
 import { assertCan } from '@/lib/authz';
 import {
   ADMIN_CAPABILITIES,
+  CAPABILITY_KEYS,
   DEFAULT_OFF_FOR_ADMIN,
   type AdminCapability,
   type Action,
@@ -32,8 +33,6 @@ import type { UserActor } from './users';
 export interface PermissionDeps {
   executor?: Executor;
 }
-
-export const CAPABILITY_KEYS = Object.keys(ADMIN_CAPABILITIES) as AdminCapability[];
 
 function defaultOf(actions: readonly Action[]): boolean {
   return actions.every((action) => !DEFAULT_OFF_FOR_ADMIN.includes(action));

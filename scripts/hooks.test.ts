@@ -77,6 +77,41 @@ describe('хук pre-push', () => {
     expect(source).toContain('set -euo pipefail');
   });
 
+  /*
+   * `pnpm verify` не собирает приложение, а CI собирает. 24 сентября 2026
+   * клиентский компонент утащил драйвер postgres в браузерный бандл:
+   * typecheck, lint и все тесты остались зелёными, хук пропустил отправку,
+   * боевой образ молча не пересобрался. Сборка теперь в хуке, и это
+   * проверяется, а не подразумевается.
+   */
+  it('собирает приложение, а не только проверяет', () => {
+    const result = runHook(0);
+
+    expect(result.stdout).toContain('pnpm build');
+  });
+
+  it('падение сборки блокирует отправку', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'nice-hook-build-'));
+    temporaryDirectories.push(directory);
+
+    // Поддельный pnpm: verify проходит, build падает.
+    writeFileSync(
+      join(directory, 'pnpm'),
+      '#!/usr/bin/env bash\nif [ "$1" = "build" ]; then exit 1; fi\nexit 0\n',
+      'utf8',
+    );
+    chmodSync(join(directory, 'pnpm'), 0o755);
+
+    const result = spawnSync('bash', [HOOK], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      env: { ...process.env, PATH: `${directory}:${process.env.PATH ?? ''}` },
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('сборка не прошла');
+  });
+
   it('подсказывает осознанный обход, а не молчит', () => {
     expect(runHook(1).stderr).toContain('--no-verify');
   });

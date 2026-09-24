@@ -122,6 +122,13 @@ export function isAdminCapability(value: string): value is AdminCapability {
   return Object.hasOwn(ADMIN_CAPABILITIES, value);
 }
 
+/**
+ * Перечень переключателей. Живёт здесь, а не в сервисе: сервис знает базу,
+ * а список читает и клиентский компонент настроек — импорт сервиса утащил бы
+ * драйвер postgres в браузерный бандл (CLAUDE.md §5).
+ */
+export const CAPABILITY_KEYS = Object.keys(ADMIN_CAPABILITIES) as AdminCapability[];
+
 export type PermissionMatrix = Readonly<
   Record<AccessRole, Readonly<Record<Action, PermissionScope>>>
 >;

@@ -5,11 +5,9 @@ import { useActionState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
-import { CAPABILITY_KEYS } from '@/services/permissions';
+import { CAPABILITY_KEYS, type AdminCapability } from '@/lib/permissions';
 
 import { setCapabilityAction, type NetworkActionState } from './actions';
-
-import type { AdminCapability } from '@/lib/permissions';
 
 const INITIAL: NetworkActionState = {};
 
