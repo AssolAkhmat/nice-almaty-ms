@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 
 import { listResidencies } from '@/db/repositories/residencies';
 import { EmptyState } from '@/components/ui/empty-state';
+import { can } from '@/lib/authz';
 import { getCurrentSession } from '@/lib/session';
 import { readProfile } from '@/services/resident-profiles';
 
@@ -83,7 +84,10 @@ export default async function ContractPage() {
         <p className="text-text-muted text-[13px]">{t('adminSubtitle')}</p>
       </div>
 
-      <ContractList rows={rows} />
+      <ContractList
+        canRead={can(context, 'contract.read', { houseId: context.houseId })}
+        rows={rows}
+      />
     </section>
   );
 }

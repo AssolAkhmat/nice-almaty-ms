@@ -7,6 +7,7 @@ import {
   revokeAllUserSessions,
   revokeSession,
 } from '@/db/repositories/sessions';
+import { loadOverridesFor } from '@/db/repositories/permission-overrides';
 import { findUserByPhone, updateUserAuthState } from '@/db/repositories/users';
 import { UnauthorizedError } from '@/lib/errors';
 import { hashPassword, verifyPassword } from '@/lib/password';
@@ -35,13 +36,33 @@ function invalidCredentials(): never {
   throw new UnauthorizedError('Неверный телефон или пароль');
 }
 
-export function toAccessContext(user: User): AccessContext {
+export function toAccessContext(
+  user: User,
+  overrides: Readonly<Partial<Record<string, boolean>>> = {},
+): AccessContext {
   return {
     orgId: user.orgId,
     userId: user.id,
     role: user.role,
     houseId: user.houseId,
+    overrides,
   };
+}
+
+/**
+ * Контекст вместе с переопределениями полномочий (указание владельца,
+ * 23 сентября 2026). Они читаются тем же запросом, что и сессия, и живут
+ * ровно столько же: снятое право обязано действовать сразу, а не после
+ * перелогина, поэтому кешировать их дольше запроса нельзя.
+ *
+ * Суперадмина и жильца это не касается, и лишнего запроса им не делается.
+ */
+async function contextFor(user: User, executor: Executor): Promise<AccessContext> {
+  if (user.role !== 'admin') {
+    return toAccessContext(user);
+  }
+
+  return toAccessContext(user, await loadOverridesFor(user.orgId, user.id, executor));
 }
 
 function isResetPermissionActive(user: User, moment: Date): boolean {
@@ -125,7 +146,11 @@ async function getSession(
     row.session.expiresAt = expiresAt;
   }
 
-  return { user: row.user, session: row.session, context: toAccessContext(row.user) };
+  return {
+    user: row.user,
+    session: row.session,
+    context: await contextFor(row.user, executor),
+  };
 }
 
 async function revoke(token: string, executor: Executor = getDb()): Promise<void> {

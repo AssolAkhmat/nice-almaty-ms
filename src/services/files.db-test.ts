@@ -120,12 +120,20 @@ async function seed(tx: Transaction, suffix: string) {
     .values({ orgId, userId: userB?.id ?? '', houseId: houseB?.id ?? '' })
     .returning();
 
-  const context = (role: AccessContext['role'], userId: string, houseId: string | null) => ({
-    orgId,
-    userId,
-    role,
-    houseId,
-  });
+  const context = (
+    role: AccessContext['role'],
+    userId: string,
+    houseId: string | null,
+    overrides: Readonly<Partial<Record<string, boolean>>> = {},
+  ) => ({ orgId, userId, role, houseId, overrides });
+
+  /*
+   * Документы жильца у админа по умолчанию выключены (указание владельца,
+   * 23 сентября 2026); проверки ниже про отдачу файла, а не про полномочие,
+   * поэтому сеть его этому админу включила. Что бывает без включения —
+   * в `documents.db-test.ts`, раздел «полномочие выключено».
+   */
+  const withDocuments = { 'document.read': true };
 
   const actor = (ctx: AccessContext): UserActor => ({ context: ctx, requestId: `req-${suffix}` });
 
@@ -142,7 +150,7 @@ async function seed(tx: Transaction, suffix: string) {
     residencyB: residencyB?.id ?? '',
     residentA: actor(context('resident', userA?.id ?? '', null)),
     residentB: actor(context('resident', userB?.id ?? '', null)),
-    adminA: actor(context('admin', adminUser?.id ?? '', houseA?.id ?? null)),
+    adminA: actor(context('admin', adminUser?.id ?? '', houseA?.id ?? null, withDocuments)),
     adminB: actor(context('admin', adminUser?.id ?? '', houseB?.id ?? null)),
     superadmin: actor(context('superadmin', superUser?.id ?? '', null)),
     houseSlug: `svc-a-${suffix}`,

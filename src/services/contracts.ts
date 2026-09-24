@@ -18,7 +18,7 @@ import { now, todayInAlmaty, type BusinessDate } from '@/lib/time';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
 import { ensureContractNumber } from './contract-numbers';
-import { revealSensitiveField } from './resident-profiles';
+import { decryptForContract } from './resident-profiles';
 
 import type { PdfRenderer } from '@/adapters/pdf';
 import type { StorageProvider } from '@/adapters/storage';
@@ -149,12 +149,12 @@ async function contractValues(
   const iin =
     profile.iinEnc === null
       ? ''
-      : await revealSensitiveField(actor, residency.userId, 'iin', executor);
+      : await decryptForContract(actor, residency.userId, 'iin', executor);
 
   const idDocNumber =
     profile.idDocNumberEnc === null
       ? ''
-      : await revealSensitiveField(actor, residency.userId, 'idDocNumber', executor);
+      : await decryptForContract(actor, residency.userId, 'idDocNumber', executor);
 
   return {
     'resident.full_name': fullName,

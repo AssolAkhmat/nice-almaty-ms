@@ -37,6 +37,7 @@ export const MIGRATIONS = [
   '0026_empty_puck.sql',
   '0027_smart_starjammers.sql',
   '0028_brown_king_cobra.sql',
+  '0029_low_the_order.sql',
 ] as const;
 
 export const EXPECTED_MIGRATIONS = MIGRATIONS.length;

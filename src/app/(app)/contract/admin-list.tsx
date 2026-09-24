@@ -22,7 +22,7 @@ export interface ContractRowView {
 
 const INITIAL: ContractActionState = {};
 
-function ContractRow({ row }: { row: ContractRowView }) {
+function ContractRow({ canRead, row }: { canRead: boolean; row: ContractRowView }) {
   const t = useTranslations();
   const [buildState, buildAction, isBuilding] = useActionState(buildContractAction, INITIAL);
   const [keysState, keysAction, isIssuing] = useActionState(issueKeysAction, INITIAL);
@@ -42,7 +42,13 @@ function ContractRow({ row }: { row: ContractRowView }) {
       </CardHeader>
 
       <div className="flex flex-col gap-3 p-4 pt-0">
-        {row.contractFileId !== null && (
+        {/*
+          Чтение готового договора — полномочие, которое сеть может админу
+          не включать (указание владельца, 23 сентября 2026). Сборка остаётся:
+          это шаг заселения. Ссылки тогда просто нет — нажимать на то,
+          что ответит отказом, незачем.
+        */}
+        {canRead && row.contractFileId !== null && (
           <FileLinks fileId={row.contractFileId} label={t('contract.open')} />
         )}
 
@@ -81,7 +87,13 @@ function ContractRow({ row }: { row: ContractRowView }) {
   );
 }
 
-export function ContractList({ rows }: { rows: readonly ContractRowView[] }) {
+export function ContractList({
+  canRead,
+  rows,
+}: {
+  canRead: boolean;
+  rows: readonly ContractRowView[];
+}) {
   const t = useTranslations();
 
   if (rows.length === 0) {
@@ -91,7 +103,7 @@ export function ContractList({ rows }: { rows: readonly ContractRowView[] }) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {rows.map((row) => (
-        <ContractRow key={row.residencyId} row={row} />
+        <ContractRow canRead={canRead} key={row.residencyId} row={row} />
       ))}
     </div>
   );

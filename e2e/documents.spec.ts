@@ -55,13 +55,28 @@ async function createResident(page: Page): Promise<{ phone: string; password: st
 }
 
 test.describe('экран документов', () => {
-  test('админ видит очередь проверки своего дома', async ({ page }) => {
+  /*
+   * Доступ админа к документам жильца выключен по умолчанию (указание
+   * владельца, 23 сентября 2026). Экран не падает отказом, а объясняет,
+   * почему пусто, и кто это включает.
+   */
+  test('админу без полномочия экран объясняет, почему документов нет', async ({ page }) => {
     await login(page, E2E_ACCOUNTS.adminHouse1);
     await page.goto('/documents');
 
     const main = page.locator('main');
     await expect(main).toContainText('Документы');
+    await expect(main).toContainText('Доступ к документам выключен');
+    await expect(main).toContainText('настройках сети');
+  });
+
+  test('суперадмин видит очередь проверки и переключатели статусов', async ({ page }) => {
+    await login(page, E2E_ACCOUNTS.superadmin);
+    await page.goto('/documents');
+
+    const main = page.locator('main');
     await expect(main).toContainText('Документы жильцов вашего дома');
+    await expect(page.getByTestId('documents-filter-approved')).toBeVisible();
   });
 
   test('новый жилец сразу видит карточки обязательных документов', async ({ page }) => {

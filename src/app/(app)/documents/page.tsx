@@ -1,11 +1,13 @@
+import { AppLink } from '@/components/ui/app-link';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { redirect } from 'next/navigation';
 
 import { requireDocumentType } from '@/db/repositories/documents';
 import { listResidencies } from '@/db/repositories/residencies';
 import { EmptyState } from '@/components/ui/empty-state';
+import { can } from '@/lib/authz';
 import { getCurrentSession } from '@/lib/session';
-import { listDocumentCards, listPendingDocuments } from '@/services/documents';
+import { listDocumentCards, listReviewDocuments } from '@/services/documents';
 import { readProfile } from '@/services/resident-profiles';
 
 import { DocumentCards, type DocumentCardView } from './document-cards';
@@ -60,11 +62,12 @@ async function reviewView(
   actor: UserActor,
   context: AccessContext,
   locale: string,
+  status: 'uploaded' | 'approved' | 'rejected' | undefined,
 ): Promise<ReviewItemView[]> {
-  const pending = await listPendingDocuments(actor);
+  const documents = await listReviewDocuments(actor, status === undefined ? {} : { status });
 
   return Promise.all(
-    pending.map(async (document) => {
+    documents.map(async (document) => {
       const type = await requireDocumentType(context, document.documentTypeId);
       const profile = await readProfile(actor, document.userId);
       const name = [profile.lastName, profile.firstName].filter((part) => part !== null).join(' ');
@@ -75,15 +78,23 @@ async function reviewView(
         // Профиль может быть ещё пустым: в списке тогда нужен хоть какой-то ориентир.
         residentName: name.trim() === '' ? document.userId : name,
         fileId: document.fileId,
+        status: document.status,
         issueDate: document.issueDate,
         validUntil: document.validUntil,
+        rejectReason: document.rejectReason,
         createdAt: document.createdAt.toISOString(),
       };
     }),
   );
 }
 
-export default async function DocumentsPage() {
+const REVIEW_STATUSES = ['uploaded', 'approved', 'rejected'] as const;
+
+export default async function DocumentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
   const session = await getCurrentSession();
   if (session === null) {
     redirect('/login');
@@ -96,8 +107,24 @@ export default async function DocumentsPage() {
 
   const isReviewer = context.role === 'admin' || context.role === 'superadmin';
 
+  /*
+   * Статус стал фильтром: по умолчанию очередь, но проверенные документы
+   * никуда не деваются и открываются (указание владельца, 23 сентября 2026).
+   */
+  const { status: requested } = await searchParams;
+  const status = REVIEW_STATUSES.find((candidate) => candidate === requested) ?? 'uploaded';
+
+  /*
+   * Доступ админа к документам жильца сеть может не включать (указание
+   * владельца, 23 сентября 2026). Тогда экран объясняет себя, а не падает
+   * отказом: отказ выглядел бы поломкой, а это осознанная настройка.
+   */
+  const mayReview =
+    isReviewer &&
+    can(context, 'document.read', { houseId: context.houseId, userId: context.userId });
+
   const resident = isReviewer ? null : await residentView(actor, context, locale);
-  const queue = isReviewer ? await reviewView(actor, context, locale) : [];
+  const queue = mayReview ? await reviewView(actor, context, locale, status) : [];
 
   return (
     <section className="flex flex-col gap-6">
@@ -108,7 +135,26 @@ export default async function DocumentsPage() {
         </p>
       </div>
 
-      {isReviewer ? (
+      {mayReview && (
+        <nav className="flex flex-wrap gap-3 text-[13px]">
+          {REVIEW_STATUSES.map((value) => (
+            <AppLink
+              className={
+                value === status ? 'text-text font-medium' : 'text-text-muted hover:text-text'
+              }
+              data-testid={`documents-filter-${value}`}
+              href={{ pathname: '/documents', query: { status: value } }}
+              key={value}
+            >
+              {t(`status.${value}`)}
+            </AppLink>
+          ))}
+        </nav>
+      )}
+
+      {isReviewer && !mayReview ? (
+        <EmptyState description={t('accessOffHint')} title={t('accessOff')} />
+      ) : isReviewer ? (
         <ReviewQueue items={queue} />
       ) : resident === null ? (
         <EmptyState description={t('noResidencyHint')} title={t('noResidency')} />

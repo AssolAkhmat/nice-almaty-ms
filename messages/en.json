@@ -202,6 +202,7 @@
       "inventory_item": "Inventory item",
       "invoice": "Invoice",
       "ledger_entry": "Ledger entry",
+      "permission": "Permission",
       "rating_event": "Rating event",
       "rating_rule": "Rating rule",
       "residency": "Residency",
@@ -598,7 +599,7 @@
   "documents": {
     "title": "Documents",
     "subtitle": "Upload your certificates and keep an eye on their validity",
-    "reviewSubtitle": "Documents from residents of your house awaiting review",
+    "reviewSubtitle": "Documents of your house's residents: the review queue and the checked ones",
     "file": "File",
     "issueDate": "Date of the scan",
     "issueDateHint": "Validity is counted from this date, not from the upload day",
@@ -636,7 +637,9 @@
       "unauthorized": "Sign-in required",
       "unknown": "The action could not be completed",
       "upload": "The file could not be uploaded"
-    }
+    },
+    "accessOff": "Document access is disabled",
+    "accessOffHint": "The network has not enabled admin access to resident documents. A superadmin enables it in network settings."
   },
   "files": {
     "open": "Open",
@@ -1725,12 +1728,33 @@
       "ratingVisibleHint": "Turning this off hides the rating number from every resident in the network.",
       "defaultLocale": "Default language",
       "defaultLocaleHint": "Assigned to new accounts",
-      "submit": "Save"
+      "submit": "Save",
+      "capabilities": {
+        "title": "Admin permissions",
+        "hint": "Applies to house admins only. Superadmins are never affected.",
+        "on": "Enabled",
+        "off": "Disabled",
+        "enable": "Enable",
+        "disable": "Disable",
+        "documents": {
+          "title": "Resident documents",
+          "hint": "See and review certificates and the ID of residents in their house. Disabled: the review queue is unavailable and the document does not open by a direct link either."
+        },
+        "contract": {
+          "title": "Resident contract",
+          "hint": "Read the prepared contract. Building the contract during onboarding stays with the admin either way."
+        },
+        "secrets": {
+          "title": "IIN and ID number",
+          "hint": "Reveal the masked IIN and ID number. Every reveal is written to the audit log."
+        }
+      }
     },
     "done": {
       "personalSaved": "Settings saved",
       "networkSaved": "Network settings saved",
-      "phoneChanged": "Number changed. Sign in with the new number."
+      "phoneChanged": "Number changed. Sign in with the new number.",
+      "capabilitySaved": "Permission saved"
     },
     "errors": {
       "unauthorized": "Sign-in required",

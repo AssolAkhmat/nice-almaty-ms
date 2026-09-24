@@ -35,8 +35,10 @@ export const ACTIONS = [
   'file.upload',
   'file.read',
   'document.upload',
+  'document.read',
   'document.review',
   'contract.generate',
+  'contract.read',
   'contract.sign',
   'residency.issueKeys',
   'residency.terminate',
@@ -88,6 +90,38 @@ export const ACTIONS = [
 
 export type Action = (typeof ACTIONS)[number];
 
+/**
+ * Полномочия, которые у админа **выключены по умолчанию**
+ * (указание владельца, 23 сентября 2026).
+ *
+ * Остальное, что стоит у админа в матрице, у него есть, пока сеть не снимет;
+ * эти четыре — наоборот, их надо включить. Причина одна и та же у всех:
+ * медицинские справки, удостоверение, ИИН и договор — данные, которые
+ * касаются жильца и сети, а не того, кто присматривает за домом.
+ *
+ * Переключателей в настройках три, потому что документы читают и проверяют
+ * одним движением: не видя справку, принять её нельзя.
+ */
+export const DEFAULT_OFF_FOR_ADMIN: readonly Action[] = [
+  'document.read',
+  'document.review',
+  'contract.read',
+  'resident.revealSensitive',
+];
+
+/** Переключатель настроек сети: имя группы и действия, которыми он правит. */
+export const ADMIN_CAPABILITIES = {
+  documents: ['document.read', 'document.review'],
+  contract: ['contract.read'],
+  secrets: ['resident.revealSensitive'],
+} as const satisfies Readonly<Record<string, readonly Action[]>>;
+
+export type AdminCapability = keyof typeof ADMIN_CAPABILITIES;
+
+export function isAdminCapability(value: string): value is AdminCapability {
+  return Object.hasOwn(ADMIN_CAPABILITIES, value);
+}
+
 export type PermissionMatrix = Readonly<
   Record<AccessRole, Readonly<Record<Action, PermissionScope>>>
 >;
@@ -114,8 +148,10 @@ export const PERMISSIONS: PermissionMatrix = {
     'file.upload': 'org',
     'file.read': 'org',
     'document.upload': 'org',
+    'document.read': 'org',
     'document.review': 'org',
     'contract.generate': 'org',
+    'contract.read': 'org',
     // Подпись личная: за жильца её не ставит никто, даже суперадмин.
     'contract.sign': 'none',
     'residency.issueKeys': 'org',
@@ -184,8 +220,17 @@ export const PERMISSIONS: PermissionMatrix = {
     'file.upload': 'house',
     'file.read': 'house',
     'document.upload': 'house',
+    /*
+     * Документы и договор жильца, а также ИИН и номер удостоверения —
+     * полномочия, выключенные у админа по умолчанию (`DEFAULT_OFF_FOR_ADMIN`,
+     * указание владельца 23 сентября 2026). В матрице они «дом»: матрица
+     * говорит, что бывает в принципе, а включена ли эта возможность
+     * в конкретной сети — говорят переопределения.
+     */
+    'document.read': 'house',
     'document.review': 'house',
     'contract.generate': 'house',
+    'contract.read': 'house',
     'contract.sign': 'none',
     'residency.issueKeys': 'house',
     'residency.terminate': 'house',
@@ -286,12 +331,14 @@ export const PERMISSIONS: PermissionMatrix = {
      * Свои документы жилец не проверяет: принять или отклонить справку
      * может только админ дома или суперадмин (модуль 1, «Карточка жильца»).
      */
+    'document.read': 'self',
     'document.review': 'none',
     /*
      * Договор жильцу собирает админ (модуль 1: жилец видит PDF и подписывает),
      * а подпись ставит только он сам и только свою.
      */
     'contract.generate': 'none',
+    'contract.read': 'self',
     'contract.sign': 'self',
     'residency.issueKeys': 'none',
     /*

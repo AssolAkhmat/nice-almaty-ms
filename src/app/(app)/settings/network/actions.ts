@@ -5,6 +5,8 @@ import { revalidatePath } from 'next/cache';
 
 import { AppError } from '@/lib/errors';
 import { getCurrentSession } from '@/lib/session';
+import { isAdminCapability } from '@/lib/permissions';
+import { setAdminCapability } from '@/services/permissions';
 import { ORG_SETTINGS, writeOrgSetting } from '@/services/settings';
 
 export interface NetworkActionState {
@@ -43,6 +45,48 @@ export async function saveNetworkSettingsAction(
     revalidatePath('/settings/network');
 
     return { done: 'settings.done.networkSaved' };
+  } catch (error) {
+    if (error instanceof AppError) {
+      return { error: `settings.errors.${error.code}` };
+    }
+
+    throw error;
+  }
+}
+
+/**
+ * Переключатель полномочия админа (указание владельца, 23 сентября 2026).
+ *
+ * Каждый переключатель — своя отправка формы: сохранять их вместе с языком
+ * и видимостью рейтинга значило бы менять права заодно с настройками вида.
+ */
+export async function setCapabilityAction(
+  _previous: NetworkActionState,
+  formData: FormData,
+): Promise<NetworkActionState> {
+  const session = await getCurrentSession();
+  if (session === null) {
+    return { error: 'settings.errors.unauthorized' };
+  }
+
+  const store = await headers();
+  const actor = {
+    context: session.context,
+    ip: store.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined,
+  };
+
+  const capability = formData.get('capability');
+
+  if (typeof capability !== 'string' || !isAdminCapability(capability)) {
+    return { error: 'settings.errors.validation_error' };
+  }
+
+  try {
+    await setAdminCapability(actor, capability, formData.get('enabled') === '1');
+
+    revalidatePath('/settings/network');
+
+    return { done: 'settings.done.capabilitySaved' };
   } catch (error) {
     if (error instanceof AppError) {
       return { error: `settings.errors.${error.code}` };

@@ -362,3 +362,80 @@ describe('токен суперадмина на один дом', () => {
     expect(can(tokenSuperadmin, 'bed.read', { houseId: HOUSE_B })).toBe(false);
   });
 });
+
+/**
+ * Полномочия, которыми распоряжается сеть (указание владельца,
+ * 23 сентября 2026). Три вещи должны быть доказаны, а не заявлены:
+ * выключенное по умолчанию выключено; включённое включается; суперадмина
+ * это не касается ни при каких данных.
+ */
+describe('переопределения полномочий админа', () => {
+  const withOverrides = (
+    context: AccessContext,
+    overrides: Readonly<Partial<Record<string, boolean>>>,
+  ): AccessContext => ({ ...context, overrides });
+
+  it('документы и договор у админа выключены, пока сеть не включит', () => {
+    for (const action of ['document.read', 'document.review', 'contract.read'] as const) {
+      expect(can(admin, action, { houseId: HOUSE_A })).toBe(false);
+    }
+
+    expect(can(admin, 'resident.revealSensitive', { houseId: HOUSE_A })).toBe(false);
+  });
+
+  it('включённое сетью полномочие действует', () => {
+    const allowed = withOverrides(admin, { 'document.read': true });
+
+    expect(can(allowed, 'document.read', { houseId: HOUSE_A })).toBe(true);
+    // Соседнее действие той же группы само собой не включается.
+    expect(can(allowed, 'document.review', { houseId: HOUSE_A })).toBe(false);
+  });
+
+  it('остальные полномочия у админа по умолчанию есть', () => {
+    expect(can(admin, 'bed.assign', { houseId: HOUSE_A })).toBe(true);
+    expect(
+      can(withOverrides(admin, { 'bed.assign': false }), 'bed.assign', { houseId: HOUSE_A }),
+    ).toBe(false);
+  });
+
+  /*
+   * Самая важная фикстура: запись в базе, снимающая право, не должна
+   * действовать на суперадмина. Урезать сеть самому себе — не полномочие,
+   * а способ запереть дверь изнутри.
+   */
+  it('суперадмина переопределения не касаются ни при каких данных', () => {
+    const cut = withOverrides(superadmin, {
+      'document.read': false,
+      'contract.read': false,
+      'resident.revealSensitive': false,
+      'bed.assign': false,
+    });
+
+    for (const action of [
+      'document.read',
+      'contract.read',
+      'resident.revealSensitive',
+      'bed.assign',
+    ] as const) {
+      expect(can(cut, action, { houseId: HOUSE_A })).toBe(true);
+    }
+  });
+
+  it('жильца переопределения не касаются', () => {
+    const resident: AccessContext = {
+      orgId: ORG,
+      userId: 'u-resident',
+      role: 'resident',
+      houseId: null,
+      overrides: { 'document.read': false },
+    };
+
+    expect(can(resident, 'document.read', { userId: 'u-resident' })).toBe(true);
+  });
+
+  it('assertCan отказывает выключенному полномочию как запрещённому роли', () => {
+    expect(() => {
+      assertCan(admin, 'document.read', { houseId: HOUSE_A });
+    }).toThrow(ForbiddenError);
+  });
+});

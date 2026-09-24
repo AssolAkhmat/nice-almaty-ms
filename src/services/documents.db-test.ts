@@ -10,10 +10,11 @@ import { parseBusinessDate } from '@/lib/time';
 
 import {
   listDocumentCards,
-  listPendingDocuments,
+  listReviewDocuments,
   reviewDocument,
   submitDocument,
 } from './documents';
+import { grantFileView, readFileContent } from './files';
 
 import type { AccessContext } from '@/db/access';
 import type { Database, Transaction } from '@/db/client';
@@ -138,7 +139,16 @@ async function seed(tx: Transaction, suffix: string) {
     role: AccessContext['role'],
     userId: string,
     houseId: string | null,
-  ): AccessContext => ({ orgId, userId, role, houseId });
+    overrides: Readonly<Partial<Record<string, boolean>>> = {},
+  ): AccessContext => ({ orgId, userId, role, houseId, overrides });
+
+  /*
+   * Доступ админа к документам жильца выключен по умолчанию (указание
+   * владельца, 23 сентября 2026). Проверки ниже про саму работу с документами,
+   * поэтому их админу сеть полномочие включила; что бывает, когда не включила,
+   * проверяется отдельно — в разделе «полномочие выключено».
+   */
+  const withDocuments = { 'document.read': true, 'document.review': true };
 
   const actor = (ctx: AccessContext): UserActor => ({ context: ctx, requestId: `req-${suffix}` });
 
@@ -156,6 +166,12 @@ async function seed(tx: Transaction, suffix: string) {
         originalName: `${name}.jpg`,
         uploadedBy: userId,
         status: 'ready',
+        /*
+         * Пометка «это документ жильца»: по ней отдача файла и решает,
+         * спрашивать ли полномочие (указание владельца, 23 сентября 2026).
+         * Настоящая загрузка ставит её сама, фикстура обязана делать то же.
+         */
+        scope: { documentType: 'dispensary' },
       })
       .returning();
 
@@ -167,7 +183,9 @@ async function seed(tx: Transaction, suffix: string) {
     typeId,
     residentA: actor(context('resident', a.userId, null)),
     residentB: actor(context('resident', b.userId, null)),
-    adminA: actor(context('admin', adminUser?.id ?? '', houseA?.id ?? null)),
+    adminA: actor(context('admin', adminUser?.id ?? '', houseA?.id ?? null, withDocuments)),
+    adminWithoutDocuments: actor(context('admin', adminUser?.id ?? '', houseA?.id ?? null)),
+    superadmin: actor(context('superadmin', adminUser?.id ?? '', null)),
     residencyA: a.residencyId,
     residencyB: b.residencyId,
     userA: a.userId,
@@ -559,14 +577,24 @@ describe('очередь проверки', () => {
         { executor: tx, today: TODAY },
       );
 
-      const pending = await listPendingDocuments(fixture.adminA, { executor: tx, today: TODAY });
+      const pending = await listReviewDocuments(
+        fixture.adminA,
+        { status: 'uploaded' },
+        { executor: tx, today: TODAY },
+      );
 
       expect(pending).toHaveLength(1);
       expect(pending[0]?.residencyId).toBe(fixture.residencyA);
     });
   });
 
-  it('проверенный документ из очереди уходит', async () => {
+  /*
+   * Прежде одобренный документ исчезал с экрана админа навсегда: фильтр
+   * «только загруженные» стоял в самом сервисе. Из очереди он уходит
+   * по-прежнему, но теперь он находится — по статусу (указание владельца,
+   * 23 сентября 2026).
+   */
+  it('проверенный документ уходит из очереди, но остаётся виден по статусу', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '5031');
       const fileId = await fixture.readyFile(fixture.residencyA, fixture.userA, 'own');
@@ -589,9 +617,125 @@ describe('очередь проверки', () => {
         { executor: tx, today: TODAY },
       );
 
-      expect(await listPendingDocuments(fixture.adminA, { executor: tx, today: TODAY })).toEqual(
-        [],
+      expect(
+        await listReviewDocuments(
+          fixture.adminA,
+          { status: 'uploaded' },
+          { executor: tx, today: TODAY },
+        ),
+      ).toEqual([]);
+
+      const approved = await listReviewDocuments(
+        fixture.adminA,
+        { status: 'approved' },
+        { executor: tx, today: TODAY },
       );
+
+      expect(approved.map((row) => row.id)).toEqual([document.id]);
+      // Файл при документе остался: справку можно открыть и после одобрения.
+      expect(approved[0]?.fileId).toBe(fileId);
+    });
+  });
+});
+
+/*
+ * Полномочие «документы жильца» выключено у админа по умолчанию (указание
+ * владельца, 23 сентября 2026). Негативные фикстуры обязательны: без них
+ * «админ не видит документ» осталось бы словами.
+ */
+describe('полномочие выключено', () => {
+  it('список документов жильца админу не отдаётся', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '5040');
+
+      await expect(
+        listDocumentCards(fixture.adminWithoutDocuments, fixture.residencyA, {
+          executor: tx,
+          today: TODAY,
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenError);
+    });
+  });
+
+  it('очередь проверки админу не отдаётся', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '5041');
+
+      await expect(
+        listReviewDocuments(
+          fixture.adminWithoutDocuments,
+          { status: 'uploaded' },
+          { executor: tx, today: TODAY },
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenError);
+    });
+  });
+
+  it('принять документ админ не может', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '5042');
+      const fileId = await fixture.readyFile(fixture.residencyA, fixture.userA, 'own');
+
+      const document = await submitDocument(
+        fixture.residentA,
+        {
+          residencyId: fixture.residencyA,
+          documentTypeId: fixture.typeId('dispensary'),
+          fileId,
+          issueDate: null,
+        },
+        { executor: tx, today: TODAY },
+      );
+
+      await expect(
+        reviewDocument(
+          fixture.adminWithoutDocuments,
+          document.id,
+          { approve: true },
+          { executor: tx, today: TODAY },
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenError);
+    });
+  });
+
+  it('содержимое файла документа админу не отдаётся', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '5043');
+      const fileId = await fixture.readyFile(fixture.residencyA, fixture.userA, 'own');
+
+      await expect(
+        readFileContent(fixture.adminWithoutDocuments, fileId, { executor: tx }),
+      ).rejects.toBeInstanceOf(ForbiddenError);
+
+      // А с включённым полномочием отказ был бы уже не про права.
+      await expect(
+        readFileContent(fixture.adminA, fileId, { executor: tx }),
+      ).rejects.not.toBeInstanceOf(ForbiddenError);
+    });
+  });
+
+  it('пропуск на просмотр файла админу не выдаётся', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '5044');
+      const fileId = await fixture.readyFile(fixture.residencyA, fixture.userA, 'own');
+
+      await expect(
+        grantFileView(fixture.adminWithoutDocuments, fileId, 'inline', { executor: tx }),
+      ).rejects.toBeInstanceOf(ForbiddenError);
+    });
+  });
+
+  /* Суперадмина переключатели не касаются никогда — даже с записью в базе. */
+  it('суперадмина запрет не касается', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '5045');
+
+      const cards = await listDocumentCards(fixture.superadmin, fixture.residencyA, {
+        executor: tx,
+        today: TODAY,
+      });
+
+      expect(cards.length).toBeGreaterThan(0);
     });
   });
 });

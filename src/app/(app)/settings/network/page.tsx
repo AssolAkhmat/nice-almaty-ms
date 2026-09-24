@@ -4,8 +4,10 @@ import { redirect } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { can } from '@/lib/authz';
 import { getCurrentSession } from '@/lib/session';
+import { readAdminCapabilities } from '@/services/permissions';
 import { readOrgSettings } from '@/services/settings';
 
+import { CapabilityToggles } from './capability-toggles';
 import { NetworkForm } from './network-form';
 
 export const dynamic = 'force-dynamic';
@@ -22,7 +24,11 @@ export default async function NetworkSettingsPage() {
   }
 
   const t = await getTranslations('settings.network');
-  const settings = await readOrgSettings({ context: session.context });
+  const actor = { context: session.context };
+  const [settings, capabilities] = await Promise.all([
+    readOrgSettings(actor),
+    readAdminCapabilities(actor),
+  ]);
 
   return (
     <section className="flex flex-col gap-6">
@@ -37,6 +43,8 @@ export default async function NetworkSettingsPage() {
           ratingVisibleToResidents={settings.ratingVisibleToResidents}
         />
       </Card>
+
+      <CapabilityToggles capabilities={capabilities} />
     </section>
   );
 }

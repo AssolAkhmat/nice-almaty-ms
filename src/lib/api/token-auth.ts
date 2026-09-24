@@ -1,5 +1,6 @@
 import { getDb, type Executor } from '@/db/client';
 import { findApiTokenByHash, touchApiToken } from '@/db/repositories/api-tokens';
+import { loadOverridesFor } from '@/db/repositories/permission-overrides';
 import { findUserInOrg } from '@/db/repositories/users';
 import { hitRateLimit } from '@/db/repositories/rate-limits';
 import { isApiScope, SCOPE_ACTIONS } from '@/domain/api-scopes';
@@ -104,8 +105,17 @@ export async function identifyByToken(
 
   await touchApiToken(token.id, executor);
 
+  /*
+   * Токен действует от имени того, кто его выдал, поэтому и снятые
+   * полномочия у него те же: иначе бот делал бы от имени админа то,
+   * что человеку запрещено (указание владельца, 23 сентября 2026).
+   */
+  const overrides =
+    owner.role === 'admin' ? await loadOverridesFor(token.orgId, owner.id, executor) : {};
+
   return {
     context: {
+      overrides,
       orgId: token.orgId,
       userId: owner.id,
       role: owner.role,

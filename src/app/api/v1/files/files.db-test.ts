@@ -139,9 +139,34 @@ async function seed(tx: Transaction, suffix: string) {
     return { residencyId: residency?.id ?? '', token };
   }
 
+  /** Админ дома A: у него полномочие на документы по умолчанию выключено. */
+  async function admin() {
+    const [user] = await tx
+      .insert(schema.users)
+      .values({
+        orgId,
+        phone: `+7708${suffix}`,
+        passwordHash: 'x',
+        role: 'admin',
+        houseId: house?.id ?? '',
+      })
+      .returning();
+
+    const token = `token-admin-${suffix}`;
+    await tx.insert(schema.sessions).values({
+      userId: user?.id ?? '',
+      tokenHash: await hashSessionToken(token),
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+
+    return { userId: user?.id ?? '', token };
+  }
+
   return {
+    orgId,
     a: await resident(1, house?.id ?? ''),
     b: await resident(2, otherHouse?.id ?? ''),
+    admin: await admin(),
   };
 }
 
@@ -640,6 +665,58 @@ describe('GET /api/v1/files/{id}/content', () => {
       );
 
       expect(viewed.status).toBe(404);
+    });
+  });
+
+  /*
+   * Полномочие «документы жильца» выключено у админа по умолчанию (указание
+   * владельца, 23 сентября 2026). Требование владельца было дословным:
+   * при выключенном доступе админ не видит документ ни на экране, ни через
+   * API, ни прямым запросом к содержимому. Ниже — третье.
+   */
+  it('админ без полномочия не достаёт документ прямым запросом', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '4050');
+      const fileId = await uploadReadyFile(fixture.a.token, fixture.a.residencyId);
+
+      /* Настоящая загрузка помечает файл типом документа — как на экране. */
+      await tx
+        .update(schema.files)
+        .set({ scope: { documentType: 'fluorography' } })
+        .where(eq(schema.files.id, fileId));
+
+      const denied = await openContent(fixture.admin.token, fileId);
+
+      expect(denied.status).toBe(403);
+
+      const direct = await getContent(authorized(fixture.admin.token), route(fileId));
+
+      expect(direct.status).toBe(403);
+    });
+  });
+
+  it('с включённым сетью полномочием тот же запрос проходит', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '4051');
+      const fileId = await uploadReadyFile(fixture.a.token, fixture.a.residencyId);
+
+      await tx
+        .update(schema.files)
+        .set({ scope: { documentType: 'fluorography' } })
+        .where(eq(schema.files.id, fileId));
+
+      for (const action of ['document.read', 'file.read']) {
+        await tx.insert(schema.permissionOverrides).values({
+          orgId: fixture.orgId,
+          userId: null,
+          action,
+          allowed: true,
+        });
+      }
+
+      const allowed = await openContent(fixture.admin.token, fileId);
+
+      expect(allowed.status).toBe(200);
     });
   });
 });

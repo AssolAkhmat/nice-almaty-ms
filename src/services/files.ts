@@ -14,6 +14,7 @@ import {
   MAX_UPLOAD_BYTES,
 } from '@/domain/files';
 import { assertCan } from '@/lib/authz';
+import { type Action } from '@/lib/permissions';
 import { ConflictError, NotFoundError, ValidationError } from '@/lib/errors';
 import { getViewGrantKey, issueViewGrant, type FileDisposition } from '@/lib/files/view-grant';
 import { now } from '@/lib/time';
@@ -77,6 +78,23 @@ export interface FileContent {
   originalName: string;
 }
 
+/**
+ * Полномочие, без которого файл не отдаётся: документ жильца или договор.
+ *
+ * Различаются по назначению файла: договор собирает сервер с типом
+ * `contract`, остальные документы несут код своего типа. Файлы дома
+ * (чеки) и фото уборки сюда не попадают — у них нет типа документа.
+ */
+function documentGateOf(file: { scope: unknown }): Action | undefined {
+  const type = (file.scope as { documentType?: string } | null)?.documentType;
+
+  if (type === undefined) {
+    return undefined;
+  }
+
+  return type === 'contract' ? 'contract.read' : 'document.read';
+}
+
 /** Права на файл берутся у проживания, к которому он прикреплён. */
 /**
  * Права на файл — права на его владельца: у документа жильца это проживание,
@@ -88,6 +106,7 @@ async function assertFileAccess(
   action: 'file.upload' | 'file.read',
   owner: { residencyId: string | null; houseId: string | null },
   executor: Executor,
+  gate?: Action,
 ): Promise<void> {
   if (owner.residencyId !== null) {
     const residency = await requireResidency(actor.context, owner.residencyId, executor);
@@ -96,6 +115,18 @@ async function assertFileAccess(
       houseId: residency.houseId,
       userId: residency.userId,
     });
+
+    /*
+     * Второй запрет — полномочие, которое сеть может у админа не включать
+     * (указание владельца, 23 сентября 2026). Он стоит здесь, а не на экране:
+     * иначе документ доставался бы прямым запросом к содержимому файла.
+     */
+    if (gate !== undefined) {
+      assertCan(actor.context, gate, {
+        houseId: residency.houseId,
+        userId: residency.userId,
+      });
+    }
 
     return;
   }
@@ -546,7 +577,7 @@ export async function readFileContent(
   const { executor, storage } = resolve(deps);
 
   const file = await requireFile(actor.context, fileId, executor);
-  await assertFileAccess(actor, 'file.read', file, executor);
+  await assertFileAccess(actor, 'file.read', file, executor, documentGateOf(file));
 
   // Незавершённая загрузка содержимым не является.
   if (file.status !== 'ready') {
@@ -609,7 +640,7 @@ export async function grantFileView(
   const { executor } = resolve(deps);
 
   const file = await requireFile(actor.context, fileId, executor);
-  await assertFileAccess(actor, 'file.read', file, executor);
+  await assertFileAccess(actor, 'file.read', file, executor, documentGateOf(file));
 
   if (file.status !== 'ready') {
     throw new NotFoundError('Файл не найден');

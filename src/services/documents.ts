@@ -67,7 +67,7 @@ function resolve(deps: DocumentDeps): { executor: Executor; today: BusinessDate 
 /** Права на документ берутся у проживания, к которому он прикреплён. */
 async function assertDocumentAccess(
   actor: UserActor,
-  action: 'document.upload' | 'document.review',
+  action: 'document.upload' | 'document.review' | 'document.read',
   residencyId: string,
   executor: Executor,
 ): Promise<void> {
@@ -93,6 +93,13 @@ function latestByType(documents: readonly DocumentRecord[]): Map<string, Documen
   return latest;
 }
 
+/**
+ * Карточки документов жильца: тип, статус проверки, срок, причина отказа.
+ *
+ * Чтение — отдельное полномочие, которое сеть может у админа не включать
+ * (указание владельца, 23 сентября 2026). Прежде проверки прав здесь
+ * не было вовсе: список отдавался всякому, кто смог позвать.
+ */
 export async function listDocumentCards(
   actor: UserActor,
   residencyId: string,
@@ -100,9 +107,7 @@ export async function listDocumentCards(
 ): Promise<DocumentCard[]> {
   const { executor, today } = resolve(deps);
 
-  const residency = await requireResidency(actor.context, residencyId, executor);
-  // Чтение идёт через видимость проживания: своё — жильцу, дом — админу.
-  void residency;
+  await assertDocumentAccess(actor, 'document.read', residencyId, executor);
 
   const [types, documents] = await Promise.all([
     listDocumentTypes(actor.context, {}, executor),
@@ -251,11 +256,29 @@ export async function reviewDocument(
 }
 
 /** Документы дома, ожидающие проверки: рабочий список админа. */
-export async function listPendingDocuments(
+/**
+ * Документы на проверку и уже проверенные.
+ *
+ * Жёсткий фильтр «только загруженные» держался здесь с самого начала,
+ * и одобренный документ исчезал с экрана админа навсегда: вернуться
+ * к справке, посмотреть файл или срок действия было нечем (указание
+ * владельца, 23 сентября 2026). Статус стал параметром.
+ */
+export async function listReviewDocuments(
   actor: UserActor,
+  filter: { status?: DocumentRecord['status'] } = {},
   deps: DocumentDeps = {},
 ): Promise<DocumentRecord[]> {
   const { executor } = resolve(deps);
 
-  return listDocuments(actor.context, { status: 'uploaded' }, executor);
+  assertCan(actor.context, 'document.read', {
+    houseId: actor.context.houseId,
+    userId: actor.context.userId,
+  });
+
+  return listDocuments(
+    actor.context,
+    filter.status === undefined ? {} : { status: filter.status },
+    executor,
+  );
 }

@@ -163,6 +163,28 @@ export async function revealSensitiveField(
     houseId: actor.context.houseId,
   });
 
+  return decryptForContract(actor, userId, field, executor);
+}
+
+/**
+ * То же, но без проверки полномочия «раскрыть ИИН».
+ *
+ * Нужно ровно одному месту — сборке договора. Договор собирает сервер,
+ * и ИИН уходит в документ, а не человеку на экран: админ, которому сеть
+ * не включила раскрытие секретов, договор собрать по-прежнему может, но
+ * прочитать его сможет, только если сеть включила чтение договора
+ * (указание владельца, 23 сентября 2026; сборка — шаг заселения).
+ *
+ * Имя говорит, где её можно звать, а тест `resident-profiles.test.ts`
+ * это стережёт: у функции нет проверки прав, и появление второго места
+ * вызова роняет прогон.
+ */
+export async function decryptForContract(
+  actor: UserActor,
+  userId: string,
+  field: SensitiveField,
+  executor: Executor = getDb(),
+): Promise<string> {
   const profile = await requireProfile(actor.context, userId, executor);
   const columns = SENSITIVE_COLUMNS[field];
   const encrypted = profile[columns.enc];
