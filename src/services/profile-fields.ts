@@ -326,10 +326,33 @@ export async function saveDeclaredFields(
   assertCan(actor.context, 'user.updateProfile', { userId, houseId: actor.context.houseId });
 
   const defs = await listFieldDefs(actor.context, { includeArchived: true }, executor);
-  const values = validateDeclaredValues(defs.map(toDeclaration), raw);
   const byCode = new Map(defs.map((def) => [def.code, def]));
   const existing = await listFieldValues(actor.context, userId, executor);
   const before = new Map(existing.map((row) => [row.fieldId, row.value]));
+
+  /*
+   * Поле могло уйти в архив после того, как форма отрисовалась: сеть решает
+   * это одним движением, а формы у людей открыты. Присланное без изменения
+   * или пустое значение архивированного поля просто не рассматривается —
+   * иначе чужая архивация ломала бы сохранение всего профиля, к которому
+   * она не имеет отношения. Попытка записать в архивированное поле новое
+   * значение по-прежнему отклоняется, и это держат фикстуры.
+   */
+  const considered = Object.fromEntries(
+    Object.entries(raw).filter(([code, value]) => {
+      const def = byCode.get(code);
+
+      if (def === undefined || def.archivedAt === null) {
+        return true;
+      }
+
+      const stored = before.get(def.id) ?? '';
+
+      return value.trim() !== '' && value.trim() !== stored;
+    }),
+  );
+
+  const values = validateDeclaredValues(defs.map(toDeclaration), considered);
 
   await executor.transaction(async (tx) => {
     for (const [code, value] of Object.entries(values)) {

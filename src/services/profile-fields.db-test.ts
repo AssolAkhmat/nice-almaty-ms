@@ -288,6 +288,58 @@ describe('значения полей у жильца', () => {
     });
   });
 
+  it('архивация соседнего поля чужому сохранению не мешает', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '3111');
+      const first = await declareField(fixture.superadmin, TEXT_FIELD, tx);
+      await declareField(
+        fixture.superadmin,
+        { ...TEXT_FIELD, code: 'kurs', type: 'number', sortOrder: 2 },
+        tx,
+      );
+
+      await archiveDeclaration(fixture.superadmin, first.id, true, tx);
+
+      /*
+       * Форма отрисовалась до архивации и присылает пустое значение
+       * архивированного поля вместе с новым значением живого. Отказывать
+       * тут нечему: ничего в архив не пишется.
+       */
+      const saved = await saveDeclaredFields(
+        fixture.superadmin,
+        fixture.residentId,
+        { kafedra: '', kurs: '3' },
+        tx,
+      );
+
+      expect(saved.map((field) => [field.code, field.value])).toEqual([['kurs', '3']]);
+    });
+  });
+
+  it('прежнее значение архивированного поля присылать можно, новое — нельзя', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '3112');
+      const def = await declareField(fixture.superadmin, TEXT_FIELD, tx);
+
+      await saveDeclaredFields(fixture.superadmin, fixture.residentId, { kafedra: 'Механика' }, tx);
+      await archiveDeclaration(fixture.superadmin, def.id, true, tx);
+
+      const unchanged = await saveDeclaredFields(
+        fixture.superadmin,
+        fixture.residentId,
+        { kafedra: 'Механика' },
+        tx,
+      );
+
+      expect(unchanged.map((field) => field.value)).toEqual(['Механика']);
+      expect(
+        await refusal(() =>
+          saveDeclaredFields(fixture.superadmin, fixture.residentId, { kafedra: 'Физика' }, tx),
+        ),
+      ).toEqual({ code: 'profileFieldArchived', field: 'kafedra' });
+    });
+  });
+
   it('архивированное поле без значения в карточке не появляется', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '3107');

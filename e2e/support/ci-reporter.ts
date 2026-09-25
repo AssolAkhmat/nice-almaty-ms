@@ -34,11 +34,28 @@ interface Failure {
  * причину — что именно ждали. Playwright оставляет у такого шага
  * отрицательную длительность.
  */
+/**
+ * Шаги уборки и хуков не называют причину: «ждали закрытия браузера» — это
+ * следствие таймаута, а не место остановки. Смотрим только на то, что делала
+ * сама проверка.
+ */
+const MEANINGFUL = new Set(['pw:api', 'expect', 'test.step']);
+
 function pendingStep(steps: readonly TestStep[]): string | null {
-  const unfinished = [...steps].reverse().find((step) => step.duration < 0);
-  const chosen = unfinished ?? steps[steps.length - 1];
+  const meaningful = steps.filter((step) => MEANINGFUL.has(step.category));
+  const unfinished = [...meaningful].reverse().find((step) => step.duration < 0);
+  const chosen = unfinished ?? meaningful[meaningful.length - 1];
 
   if (chosen === undefined) {
+    /* Внутри хука своих шагов нет — заглядываем в него глубже. */
+    for (const step of [...steps].reverse()) {
+      const deeper = pendingStep(step.steps);
+
+      if (deeper !== null) {
+        return deeper;
+      }
+    }
+
     return null;
   }
 

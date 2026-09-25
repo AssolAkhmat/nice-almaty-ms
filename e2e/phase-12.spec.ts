@@ -1,7 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { E2E_ACCOUNTS } from './global-setup';
+import { E2E_ACCOUNTS, E2E_PASSWORD } from './global-setup';
 import { login } from './support/login';
+import { signInAs } from './support/onboarding';
 
 /**
  * Приёмка фазы 12 — дополнительные поля профиля.
@@ -9,10 +10,13 @@ import { login } from './support/login';
  * Суперадмин объявляет поле, оно появляется в его собственном профиле и в
  * палитре шаблона договора, заполняется, а после архивации остаётся читаемым.
  *
- * Профиль берётся свой, а не нового жильца: форма профиля одна на всех,
- * а заведение жильца со сменой пароля — четыре минуты чужой работы, из-за
- * которых сценарий не укладывался в бюджет и падал по таймауту, ничего
- * не проверив. Путь жильца через ту же форму держат приёмки фаз 2 и 3.
+ * Профиль берётся не новый жилец, а админ своего дома: форма профиля одна
+ * на всех, а заведение жильца со сменой пароля — четыре минуты чужой работы,
+ * из-за которых сценарий падал по таймауту, ничего не проверив. Путь жильца
+ * через ту же форму держат приёмки фаз 2 и 3.
+ *
+ * Учётная запись у каждой ширины своя: профиль суперадмина один, и три копии
+ * приёмки затирали бы друг другу значения в одной и той же форме.
  *
  * Обязательность здесь не проверяется намеренно: объявление живёт в сети,
  * одно на всех, и обязательное поле не дало бы заполнить профиль жильцам
@@ -26,20 +30,20 @@ import { login } from './support/login';
  * Код поля у каждой ширины свой: объявление живёт в сети, одно на всех,
  * и три копии приёмки мешали бы друг другу — как дом в фазе 3.
  */
-const CODE_BY_PROJECT: Readonly<Record<string, string>> = {
-  'mobile-375': 'priemka_mobile',
-  'tablet-768': 'priemka_tablet',
-  'desktop-1440': 'priemka_desktop',
+const BY_PROJECT: Readonly<Record<string, { code: string; filler: string }>> = {
+  'mobile-375': { code: 'priemka_mobile', filler: E2E_ACCOUNTS.adminHouse3 },
+  'tablet-768': { code: 'priemka_tablet', filler: E2E_ACCOUNTS.adminHouse4 },
+  'desktop-1440': { code: 'priemka_desktop', filler: E2E_ACCOUNTS.adminHouse5 },
 };
 
-function codeFor(projectName: string): string {
-  const code = CODE_BY_PROJECT[projectName];
+function partsFor(projectName: string): { code: string; filler: string } {
+  const parts = BY_PROJECT[projectName];
 
-  if (code === undefined) {
+  if (parts === undefined) {
     throw new Error(`Код поля приёмки не задан для ширины ${projectName}`);
   }
 
-  return code;
+  return parts;
 }
 
 /** Объявить поле; если оно осталось с прошлого прогона — вернуть из архива. */
@@ -80,7 +84,7 @@ test.describe('приёмка фазы 12', () => {
   test('объявленное поле заполняется в профиле, а после архивации остаётся читаемым', async ({
     page,
   }, testInfo) => {
-    const code = codeFor(testInfo.project.name);
+    const { code, filler } = partsFor(testInfo.project.name);
 
     await login(page, E2E_ACCOUNTS.superadmin);
     await declareField(page, code);
@@ -90,17 +94,20 @@ test.describe('приёмка фазы 12', () => {
     await expect(page.locator('main')).toContainText(`profile.${code}`);
 
     /* Поле появилось в форме профиля и заполняется ею же. */
+    await signInAs(page, filler, E2E_PASSWORD);
     await page.goto('/profile');
     await page.getByTestId(`declared-${code}`).fill('Механика');
     await page.getByTestId('profile-submit').click();
     await expect(page.getByTestId('profile-saved')).toBeVisible();
 
     /* Архивация: поле уходит из формы, а значение остаётся на экране. */
+    await signInAs(page, E2E_ACCOUNTS.superadmin, E2E_PASSWORD);
     await page.goto('/settings/profile-fields');
     await page.getByTestId(`archive-${code}`).first().click();
     await page.getByTestId('archive-field-submit').click();
     await expect(page.getByTestId(`restore-${code}`).first()).toBeVisible();
 
+    await signInAs(page, filler, E2E_PASSWORD);
     await page.goto('/profile');
 
     const archived = page.getByTestId(`declared-${code}`);
