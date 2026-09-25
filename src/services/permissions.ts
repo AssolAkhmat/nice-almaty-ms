@@ -89,15 +89,24 @@ export async function setAdminCapability(
     /*
      * Запись построчно и с именем действия: «кому, что, когда». Ради этого
      * полномочия и живут отдельной таблицей, а не массивом в одной строке.
+     *
+     * `entityId` — идентификатор того, чьи права меняются: у сетевого правила
+     * это сама сеть, у личного будет админ. Имя переключателя уходит
+     * в `after`: колонка `entity_id` — это uuid, и слово в неё не влезает.
+     * 24 сентября 2026 именно это и роняло действие на боевом (I20).
      */
     await recordAudit(
       { context: actor.context, ip: actor.ip, requestId: actor.requestId },
       {
         action: AUDIT_ACTIONS.permissionChanged,
         entityType: 'permission',
-        entityId: capability,
+        entityId: actor.context.orgId,
+        /*
+         * Имя переключателя только в `after`: журнал пишет разницу, и поле,
+         * одинаковое с обеих сторон, из записи выпадает как неизменившееся.
+         */
         before: { enabled: !enabled },
-        after: { enabled, scope: 'org', actions: [...actions] },
+        after: { capability, enabled, scope: 'org', actions: [...actions] },
       },
       tx,
     );

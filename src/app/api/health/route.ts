@@ -73,8 +73,20 @@ export async function GET(request: Request): Promise<Response> {
     log.error({ checks }, 'health check failed');
   }
 
+  /*
+   * Хеш коммита, из которого собран образ (указание владельца,
+   * 25 сентября 2026). Пока версия не видна снаружи, «развёрнуто» — слово,
+   * а не факт: 24 сентября образ два дня не пересобирался, а все признаки
+   * успеха были на месте (разбор I19). Значение приходит в образ аргументом
+   * сборки; `unknown` означает «собрано мимо `scripts/deploy.sh`».
+   */
   return Response.json(
-    { status: isHealthy ? 'ok' : 'error', checks, request_id: requestId },
+    {
+      status: isHealthy ? 'ok' : 'error',
+      commit: process.env.APP_COMMIT ?? 'unknown',
+      checks,
+      request_id: requestId,
+    },
     { status: isHealthy ? 200 : 503 },
   );
 }

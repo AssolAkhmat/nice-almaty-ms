@@ -51,6 +51,10 @@ services:
     build:
       context: .
       target: runner
+      args:
+        # Хеш коммита запекается в образ и отдаётся из /api/health (I19):
+        # пока версия не видна снаружи, «развёрнуто» — слово, а не факт.
+        APP_COMMIT: ${APP_COMMIT:-unknown}
     restart: unless-stopped
     # PID 1 — tini, а не node: процессы chromium, осиротевшие после печати,
     # переходят к PID 1, и node их не подбирает — каждый договор оставлял

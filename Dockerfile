@@ -27,6 +27,13 @@ RUN pnpm build
 
 # Рантайм приложения: только standalone-вывод, без исходников и devDependencies.
 FROM base AS runner
+#
+# Хеш коммита, из которого собран образ. Отдаётся из /api/health, чтобы
+# «развёрнуто» проверялось, а не принималось на веру (разбор I19).
+# `unknown` означает сборку мимо scripts/deploy.sh.
+#
+ARG APP_COMMIT=unknown
+ENV APP_COMMIT=$APP_COMMIT
 # Печать договора идёт системным chromium: puppeteer-core своего браузера
 # не приносит (docs/01-ARCHITECTURE.md). Шрифты нужны отдельно, иначе
 # кириллица в PDF превращается в квадраты.

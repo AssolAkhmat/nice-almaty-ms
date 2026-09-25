@@ -158,7 +158,7 @@
     "error": {
       "title": "Something went wrong",
       "subtitle": "The page did not open",
-      "hint": "The failure is logged. Try again; if it repeats, give the administrator the code below.",
+      "hint": "The failure went to the server technical log, not to the audit journal — the code below finds it in the log. Try again; if it repeats, give the code to an administrator.",
       "digest": "Failure code: {digest}",
       "retry": "Try again"
     }
