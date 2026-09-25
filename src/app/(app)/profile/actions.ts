@@ -133,8 +133,18 @@ export async function saveProfileAction(
   const payment = text(formData, 'preferredPayment');
   const course = text(formData, 'course');
 
+  /*
+   * Чей профиль правим. Пусто — свой; заполнено — чужой, и тогда право
+   * проверит сам сервис по цели (`user.updateProfile` с userId и houseId).
+   * Так карточка жильца правит профиль той же формой и тем же действием,
+   * а не своей копией, которая однажды разошлась бы с этой
+   * (указание владельца, 25 сентября 2026).
+   */
+  const target = text(formData, 'userId');
+  const userId = target === '' ? current.session.user.id : target;
+
   try {
-    await saveProfile(current.actor, current.session.user.id, {
+    await saveProfile(current.actor, userId, {
       lastName: optionalText(formData, 'lastName'),
       firstName: optionalText(formData, 'firstName'),
       middleName: optionalText(formData, 'middleName'),
@@ -159,6 +169,8 @@ export async function saveProfileAction(
     });
 
     revalidatePath('/profile');
+    /* Профиль правится и из карточки жильца — обновляется и она. */
+    revalidatePath('/residents', 'layout');
 
     return { done: 'profile.done.saved' };
   } catch (error) {
@@ -188,8 +200,17 @@ export async function revealAction(
     return { error: 'profile.errors.validation_error' };
   }
 
+  /*
+   * Чей секрет раскрываем. Пусто — свой; заполнено — чужой, и право
+   * `resident.revealSensitive` проверит сервис, он же запишет раскрытие
+   * в журнал. Прежде здесь жёстко стоял свой идентификатор, и «глаз»
+   * у админа не работал в принципе (25 сентября 2026).
+   */
+  const target = text(formData, 'userId');
+  const userId = target === '' ? current.session.user.id : target;
+
   try {
-    const value = await revealSensitiveField(current.actor, current.session.user.id, field);
+    const value = await revealSensitiveField(current.actor, userId, field);
 
     return { field, value };
   } catch (error) {

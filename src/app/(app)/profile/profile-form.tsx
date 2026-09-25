@@ -51,9 +51,19 @@ const INITIAL_REVEAL: RevealState = {};
 export function ProfileForm({
   values,
   placement,
+  userId,
+  canReplaceSecrets = false,
 }: {
   values: ProfileFormValues;
   placement: PlacementView;
+  /**
+   * Чей профиль. Пусто — свой: так эту форму открывает жилец. Заполнено —
+   * чужой, и тогда её открывает карточка жильца: форма одна на оба случая,
+   * иначе копия однажды разошлась бы с оригиналом (25 сентября 2026).
+   */
+  userId?: string;
+  /** Исправлять уже введённые ИИН и номер удостоверения (суперадмин). */
+  canReplaceSecrets?: boolean;
 }) {
   const t = useTranslations();
   const [state, action, isPending] = useActionState(saveProfileAction, INITIAL);
@@ -86,6 +96,8 @@ export function ProfileForm({
       </Card>
 
       <form action={action} className="flex flex-col gap-6" data-testid="profile-form">
+        {/* Чей профиль: пусто — свой. Право на чужой проверяет сервис. */}
+        {userId !== undefined && <input name="userId" type="hidden" value={userId} />}
         <Card>
           <CardHeader>
             <CardTitle>{t('profile.sections.personal')}</CardTitle>
@@ -129,6 +141,7 @@ export function ProfileForm({
 
           <div className="grid gap-3 md:grid-cols-2">
             <SensitiveInput
+              canReplace={canReplaceSecrets}
               current={values.iinMasked}
               hint={t('profile.fields.iinHint')}
               label={t('profile.fields.iin')}
@@ -136,6 +149,7 @@ export function ProfileForm({
               revealed={revealed('iin')}
             />
             <SensitiveInput
+              canReplace={canReplaceSecrets}
               current={values.idDocNumberMasked}
               hint={t('profile.fields.idDocHint')}
               label={t('profile.fields.idDocNumber')}
@@ -262,6 +276,7 @@ export function ProfileForm({
 
       {/* Раскрытие вынесено в отдельную форму: это отдельное действие с записью в журнал. */}
       <form action={revealFormAction} className="hidden" id="reveal-form">
+        {userId !== undefined && <input name="userId" type="hidden" value={userId} />}
         <input name="field" type="hidden" />
       </form>
 

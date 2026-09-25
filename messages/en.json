@@ -640,7 +640,8 @@
       "upload": "The file could not be uploaded"
     },
     "accessOff": "Document access is disabled",
-    "accessOffHint": "The network has not enabled admin access to resident documents. A superadmin enables it in network settings."
+    "accessOffHint": "The network has not enabled admin access to resident documents. A superadmin enables it in network settings.",
+    "noDocumentTypes": "No document types yet"
   },
   "files": {
     "open": "Open",
@@ -1435,7 +1436,10 @@
     "ratingShort": "Rating {value}",
     "debtShort": "Debt",
     "keysIssued": "Keys issued",
-    "keysNotIssued": "Keys not issued"
+    "keysNotIssued": "Keys not issued",
+    "historyTitle": "History",
+    "historyEmpty": "No entries",
+    "historyEmptyHint": "Changes for this resident will appear here"
   },
   "rotationCalendar": {
     "assign": "Assign",
