@@ -45,7 +45,10 @@ export async function DepositSection({ view }: { view: DepositView }) {
         ) : (
           <ul className="flex flex-col gap-1">
             {view.transactions.map((transaction) => (
-              <li className="flex items-center justify-between gap-4" key={transaction.id}>
+              <li
+                className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1"
+                key={transaction.id}
+              >
                 <span>
                   {transaction.note ?? t(`deposit.movement.${transaction.type}`)}
                   <span className="text-text-muted ml-2">
@@ -94,7 +97,10 @@ export async function InvoicesSection({
         ) : (
           <ul className="flex flex-col gap-1">
             {rows.map((row) => (
-              <li className="flex items-center justify-between gap-4" key={row.invoice.id}>
+              <li
+                className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1"
+                key={row.invoice.id}
+              >
                 <span>
                   {t(`invoices.type.${row.invoice.type}`)}
                   {row.invoice.periodMonth !== null && (
@@ -186,7 +192,10 @@ export async function RatingSection({ view }: { view: ResidentRatingView }) {
         ) : (
           <ul className="flex flex-col gap-1">
             {view.events.slice(-8).map((event) => (
-              <li className="flex items-center justify-between gap-4" key={event.id}>
+              <li
+                className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1"
+                key={event.id}
+              >
                 <span>
                   {event.note ?? event.type}
                   <span className="text-text-muted ml-2">
@@ -223,7 +232,10 @@ export async function HistorySection({ entries }: { entries: readonly AuditLogEn
         ) : (
           <ul className="flex flex-col gap-1">
             {entries.map((entry) => (
-              <li className="flex items-start justify-between gap-4" key={entry.id}>
+              <li
+                className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1"
+                key={entry.id}
+              >
                 <span>
                   {entry.action}
                   <span className="text-text-muted ml-2">

@@ -641,7 +641,8 @@
     },
     "accessOff": "Document access is disabled",
     "accessOffHint": "The network has not enabled admin access to resident documents. A superadmin enables it in network settings.",
-    "noDocumentTypes": "No document types yet"
+    "noDocumentTypes": "No document types yet",
+    "reviewOf": "Review documents: {count}"
   },
   "files": {
     "open": "Open",

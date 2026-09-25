@@ -266,10 +266,29 @@ export async function reviewDocument(
  */
 export async function listReviewDocuments(
   actor: UserActor,
-  filter: { status?: DocumentRecord['status'] } = {},
+  filter: { status?: DocumentRecord['status']; residencyId?: string } = {},
   deps: DocumentDeps = {},
 ): Promise<DocumentRecord[]> {
   const { executor } = resolve(deps);
+
+  /*
+   * Отбор по жильцу — ради сценария «открыл человека и проверяю его справки,
+   * а не разгребаю очередь дома» (указание владельца, 25 сентября 2026).
+   * Право тогда спрашивается по самому проживанию: очередь дома и документы
+   * одного жильца — разные области, и общая проверка была бы шире нужного.
+   */
+  if (filter.residencyId !== undefined) {
+    await assertDocumentAccess(actor, 'document.read', filter.residencyId, executor);
+
+    return listDocuments(
+      actor.context,
+      {
+        residencyId: filter.residencyId,
+        ...(filter.status === undefined ? {} : { status: filter.status }),
+      },
+      executor,
+    );
+  }
 
   assertCan(actor.context, 'document.read', {
     houseId: actor.context.houseId,

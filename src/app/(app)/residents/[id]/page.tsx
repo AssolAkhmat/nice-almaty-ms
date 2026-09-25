@@ -256,7 +256,13 @@ export default async function ResidentCardPage({ params }: { params: Promise<{ i
         />
       )}
 
-      {documents !== null && <DocumentsSection cards={documents} />}
+      {documents !== null && (
+        <DocumentsSection
+          canReview={can(context, 'document.review', target)}
+          cards={documents}
+          residencyId={card.residency.id}
+        />
+      )}
 
       {deposit !== null && <DepositSection view={deposit} />}
 

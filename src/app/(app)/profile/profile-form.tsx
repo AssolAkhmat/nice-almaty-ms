@@ -349,8 +349,8 @@ export function SensitiveInput({
       {current === null ? (
         <Input data-testid={name} id={name} inputMode="numeric" name={name} />
       ) : (
-        <div className="flex items-center gap-2">
-          <span className="tabular text-[15px]" data-testid={`${name}-masked`}>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="tabular min-w-0 text-[15px] break-all" data-testid={`${name}-masked`}>
             {revealed ?? current}
           </span>
           {revealed === null ? (

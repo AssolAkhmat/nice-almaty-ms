@@ -34,7 +34,7 @@ const TONES: Readonly<Record<ReviewItemView['status'], BadgeTone>> = {
   rejected: 'danger',
 };
 
-function ReviewItem({ item }: { item: ReviewItemView }) {
+function ReviewItem({ item, returnTo }: { item: ReviewItemView; returnTo?: string }) {
   const t = useTranslations();
   const format = useFormatter();
   const [state, action, isPending] = useActionState(reviewDocumentAction, INITIAL);
@@ -44,8 +44,10 @@ function ReviewItem({ item }: { item: ReviewItemView }) {
     <Card data-testid="review-item">
       <CardHeader>
         <CardTitle>{item.typeName}</CardTitle>
-        <span className="flex items-center gap-2">
-          <span className="text-text-muted text-[13px]">{item.residentName}</span>
+        <span className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className="text-text-muted min-w-0 text-[13px] break-words">
+            {item.residentName}
+          </span>
           <Badge tone={TONES[item.status]}>{t(`documents.status.${item.status}`)}</Badge>
         </span>
       </CardHeader>
@@ -90,6 +92,8 @@ function ReviewItem({ item }: { item: ReviewItemView }) {
         {item.status !== 'uploaded' ? null : (
           <form action={action} className="flex flex-col gap-3">
             <input name="documentId" type="hidden" value={item.id} />
+            {/* Куда вернуться после решения: пусто — остаёмся в очереди. */}
+            {returnTo !== undefined && <input name="returnTo" type="hidden" value={returnTo} />}
 
             {isRejecting && (
               <Field htmlFor={`reason-${item.id}`} label={t('documents.rejectReason')}>
@@ -143,7 +147,14 @@ function ReviewItem({ item }: { item: ReviewItemView }) {
   );
 }
 
-export function ReviewQueue({ items }: { items: readonly ReviewItemView[] }) {
+export function ReviewQueue({
+  items,
+  returnTo,
+}: {
+  items: readonly ReviewItemView[];
+  /** Адрес возврата после решения; пусто — остаёмся в очереди. */
+  returnTo?: string;
+}) {
   const t = useTranslations();
 
   if (items.length === 0) {
@@ -155,7 +166,7 @@ export function ReviewQueue({ items }: { items: readonly ReviewItemView[] }) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {items.map((item) => (
-        <ReviewItem item={item} key={item.id} />
+        <ReviewItem item={item} key={item.id} returnTo={returnTo} />
       ))}
     </div>
   );

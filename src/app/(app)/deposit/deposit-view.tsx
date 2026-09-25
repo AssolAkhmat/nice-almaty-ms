@@ -58,7 +58,10 @@ function Movements({ movements }: { movements: readonly DepositMovementView[] })
   return (
     <ul className="flex flex-col gap-2">
       {movements.map((movement) => (
-        <li className="flex items-center justify-between gap-4" key={movement.id}>
+        <li
+          className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1"
+          key={movement.id}
+        >
           <span className="text-[13px]">
             {movement.note ?? t(`deposit.movement.${movement.type}`)}
             <span className="text-text-muted ml-2">

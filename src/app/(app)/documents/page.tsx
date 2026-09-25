@@ -63,8 +63,12 @@ async function reviewView(
   context: AccessContext,
   locale: string,
   status: 'uploaded' | 'approved' | 'rejected' | undefined,
+  residencyId: string | undefined,
 ): Promise<ReviewItemView[]> {
-  const documents = await listReviewDocuments(actor, status === undefined ? {} : { status });
+  const documents = await listReviewDocuments(actor, {
+    ...(status === undefined ? {} : { status }),
+    ...(residencyId === undefined ? {} : { residencyId }),
+  });
 
   return Promise.all(
     documents.map(async (document) => {
@@ -93,7 +97,7 @@ const REVIEW_STATUSES = ['uploaded', 'approved', 'rejected'] as const;
 export default async function DocumentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; residency?: string; back?: string }>;
 }) {
   const session = await getCurrentSession();
   if (session === null) {
@@ -111,8 +115,21 @@ export default async function DocumentsPage({
    * Статус стал фильтром: по умолчанию очередь, но проверенные документы
    * никуда не деваются и открываются (указание владельца, 23 сентября 2026).
    */
-  const { status: requested } = await searchParams;
+  const { status: requested, residency: requestedResidency, back } = await searchParams;
   const status = REVIEW_STATUSES.find((candidate) => candidate === requested) ?? 'uploaded';
+
+  /*
+   * Очередь по одному жильцу: админ открыл человека и проверяет его справки
+   * (указание владельца, 25 сентября 2026). Адрес возврата проверяется
+   * белым списком — «куда угодно из ссылки» это открытое перенаправление.
+   */
+  const residencyId =
+    requestedResidency !== undefined && /^[0-9a-f-]{36}$/.test(requestedResidency)
+      ? requestedResidency
+      : undefined;
+
+  const returnTo =
+    back !== undefined && /^\/residents\/[0-9a-f-]{36}$/.test(back) ? back : undefined;
 
   /*
    * Доступ админа к документам жильца сеть может не включать (указание
@@ -124,7 +141,7 @@ export default async function DocumentsPage({
     can(context, 'document.read', { houseId: context.houseId, userId: context.userId });
 
   const resident = isReviewer ? null : await residentView(actor, context, locale);
-  const queue = mayReview ? await reviewView(actor, context, locale, status) : [];
+  const queue = mayReview ? await reviewView(actor, context, locale, status, residencyId) : [];
 
   return (
     <section className="flex flex-col gap-6">
@@ -143,7 +160,14 @@ export default async function DocumentsPage({
                 value === status ? 'text-text font-medium' : 'text-text-muted hover:text-text'
               }
               data-testid={`documents-filter-${value}`}
-              href={{ pathname: '/documents', query: { status: value } }}
+              href={{
+                pathname: '/documents',
+                query: {
+                  status: value,
+                  ...(residencyId === undefined ? {} : { residency: residencyId }),
+                  ...(returnTo === undefined ? {} : { back: returnTo }),
+                },
+              }}
               key={value}
             >
               {t(`status.${value}`)}
@@ -155,7 +179,7 @@ export default async function DocumentsPage({
       {isReviewer && !mayReview ? (
         <EmptyState description={t('accessOffHint')} title={t('accessOff')} />
       ) : isReviewer ? (
-        <ReviewQueue items={queue} />
+        <ReviewQueue items={queue} returnTo={returnTo} />
       ) : resident === null ? (
         <EmptyState description={t('noResidencyHint')} title={t('noResidency')} />
       ) : (

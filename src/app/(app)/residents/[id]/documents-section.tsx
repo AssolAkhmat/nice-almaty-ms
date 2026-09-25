@@ -1,5 +1,7 @@
 import { getLocale, getTranslations } from 'next-intl/server';
 
+import { AppLink } from '@/components/ui/app-link';
+
 import { FileLinks } from '@/components/files/file-links';
 import { Badge, type BadgeTone } from '@/components/ui/badge';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,14 +33,44 @@ function localizedName(card: DocumentCard, locale: string): string {
   return names?.[locale] ?? names?.ru ?? card.type.code;
 }
 
-export async function DocumentsSection({ cards }: { cards: readonly DocumentCard[] }) {
+export async function DocumentsSection({
+  cards,
+  residencyId,
+  canReview,
+}: {
+  cards: readonly DocumentCard[];
+  residencyId: string;
+  canReview: boolean;
+}) {
   const t = await getTranslations();
   const locale = await getLocale();
+
+  const pending = cards.filter((card) => card.document?.status === 'uploaded').length;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>{t('documents.title')}</CardTitle>
+
+        {/*
+          Переход в очередь, отфильтрованную по этому жильцу: админ открыл
+          человека и проверяет его справки, а не разгребает очередь дома.
+          После решения возвращает сюда же (указание владельца, 25 сентября
+          2026). Кнопок решения здесь нет намеренно: двух мест для одного
+          решения быть не должно.
+        */}
+        {canReview && pending > 0 && (
+          <AppLink
+            className="text-accent text-[13px] underline"
+            data-testid="review-resident-documents"
+            href={{
+              pathname: '/documents',
+              query: { residency: residencyId, back: `/residents/${residencyId}` },
+            }}
+          >
+            {t('documents.reviewOf', { count: pending })}
+          </AppLink>
+        )}
       </CardHeader>
 
       <div className="flex flex-col gap-2 p-4 pt-0 text-[13px]">

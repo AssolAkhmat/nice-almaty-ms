@@ -2,6 +2,7 @@
 
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 
 import { actionErrorKey } from '@/lib/action-failure';
 import { getCurrentSession } from '@/lib/session';
@@ -98,6 +99,19 @@ export async function reviewDocumentAction(
   }
 
   revalidatePath('/documents');
+
+  /*
+   * Возврат туда, откуда пришли: админ открыл жильца и проверяет ЕГО справки,
+   * а не разгребает очередь дома (указание владельца, 25 сентября 2026).
+   * Адрес проверяется белым списком: «куда угодно из формы» — это открытое
+   * перенаправление, а не удобство.
+   */
+  const back = text(formData, 'returnTo');
+
+  if (/^\/residents\/[0-9a-f-]{36}$/.test(back)) {
+    revalidatePath(back);
+    redirect(back);
+  }
 
   return { done: approve ? 'documents.approved' : 'documents.rejected' };
 }

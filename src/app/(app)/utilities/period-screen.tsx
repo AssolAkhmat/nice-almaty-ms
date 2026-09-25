@@ -207,7 +207,10 @@ export function PeriodScreen({
           ) : (
             <ul className="flex flex-col gap-1 text-[13px]">
               {lines.map((line) => (
-                <li className="flex items-center justify-between gap-4" key={line.id}>
+                <li
+                  className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1"
+                  key={line.id}
+                >
                   <span>{line.title}</span>
                   <span className="flex items-center gap-3">
                     {line.receiptFileId !== null && (
