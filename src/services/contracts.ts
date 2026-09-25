@@ -11,7 +11,6 @@ import { requireResidency, updateResidency } from '@/db/repositories/residencies
 import { requireUser } from '@/db/repositories/users';
 import { contractTemplates, type ContractTemplate } from '@/db/schema';
 import { hasToken, renderContractTemplate, unknownTokens } from '@/domain/contract-template';
-import { readOwnerSignatureFileId } from './settings';
 import { documentStorageKey } from '@/domain/files';
 import { assertCan } from '@/lib/authz';
 import { ConflictError, NotFoundError, ValidationError } from '@/lib/errors';
@@ -19,6 +18,8 @@ import { now, todayInAlmaty, type BusinessDate } from '@/lib/time';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
 import { ensureContractNumber } from './contract-numbers';
+import { declaredContractValues, declaredTokens } from './profile-fields';
+import { readOwnerSignatureFileId } from './settings';
 import { decryptForContract } from './resident-profiles';
 
 import type { PdfRenderer } from '@/adapters/pdf';
@@ -139,6 +140,12 @@ async function contractValues(
   const placement = await findPlacementOfResidency(actor.context, residency.id, executor);
 
   const profile = await requireProfile(actor.context, residency.userId, executor);
+  /*
+   * Значения объявленных сетью полей (T12.4): по одному на токен
+   * `profile.<код>`, включая архивированные поля — их токены стоят
+   * в шаблонах, по которым уже собраны договоры.
+   */
+  const declared = await declaredContractValues(actor.context, residency.userId, executor);
   // Телефон входа — резерв для договора: у входа он обязателен всегда,
   // а в профиле это отдельное, необязательное контактное поле (T9.7).
   const user = await requireUser(actor.context, residency.userId, executor);
@@ -158,6 +165,7 @@ async function contractValues(
       : await decryptForContract(actor, residency.userId, 'idDocNumber', executor);
 
   return {
+    ...declared,
     'resident.full_name': fullName,
     'resident.iin': iin,
     'residency.contract_start': humanDate(residency.contractStart),
@@ -212,17 +220,22 @@ function renderContract(
   values: Readonly<Record<string, string>>,
   dataUrl: string | null,
   ownerDataUrl: string | null = null,
+  declared: readonly string[] = [],
 ): string {
-  const html = renderContractTemplate(bodyHtml, {
-    ...values,
-    'resident.signature': dataUrl === null ? '' : signatureImage(dataUrl),
-    /*
-     * Подпись исполнителя ставится только там, где её ждёт шаблон: блоком
-     * в конце она не приклеивается. Шаблон без токена — это шаблон, который
-     * про подпись исполнителя не знает, и дописывать её за автора незачем.
-     */
-    'owner.signature': ownerDataUrl === null ? '' : signatureImage(ownerDataUrl),
-  });
+  const html = renderContractTemplate(
+    bodyHtml,
+    {
+      ...values,
+      'resident.signature': dataUrl === null ? '' : signatureImage(dataUrl),
+      /*
+       * Подпись исполнителя ставится только там, где её ждёт шаблон: блоком
+       * в конце она не приклеивается. Шаблон без токена — это шаблон, который
+       * про подпись исполнителя не знает, и дописывать её за автора незачем.
+       */
+      'owner.signature': ownerDataUrl === null ? '' : signatureImage(ownerDataUrl),
+    },
+    declared,
+  );
 
   return hasToken(bodyHtml, 'resident.signature') ? html : withSignature(html, dataUrl);
 }
@@ -347,7 +360,8 @@ export async function buildContract(
     throw new NotFoundError('Активный шаблон договора не задан');
   }
 
-  const unknown = unknownTokens(template.bodyHtml);
+  const declared = await declaredTokens(actor.context, executor);
+  const unknown = unknownTokens(template.bodyHtml, declared);
   if (unknown.length > 0) {
     throw new ValidationError('contracts.unknownTokens', { tokens: unknown });
   }
@@ -356,7 +370,7 @@ export async function buildContract(
   const values = await contractValues(actor, residency, resolved, contractNumber);
   const owner = await ownerSignatureDataUrl(actor, residency, resolved);
   // Договор до подписания: токен подписи жильца получает пустое значение.
-  const html = renderContract(template.bodyHtml, values, null, owner.dataUrl);
+  const html = renderContract(template.bodyHtml, values, null, owner.dataUrl, declared);
   const pdf = await resolved.pdf.render(html);
 
   const file = await storeServerFile(
@@ -452,7 +466,13 @@ export async function signContract(
    * (указание владельца, 22 сентября 2026).
    */
   const owner = await ownerSignatureDataUrl(actor, residency, resolved);
-  const html = renderContract(template.bodyHtml, values, dataUrl, owner.dataUrl);
+  const html = renderContract(
+    template.bodyHtml,
+    values,
+    dataUrl,
+    owner.dataUrl,
+    await declaredTokens(actor.context, executor),
+  );
   const pdf = await resolved.pdf.render(html);
 
   const file = await storeServerFile(

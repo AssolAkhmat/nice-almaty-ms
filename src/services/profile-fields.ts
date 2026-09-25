@@ -12,14 +12,21 @@ import { assertCan } from '@/lib/authz';
 import { NotFoundError, ValidationError } from '@/lib/errors';
 import { LOCALES } from '@/lib/i18n/config';
 import { now } from '@/lib/time';
+import { profileToken } from '@/domain/contract-template';
 import {
+  displayValue,
   missingRequiredFields,
+  sampleValue,
   validateDeclaredValues,
+  type BooleanLabels,
   type FieldDeclaration,
 } from '@/domain/profile-fields';
+import { textIn } from '@/lib/i18n/text';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
+import { readDefaultLocale } from './settings';
 
+import type { AccessContext } from '@/db/access';
 import type { ProfileFieldDef, ProfileFieldType } from '@/db/schema';
 import type { UserActor } from './users';
 
@@ -385,4 +392,82 @@ export async function assertDeclaredFieldsFilled(
   if (missing.length > 0) {
     throw new ValidationError('profileFieldsRequired', { codes: missing.join(', ') });
   }
+}
+
+/**
+ * Токены договора по объявленным полям сети (T12.4).
+ *
+ * Палитра шаблона перестала быть константой: к постоянным токенам
+ * добавляются `profile.<код>` — по одному на объявленное поле, включая
+ * архивированные. Архивированное поле остаётся в палитре намеренно:
+ * его токен стоит в шаблонах, по которым уже собраны договоры, и убрать
+ * токен из палитры значило бы объявить такой шаблон испорченным.
+ */
+export async function declaredTokens(
+  context: AccessContext,
+  executor: Executor = getDb(),
+): Promise<string[]> {
+  const defs = await listFieldDefs(context, { includeArchived: true }, executor);
+
+  return defs.map((def) => profileToken(def.code));
+}
+
+async function booleanLabels(context: AccessContext, executor: Executor): Promise<BooleanLabels> {
+  const defaultLocale = await readDefaultLocale(context, executor);
+
+  return {
+    no: await textIn(defaultLocale, 'profile.declared.no'),
+    yes: await textIn(defaultLocale, 'profile.declared.yes'),
+  };
+}
+
+/**
+ * Значения объявленных полей для договора: по одному на токен палитры.
+ *
+ * Пустое значение необязательного поля — это пустая строка, а не дыра:
+ * договор печатает то, что есть, а отсутствие значения у объявленного поля
+ * законно. Язык слов «да» и «нет» — язык сети, а не читающего: договор
+ * пишется один раз и на одном языке.
+ */
+export async function declaredContractValues(
+  context: AccessContext,
+  userId: string,
+  executor: Executor = getDb(),
+): Promise<Record<string, string>> {
+  const defs = await listFieldDefs(context, { includeArchived: true }, executor);
+  const values = await listFieldValues(context, userId, executor);
+  const byField = new Map(values.map((row) => [row.fieldId, row.value]));
+  const labels = await booleanLabels(context, executor);
+
+  return Object.fromEntries(
+    defs.map((def) => {
+      const value = byField.get(def.id) ?? null;
+
+      return [
+        profileToken(def.code),
+        value === null ? '' : displayValue(toDeclaration(def), value, labels),
+      ];
+    }),
+  );
+}
+
+/**
+ * Образцы значений для предпросмотра шаблона: по одному на каждый из пяти
+ * типов. Без них предпросмотр печатал бы пустоту там, где в договоре будет
+ * значение, и вёрстку абзаца с полем было бы не проверить.
+ */
+export async function declaredSampleValues(
+  context: AccessContext,
+  executor: Executor = getDb(),
+): Promise<Record<string, string>> {
+  const defs = await listFieldDefs(context, { includeArchived: true }, executor);
+  const labels = await booleanLabels(context, executor);
+
+  return Object.fromEntries(
+    defs.map((def) => {
+      const declaration = toDeclaration(def);
+
+      return [profileToken(def.code), displayValue(declaration, sampleValue(declaration), labels)];
+    }),
+  );
 }

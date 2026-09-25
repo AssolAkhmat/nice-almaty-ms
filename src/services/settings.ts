@@ -120,6 +120,26 @@ export async function readWelcomeMessage(
   return typeof value === 'string' && value !== '' ? value : null;
 }
 
+/**
+ * Язык сети без проверки прав: он нужен там, где текст пишется не читающему,
+ * а документу — в договор и в сообщение жильцу. Право `settings.org.read`
+ * есть только у суперадмина, а договор собирает админ дома, поэтому спрашивать
+ * его здесь значило бы запретить админу сборку из-за одной подписи «да/нет».
+ */
+export async function readDefaultLocale(
+  context: AccessContext,
+  executor: Executor = getDb(),
+): Promise<Locale> {
+  const value = await readSettingValue(
+    'org',
+    context.orgId,
+    ORG_SETTINGS.defaultLocale.key,
+    executor,
+  );
+
+  return isLocale(value) ? value : ORG_SETTINGS.defaultLocale.defaultValue;
+}
+
 export async function readOrgSettings(
   actor: UserActor,
   executor: Executor = getDb(),

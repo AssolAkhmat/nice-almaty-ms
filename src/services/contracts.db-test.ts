@@ -14,6 +14,7 @@ import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '@
 import { parseBusinessDate } from '@/lib/time';
 
 import { buildContract, markKeysIssued, signContract } from './contracts';
+import { archiveDeclaration, declareField, saveDeclaredFields } from './profile-fields';
 import { saveContractTemplate } from './contract-templates';
 import { saveProfile } from './resident-profiles';
 
@@ -870,6 +871,136 @@ describe('подпись исполнителя', () => {
         .where(eq(schema.residencies.id, fixture.residencyId));
 
       expect(residency?.ownerSignatureFileId).toBe(first);
+    });
+  });
+});
+
+/**
+ * Объявленные поля профиля в договоре (T12.4).
+ *
+ * Требование владельца: архивированное поле остаётся читаемым в уже
+ * подписанных договорах. Значит и токен остаётся в палитре, и значение
+ * остаётся в подставляемом наборе — иначе пересборка подписанного договора
+ * по своей версии шаблона упала бы на «неизвестный токен».
+ */
+describe('дополнительные поля профиля в договоре', () => {
+  it('значение объявленного поля попадает в документ', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6301');
+      const pdf = fakePdf();
+
+      const def = await declareField(
+        fixture.superadmin,
+        {
+          code: 'kafedra',
+          nameI18n: { ru: 'Кафедра', kk: 'Кафедра', en: 'Department' },
+          type: 'text',
+          isRequired: false,
+          options: [],
+          sortOrder: 1,
+        },
+        tx,
+      );
+      await saveDeclaredFields(fixture.superadmin, fixture.userId, { kafedra: 'Механика' }, tx);
+
+      await tx
+        .update(schema.contractTemplates)
+        .set({ bodyHtml: '<p>{{house.name}} — {{profile.kafedra}}</p>' });
+
+      await buildContract(fixture.admin, fixture.residencyId, {
+        executor: tx,
+        storage: freshStorage(),
+        pdf: pdf.renderer,
+        today: TODAY,
+      });
+
+      expect(pdf.printed[0] ?? '').toContain('Механика');
+      expect(def.code).toBe('kafedra');
+    });
+  });
+
+  it('после архивации поля договор собирается по-прежнему', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6302');
+      const pdf = fakePdf();
+
+      const def = await declareField(
+        fixture.superadmin,
+        {
+          code: 'kafedra',
+          nameI18n: { ru: 'Кафедра', kk: 'Кафедра', en: 'Department' },
+          type: 'text',
+          isRequired: false,
+          options: [],
+          sortOrder: 1,
+        },
+        tx,
+      );
+      await saveDeclaredFields(fixture.superadmin, fixture.userId, { kafedra: 'Механика' }, tx);
+      await tx
+        .update(schema.contractTemplates)
+        .set({ bodyHtml: '<p>{{house.name}} — {{profile.kafedra}}</p>' });
+
+      await archiveDeclaration(fixture.superadmin, def.id, true, tx);
+
+      await buildContract(fixture.admin, fixture.residencyId, {
+        executor: tx,
+        storage: freshStorage(),
+        pdf: pdf.renderer,
+        today: TODAY,
+      });
+
+      expect(pdf.printed[0] ?? '').toContain('Механика');
+    });
+  });
+
+  it('шаблон с токеном необъявленного поля отвергается до печати', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6303');
+
+      await tx.update(schema.contractTemplates).set({ bodyHtml: '<p>{{profile.vydumka}}</p>' });
+
+      await expect(
+        buildContract(fixture.admin, fixture.residencyId, {
+          executor: tx,
+          storage: freshStorage(),
+          pdf: fakePdf().renderer,
+          today: TODAY,
+        }),
+      ).rejects.toThrow(/unknownTokens/);
+    });
+  });
+
+  it('значение поля в документ разметкой не попадает', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6304');
+      const pdf = fakePdf();
+
+      await declareField(
+        fixture.superadmin,
+        {
+          code: 'kafedra',
+          nameI18n: { ru: 'Кафедра', kk: 'Кафедра', en: 'Department' },
+          type: 'text',
+          isRequired: false,
+          options: [],
+          sortOrder: 1,
+        },
+        tx,
+      );
+      await saveDeclaredFields(fixture.superadmin, fixture.userId, { kafedra: '<b>жирно</b>' }, tx);
+      await tx.update(schema.contractTemplates).set({ bodyHtml: '<p>{{profile.kafedra}}</p>' });
+
+      await buildContract(fixture.admin, fixture.residencyId, {
+        executor: tx,
+        storage: freshStorage(),
+        pdf: pdf.renderer,
+        today: TODAY,
+      });
+
+      const html = pdf.printed[0] ?? '';
+      expect(html).toContain('&lt;b&gt;жирно&lt;/b&gt;');
+      expect(html).not.toContain('<b>жирно</b>');
     });
   });
 });

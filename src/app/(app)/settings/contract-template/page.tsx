@@ -6,6 +6,7 @@ import { can } from '@/lib/authz';
 import { NotFoundError } from '@/lib/errors';
 import { getCurrentSession } from '@/lib/session';
 import { readContractTemplate } from '@/services/contract-templates';
+import { declaredTokens } from '@/services/profile-fields';
 
 import { TemplateEditor } from './template-editor';
 
@@ -28,6 +29,12 @@ export default async function ContractTemplatePage() {
   }
 
   const t = await getTranslations('contractTemplate');
+
+  /*
+   * Палитра = постоянные токены плюс объявленные поля сети (T12.4). Без них
+   * суперадмин не узнал бы, как вставить в договор поле, которое сам и завёл.
+   */
+  const declared = await declaredTokens(context);
 
   const template = await readContractTemplate({ context }).catch((error: unknown) => {
     if (error instanceof NotFoundError) {
@@ -53,7 +60,7 @@ export default async function ContractTemplatePage() {
           bodyHtml={template.bodyHtml}
           canManage={can(context, 'settings.org.write')}
           name={template.name}
-          tokens={CONTRACT_TOKENS}
+          tokens={[...CONTRACT_TOKENS, ...declared]}
           version={template.version}
         />
       )}

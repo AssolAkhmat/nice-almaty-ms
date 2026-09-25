@@ -13,6 +13,7 @@ import { now } from '@/lib/time';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
 import { activeTemplate } from './contracts';
+import { declaredSampleValues, declaredTokens } from './profile-fields';
 
 import type { ContractTemplate } from '@/db/schema';
 import type { UserActor } from './users';
@@ -33,7 +34,7 @@ export interface ContractTemplateInput {
   bodyHtml: string;
 }
 
-function assertUsable(input: ContractTemplateInput): void {
+function assertUsable(input: ContractTemplateInput, declared: readonly string[]): void {
   if (input.name.trim() === '') {
     throw new ValidationError('nameRequired');
   }
@@ -42,7 +43,7 @@ function assertUsable(input: ContractTemplateInput): void {
     throw new ValidationError('bodyRequired');
   }
 
-  const unknown = unknownTokens(input.bodyHtml);
+  const unknown = unknownTokens(input.bodyHtml, declared);
 
   if (unknown.length > 0) {
     throw new ValidationError('unknownTokens', { tokens: unknown });
@@ -70,7 +71,13 @@ export async function saveContractTemplate(
   executor: Executor = getDb(),
 ): Promise<ContractTemplate> {
   assertCan(actor.context, 'settings.org.write');
-  assertUsable(input);
+
+  /*
+   * Палитра шаблона = постоянные токены плюс объявленные поля сети (T12.4).
+   * Список приходит из базы, потому что набор полей стал данными; проверка
+   * шаблона осталась чистой функцией и получает его аргументом.
+   */
+  assertUsable(input, await declaredTokens(actor.context, executor));
 
   const before = await readContractTemplate(actor, executor);
 
@@ -124,14 +131,25 @@ export async function saveContractTemplate(
  * Права спрашиваются всё равно — незачем показывать текст договора тому,
  * кому не положено его править.
  */
-export async function previewContractTemplate(actor: UserActor, bodyHtml: string): Promise<string> {
+export async function previewContractTemplate(
+  actor: UserActor,
+  bodyHtml: string,
+  executor: Executor = getDb(),
+): Promise<string> {
   assertCan(actor.context, 'settings.org.read');
 
-  const unknown = unknownTokens(bodyHtml);
+  /*
+   * Исполнитель передаётся дальше: без него образцы объявленных полей
+   * читались бы вне транзакции вызывающего — интеграционный тест на этом
+   * и покраснел, а в приложении это был бы запрос мимо начатой транзакции.
+   */
+  const samples = await declaredSampleValues(actor.context, executor);
+  const declared = Object.keys(samples);
+  const unknown = unknownTokens(bodyHtml, declared);
 
   if (unknown.length > 0) {
     throw new ValidationError('unknownTokens', { tokens: unknown });
   }
 
-  return Promise.resolve(renderContractTemplate(bodyHtml, SAMPLE_CONTRACT_VALUES));
+  return renderContractTemplate(bodyHtml, { ...SAMPLE_CONTRACT_VALUES, ...samples }, declared);
 }

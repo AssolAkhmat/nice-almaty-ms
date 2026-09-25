@@ -12,6 +12,7 @@ import {
   readContractTemplate,
   saveContractTemplate,
 } from './contract-templates';
+import { declareField } from './profile-fields';
 
 import type { AccessContext } from '@/db/access';
 import type { Database, Transaction } from '@/db/client';
@@ -160,6 +161,34 @@ describe('шаблон договора', () => {
     });
   });
 
+  it('предпросмотр показывает образец объявленного поля', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '4008');
+
+      await declareField(
+        fixture.superadmin,
+        {
+          code: 'forma',
+          nameI18n: { ru: 'Форма обучения', kk: 'Оқу түрі', en: 'Study form' },
+          type: 'choice',
+          isRequired: false,
+          options: ['grant', 'platnoe'],
+          sortOrder: 1,
+        },
+        tx,
+      );
+
+      const html = await previewContractTemplate(
+        fixture.superadmin,
+        '<p>{{profile.forma}}</p>',
+        tx,
+      );
+
+      /* Образец выбора — первый вариант: пустота не показала бы вёрстку абзаца. */
+      expect(html).toBe('<p>grant</p>');
+    });
+  });
+
   it('предпросмотр идёт на выдуманных данных и не оставляет скобок', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '4005');
@@ -167,6 +196,7 @@ describe('шаблон договора', () => {
       const html = await previewContractTemplate(
         fixture.superadmin,
         '<p>{{resident.full_name}}, ИИН {{resident.iin}}</p>',
+        tx,
       );
 
       expect(html).not.toContain('{{');

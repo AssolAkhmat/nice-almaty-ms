@@ -3,6 +3,7 @@ import { createTranslator } from 'next-intl';
 import { ALMATY_TIME_ZONE } from '@/lib/time';
 
 import { LOCALES, type Locale } from './config';
+import { messagesFor } from './text';
 
 /**
  * Тексты уведомления во всех локалях (docs/02-DATA-MODEL.md, `notifications`).
@@ -12,23 +13,6 @@ import { LOCALES, type Locale } from './config';
  * и на каком языке это откроет. Захардкоженных строк здесь нет — только
  * ключи словаря, как и в интерфейсе (CLAUDE.md §4).
  */
-type Messages = Record<string, unknown>;
-
-const cache = new Map<Locale, Messages>();
-
-async function messagesFor(locale: Locale): Promise<Messages> {
-  const known = cache.get(locale);
-
-  if (known !== undefined) {
-    return known;
-  }
-
-  const loaded = (await import(`../../../messages/${locale}.json`)) as { default: Messages };
-  cache.set(locale, loaded.default);
-
-  return loaded.default;
-}
-
 /**
  * Значение подстановки. Обычно это строка или число, но название,
  * которое само хранится на трёх языках — тип документа, дом, зона, —

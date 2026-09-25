@@ -4,6 +4,7 @@ import {
   CONTRACT_TOKENS,
   SAMPLE_CONTRACT_VALUES,
   hasToken,
+  profileToken,
   renderContractTemplate,
   unknownTokens,
 } from './contract-template';
@@ -218,5 +219,42 @@ describe('токен подписи', () => {
     expect(hasToken('<p>{{ resident.signature }}</p>', 'resident.signature')).toBe(true);
     expect(hasToken('<p>{{resident.full_name}}</p>', 'resident.signature')).toBe(false);
     expect(hasToken('<p>подпись</p>', 'resident.signature')).toBe(false);
+  });
+});
+
+describe('объявленные поля в палитре шаблона (T12.4)', () => {
+  it('токен объявленного поля известен, когда палитра его содержит', () => {
+    const template = '<p>{{profile.kafedra}}</p>';
+
+    expect(unknownTokens(template)).toEqual(['profile.kafedra']);
+    expect(unknownTokens(template, ['profile.kafedra'])).toEqual([]);
+  });
+
+  it('значение объявленного поля экранируется, а не вставляется разметкой', () => {
+    const html = renderContractTemplate(
+      '<p>{{profile.kafedra}}</p>',
+      { 'profile.kafedra': '<img src=x onerror=alert(1)>' },
+      ['profile.kafedra'],
+    );
+
+    expect(html).toBe('<p>&lt;img src=x onerror=alert(1)&gt;</p>');
+  });
+
+  it('токена вне палитры нет и с объявленными полями', () => {
+    expect(() =>
+      renderContractTemplate('{{profile.vydumka}}', { 'profile.vydumka': 'x' }, [
+        'profile.kafedra',
+      ]),
+    ).toThrow(/profile.vydumka/);
+  });
+
+  it('объявленное поле без значения — отказ, а не дыра в документе', () => {
+    expect(() => renderContractTemplate('{{profile.kafedra}}', {}, ['profile.kafedra'])).toThrow(
+      /profile.kafedra/,
+    );
+  });
+
+  it('токен собирается из кода одним способом', () => {
+    expect(profileToken('kafedra')).toBe('profile.kafedra');
   });
 });

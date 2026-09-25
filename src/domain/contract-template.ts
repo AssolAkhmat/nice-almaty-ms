@@ -56,8 +56,22 @@ export type ContractValues = Readonly<Partial<Record<string, string>>>;
 /** `{{ token }}` с любым числом пробелов внутри скобок. */
 const TOKEN_PATTERN = /\{\{\s*([\w.]+)\s*\}\}/g;
 
-function isKnown(token: string): token is ContractToken {
-  return (CONTRACT_TOKENS as readonly string[]).includes(token);
+/**
+ * Палитра токенов перестала быть константой (T12.4): сеть объявляет
+ * дополнительные поля профиля, и каждое становится токеном `profile.<код>`.
+ *
+ * Список приходит аргументом, а не импортом из базы: ядро о базе не знает,
+ * а проверка шаблона остаётся чистой функцией. Пустой список — прежнее
+ * поведение, поэтому все старые вызовы читаются как раньше.
+ */
+export const PROFILE_TOKEN_PREFIX = 'profile.';
+
+export function profileToken(code: string): string {
+  return `${PROFILE_TOKEN_PREFIX}${code}`;
+}
+
+function isKnown(token: string, declared: readonly string[] = []): boolean {
+  return (CONTRACT_TOKENS as readonly string[]).includes(token) || declared.includes(token);
 }
 
 /**
@@ -87,12 +101,12 @@ function escapeHtml(value: string): string {
  * Токены, которых нет в палитре. Нужны при сохранении шаблона: опечатка
  * должна всплыть там, а не в договоре, который уже подписали.
  */
-export function unknownTokens(template: string): string[] {
+export function unknownTokens(template: string, declared: readonly string[] = []): string[] {
   const found: string[] = [];
 
   for (const match of template.matchAll(TOKEN_PATTERN)) {
     const token = match[1] ?? '';
-    if (!isKnown(token) && !found.includes(token)) {
+    if (!isKnown(token, declared) && !found.includes(token)) {
       found.push(token);
     }
   }
@@ -104,9 +118,13 @@ export function unknownTokens(template: string): string[] {
  * Подстановка значений. Неизвестный токен или отсутствующее значение —
  * ошибка: документ с дырой на месте срока или цены хуже, чем несозданный.
  */
-export function renderContractTemplate(template: string, values: ContractValues): string {
+export function renderContractTemplate(
+  template: string,
+  values: ContractValues,
+  declared: readonly string[] = [],
+): string {
   return template.replaceAll(TOKEN_PATTERN, (_match, rawToken: string) => {
-    if (!isKnown(rawToken)) {
+    if (!isKnown(rawToken, declared)) {
       throw new RangeError(`Неизвестный токен шаблона: ${rawToken}`);
     }
 
@@ -115,7 +133,13 @@ export function renderContractTemplate(template: string, values: ContractValues)
       throw new RangeError(`Нет значения для токена шаблона: ${rawToken}`);
     }
 
-    return RAW_TOKENS.includes(rawToken) ? value : escapeHtml(value);
+    /*
+     * Значение объявленного поля экранируется как любое другое: список
+     * вставляемых разметкой токенов закрыт подписями, и поле профиля
+     * в него не попадает — иначе разметку в договор можно было бы положить
+     * через ввод в форме.
+     */
+    return RAW_TOKENS.includes(rawToken as ContractToken) ? value : escapeHtml(value);
   });
 }
 
