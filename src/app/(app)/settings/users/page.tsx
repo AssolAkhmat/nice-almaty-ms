@@ -6,6 +6,7 @@ import { listResidencies } from '@/db/repositories/residencies';
 import { can } from '@/lib/authz';
 import { loadEnv } from '@/lib/env/load';
 import { getCurrentSession } from '@/lib/session';
+import { personLabels } from '@/services/person-labels';
 import { readWelcomeMessage } from '@/services/settings';
 import { listAccounts } from '@/services/users';
 
@@ -45,11 +46,23 @@ export default async function UsersPage() {
    */
   const canOpenResidency = can(context, 'user.create');
 
+  /*
+   * Подписи людей: ФИО под номером и дом жильца. Дом у жильца живёт
+   * в проживании, а не в учётной записи (D11), и колонка, читавшая
+   * `users.house_id`, показывала ему прочерк — при том что дом есть
+   * и виден в карточке (указание владельца, 25 сентября 2026).
+   */
+  const labels = await personLabels(
+    context,
+    accounts.map((account) => account.id),
+  );
+
   const rows: AccountRow[] = accounts.map((account) => ({
     id: account.id,
     phone: account.phone,
+    name: labels.get(account.id)?.name ?? null,
     role: account.role,
-    houseName: account.houseId === null ? null : (houseNames.get(account.houseId) ?? null),
+    houseName: houseNames.get(account.houseId ?? houseOfResident.get(account.id) ?? '') ?? null,
     status: account.status,
     lastLoginAt: account.lastLoginAt?.toISOString() ?? null,
     isSelf: account.id === context.userId,

@@ -8,13 +8,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { PersonName, type PersonNameView } from '@/components/ui/person-name';
 
 import { buildContractAction, issueKeysAction, type ContractActionState } from './actions';
 
 /** Строка списка: договор и ключи — раздельные отметки, и видны они раздельно. */
 export interface ContractRowView {
   residencyId: string;
-  residentName: string;
+  resident: PersonNameView;
   contractFileId: string | null;
   isSigned: boolean;
   keysIssued: boolean;
@@ -30,7 +31,9 @@ function ContractRow({ canRead, row }: { canRead: boolean; row: ContractRowView 
   return (
     <Card data-testid="contract-row">
       <CardHeader>
-        <CardTitle>{row.residentName}</CardTitle>
+        <CardTitle>
+          <PersonName person={row.resident} />
+        </CardTitle>
         <div className="flex gap-2">
           <Badge tone={row.isSigned ? 'success' : 'neutral'}>
             {row.isSigned ? t('contract.statusSigned') : t('contract.statusUnsigned')}

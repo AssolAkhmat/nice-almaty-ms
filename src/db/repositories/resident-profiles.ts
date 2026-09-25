@@ -155,6 +155,43 @@ export async function listPreferredPayments(
   return new Map(rows.map((row) => [row.userId, row.preferredPayment]));
 }
 
+/**
+ * ФИО по списку жильцов — для подписей на экранах (указание владельца,
+ * 25 сентября 2026).
+ *
+ * Отдельный запрос вместо `findProfile` в цикле: экран показывает список,
+ * и запрос на каждую строку стоил бы дороже самой страницы. Видимость
+ * та же, что у профиля: чужого дома в ответе не будет.
+ */
+export async function listProfileNames(
+  context: AccessContext,
+  userIds: readonly string[],
+  executor: Executor = getDb(),
+): Promise<
+  Map<string, { lastName: string | null; firstName: string | null; middleName: string | null }>
+> {
+  if (userIds.length === 0) {
+    return new Map();
+  }
+
+  const rows = await executor
+    .select({
+      userId: residentProfiles.userId,
+      lastName: residentProfiles.lastName,
+      firstName: residentProfiles.firstName,
+      middleName: residentProfiles.middleName,
+    })
+    .from(residentProfiles)
+    .where(and(visibleUserIds(context, executor), inArray(residentProfiles.userId, [...userIds])));
+
+  return new Map(
+    rows.map((row) => [
+      row.userId,
+      { lastName: row.lastName, firstName: row.firstName, middleName: row.middleName },
+    ]),
+  );
+}
+
 export async function requireProfile(
   context: AccessContext,
   userId: string,

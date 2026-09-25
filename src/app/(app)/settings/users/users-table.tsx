@@ -24,6 +24,8 @@ import {
 export interface AccountRow {
   id: string;
   phone: string;
+  /** ФИО из профиля; пусто — профиль не заполнен (25 сентября 2026). */
+  name: string | null;
   role: 'superadmin' | 'admin' | 'resident';
   houseName: string | null;
   status: 'active' | 'archived';
@@ -77,7 +79,16 @@ export function UsersTable({ rows }: { rows: readonly AccountRow[] }) {
     {
       key: 'phone',
       header: t('users.columns.phone'),
-      cell: (row) => <span className="tabular">{row.phone}</span>,
+      /*
+       * Под номером — фамилия и имя: по одному номеру одного жильца
+       * от другого не отличить (указание владельца, 25 сентября 2026).
+       */
+      cell: (row) => (
+        <span className="flex flex-col">
+          <span className="tabular">{row.phone}</span>
+          {row.name !== null && <span className="text-text-muted text-[13px]">{row.name}</span>}
+        </span>
+      ),
     },
     {
       key: 'role',

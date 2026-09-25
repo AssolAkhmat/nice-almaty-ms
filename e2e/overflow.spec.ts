@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import { E2E_ACCOUNTS } from './global-setup';
 import { login } from './support/login';
 import { expectNoHorizontalOverflow, measureOverflow } from './support/overflow';
+import { expectNoVisibleId, findVisibleIds } from './support/visible-id';
 
 /**
  * Ни одна страница не шире окна — на всех трёх ширинах (отзыв владельца,
@@ -50,7 +51,7 @@ const ROUTES = [
   '/utilities',
 ] as const;
 
-test.describe('ничто не вылезает за ширину окна', () => {
+test.describe('страница помещается в экран и не показывает идентификаторов', () => {
   test('страницы суперадмина помещаются в экран', async ({ page }) => {
     await login(page, E2E_ACCOUNTS.superadmin);
 
@@ -58,6 +59,7 @@ test.describe('ничто не вылезает за ширину окна', () 
       await page.goto(route);
       await expect(page.locator('main')).toBeVisible();
       await expectNoHorizontalOverflow(page, route);
+      await expectNoVisibleId(page, route);
     }
   });
 
@@ -75,6 +77,7 @@ test.describe('ничто не вылезает за ширину окна', () 
     await expect(page).toHaveURL(/\/residents\/[0-9a-f-]+$/);
 
     await expectNoHorizontalOverflow(page, 'карточка жильца');
+    await expectNoVisibleId(page, 'карточка жильца');
   });
 
   test('страницы админа дома помещаются в экран', async ({ page }) => {
@@ -84,6 +87,7 @@ test.describe('ничто не вылезает за ширину окна', () 
       await page.goto(route);
       await expect(page.locator('main')).toBeVisible();
       await expectNoHorizontalOverflow(page, `админ: ${route}`);
+      await expectNoVisibleId(page, `админ: ${route}`);
     }
   });
 
@@ -113,5 +117,21 @@ test.describe('ничто не вылезает за ширину окна', () 
 
     expect(report.scrollWidth).toBeGreaterThan(report.clientWidth + 1);
     expect(report.offenders.length).toBeGreaterThan(0);
+  });
+
+  /*
+   * Негативная фикстура к проверке идентификаторов: без неё она осталась бы
+   * зелёной, даже перестав что-либо искать.
+   */
+  test('проверка ловит подложенный идентификатор', async ({ page }) => {
+    await page.goto('/login');
+
+    await page.evaluate(() => {
+      const node = document.createElement('p');
+      node.textContent = 'Жилец 801fc35a-b347-40f0-940a-859ce96d89c4';
+      document.body.append(node);
+    });
+
+    expect(await findVisibleIds(page)).toEqual(['801fc35a-b347-40f0-940a-859ce96d89c4']);
   });
 });

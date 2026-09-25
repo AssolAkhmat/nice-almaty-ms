@@ -91,7 +91,7 @@ export default async function DamagesPage({
 
   const rosterView: RosterView[] = roster.map((entry) => ({
     userId: entry.userId,
-    name: nameOf.get(entry.userId) ?? entry.userId,
+    name: nameOf.get(entry.userId) ?? '',
     areaId: entry.areaId,
   }));
 

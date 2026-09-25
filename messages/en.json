@@ -1966,7 +1966,8 @@
       "save": "Save the message",
       "reset": "Restore the default text",
       "send": "Send on WhatsApp"
-    }
+    },
+    "profileMissing": "profile not filled in"
   },
   "utilities": {
     "title": "Utilities",

@@ -154,7 +154,7 @@ export default async function InvoicesPage({
     const name = [profile.lastName, profile.firstName]
       .filter((part) => part !== null && part !== '')
       .join(' ');
-    nameOf.set(residency.userId, name.trim() === '' ? residency.userId : name);
+    nameOf.set(residency.userId, name.trim() === '' ? '' : name);
   }
 
   /*
@@ -191,7 +191,7 @@ export default async function InvoicesPage({
 
   const options: ResidencyOption[] = residencies.map((residency) => ({
     id: residency.id,
-    name: nameOf.get(residency.userId) ?? residency.userId,
+    name: nameOf.get(residency.userId) ?? '',
   }));
 
   return (

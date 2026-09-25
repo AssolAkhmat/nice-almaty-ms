@@ -80,7 +80,7 @@ async function reviewView(
         id: document.id,
         typeName: localizedName(type, locale),
         // Профиль может быть ещё пустым: в списке тогда нужен хоть какой-то ориентир.
-        residentName: name.trim() === '' ? document.userId : name,
+        residentName: name.trim() === '' ? '' : name,
         fileId: document.fileId,
         status: document.status,
         issueDate: document.issueDate,

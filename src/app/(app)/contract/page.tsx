@@ -4,13 +4,11 @@ import { redirect } from 'next/navigation';
 import { listResidencies } from '@/db/repositories/residencies';
 import { EmptyState } from '@/components/ui/empty-state';
 import { can } from '@/lib/authz';
+import { personLabels } from '@/services/person-labels';
 import { getCurrentSession } from '@/lib/session';
-import { readProfile } from '@/services/resident-profiles';
 
 import { ContractList, type ContractRowView } from './admin-list';
 import { ContractCard } from './contract-view';
-
-import type { UserActor } from '@/services/users';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,7 +27,6 @@ export default async function ContractPage() {
 
   const t = await getTranslations('contract');
   const { context } = session;
-  const actor: UserActor = { context };
 
   const isAdmin = context.role === 'admin' || context.role === 'superadmin';
   const residencies = await listResidencies(context, {});
@@ -60,22 +57,28 @@ export default async function ContractPage() {
     );
   }
 
-  const rows: ContractRowView[] = await Promise.all(
-    residencies.map(async (residency) => {
-      const profile = await readProfile(actor, residency.userId);
-      const name = [profile.lastName, profile.firstName]
-        .filter((part) => part !== null && part !== '')
-        .join(' ');
-
-      return {
-        residencyId: residency.id,
-        residentName: name.trim() === '' ? residency.userId : name,
-        contractFileId: residency.contractFileId,
-        isSigned: residency.contractSignedAt !== null,
-        keysIssued: residency.keysIssued,
-      };
-    }),
+  /*
+   * Вместо человека в списке стоял uuid проживания: понять, кто не заполнил
+   * профиль и кто не подписал, было нельзя (указание владельца, 25 сентября
+   * 2026). Подпись теперь общая для всех экранов — ФИО, а без профиля
+   * телефон с пометкой.
+   */
+  const labels = await personLabels(
+    context,
+    residencies.map((residency) => residency.userId),
   );
+
+  const rows: ContractRowView[] = residencies.map((residency) => {
+    const label = labels.get(residency.userId);
+
+    return {
+      residencyId: residency.id,
+      resident: { name: label?.name ?? null, phone: label?.phone ?? '' },
+      contractFileId: residency.contractFileId,
+      isSigned: residency.contractSignedAt !== null,
+      keysIssued: residency.keysIssued,
+    };
+  });
 
   return (
     <section className="flex flex-col gap-6">

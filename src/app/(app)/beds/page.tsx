@@ -11,7 +11,7 @@ import { can } from '@/lib/authz';
 import { getCurrentSession } from '@/lib/session';
 import { todayInAlmaty } from '@/lib/time';
 import { houseLayout, myPlacement } from '@/services/beds';
-import { readProfile } from '@/services/resident-profiles';
+import { personLabels } from '@/services/person-labels';
 import { listTemporary } from '@/services/temporary-residents';
 
 import { HouseLayout, type RoomView, type UnplacedResident } from './house-layout';
@@ -88,15 +88,19 @@ export default async function BedsPage({
 
   const layout = houseId === null ? [] : await houseLayout(actor, houseId);
 
-  /** Имена показываются вместо идентификаторов: схему читает человек. */
-  const nameOf = new Map<string, string>();
-  for (const residency of residencies) {
-    const profile = await readProfile(actor, residency.userId);
-    const name = [profile.lastName, profile.firstName]
-      .filter((part) => part !== null && part !== '')
-      .join(' ');
-    nameOf.set(residency.userId, name.trim() === '' ? residency.userId : name);
-  }
+  /*
+   * Имена вместо идентификаторов: схему читает человек. Незаполненный
+   * профиль даёт телефон, а не uuid — идентификатор человеку не нужен
+   * нигде (указание владельца, 25 сентября 2026).
+   */
+  const labels = await personLabels(
+    context,
+    residencies.map((residency) => residency.userId),
+  );
+
+  const nameOf = new Map(
+    [...labels.values()].map((label) => [label.userId, label.name ?? label.phone]),
+  );
 
   const rooms: RoomView[] = layout.map((area) => ({
     areaId: area.area.id,
@@ -125,7 +129,7 @@ export default async function BedsPage({
     .filter((residency) => !placedResidencies.has(residency.id))
     .map((residency) => ({
       residencyId: residency.id,
-      name: nameOf.get(residency.userId) ?? residency.userId,
+      name: nameOf.get(residency.userId) ?? '',
     }));
 
   /*

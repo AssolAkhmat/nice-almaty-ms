@@ -206,7 +206,8 @@ export default async function UtilitiesPage({
 
     return {
       userId: row.userId,
-      name: name.trim() === '' ? row.userId : name,
+      /* Без имени — пусто, а не uuid: идентификатор человеку не нужен. */
+      name: name.trim() === '' ? '' : name,
       days: row.days,
       amount: row.amount,
     };
