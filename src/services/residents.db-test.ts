@@ -203,6 +203,57 @@ describe('список жильцов дома', () => {
     });
   });
 
+  /*
+   * Модуль 1 требует в списке рейтинг, долг и отметку о ключах. Долга
+   * суммой не было вовсе — только бинарный значок, а «должен» и «должен
+   * сколько» разные ответы (25 сентября 2026).
+   */
+  it('показывает рейтинг, сумму долга и отметку о ключах', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '1131');
+
+      const [row] = await listHouseResidents(fixture.admin, {}, { executor: tx, today: TODAY });
+
+      expect(row?.rating).toBeGreaterThanOrEqual(0);
+      expect(row?.keysIssued).toBe(false);
+      expect(row?.debt).toBe(0);
+    });
+  });
+
+  it('сумма долга считается остатком по просроченным счётам', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '1132');
+
+      const [invoice] = await tx
+        .insert(schema.invoices)
+        .values({
+          orgId: fixture.orgId,
+          residencyId: fixture.own.residencyId,
+          userId: fixture.own.userId,
+          houseId: fixture.houseA,
+          type: 'monthly',
+          status: 'partially_paid',
+          periodMonth: '2026-08-01',
+          dueDate: '2026-08-01',
+          total: 100_000,
+        })
+        .returning();
+
+      await tx.insert(schema.payments).values({
+        invoiceId: invoice?.id ?? '',
+        amount: 40_000,
+        method: 'kaspi',
+        paidAt: new Date('2026-08-02T10:00:00Z'),
+      });
+
+      const [row] = await listHouseResidents(fixture.admin, {}, { executor: tx, today: TODAY });
+
+      // Итог 100 000, оплачено 40 000 — долг это остаток, а не итог счёта.
+      expect(row?.debt).toBe(60_000);
+      expect(row?.hasDebt).toBe(true);
+    });
+  });
+
   it('показывает комнату, место и цену из назначения', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '1102');

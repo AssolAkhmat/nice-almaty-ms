@@ -180,6 +180,29 @@ export default async function ResidentsPage({
 
                 {row.price !== null && <Money amount={row.price} className="self-start" />}
 
+                {/*
+                  Модуль 1 требует в списке рейтинг, долг и отметку о ключах.
+                  Долг суммой, а не значком: «должен» и «должен сколько» —
+                  разные ответы (25 сентября 2026).
+                */}
+                <span className="text-text-muted flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span data-testid="resident-rating">
+                    {t('ratingShort', { value: row.rating })}
+                  </span>
+
+                  {row.debt > 0 && (
+                    <span
+                      className="text-danger flex items-center gap-1"
+                      data-testid="resident-debt"
+                    >
+                      {t('debtShort')}
+                      <Money amount={row.debt} />
+                    </span>
+                  )}
+
+                  <span>{row.keysIssued ? t('keysIssued') : t('keysNotIssued')}</span>
+                </span>
+
                 <span className="flex gap-2">
                   {row.hasDebt && <Badge tone="danger">{t('debtMark')}</Badge>}
                   {row.hasDocumentProblem && <Badge tone="warning">{t('documentsMark')}</Badge>}

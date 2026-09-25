@@ -1242,7 +1242,8 @@
       "preferredPayment": "Preferred payment method",
       "noEpilepsy": "I confirm: no epilepsy",
       "noAsthma": "I confirm: no asthma",
-      "notChosen": "Not chosen"
+      "notChosen": "Not chosen",
+      "replaceHint": "The new value replaces the old one; the change goes to the audit log"
     },
     "sex": {
       "male": "Male",
@@ -1262,7 +1263,8 @@
       "conflict": "Data changed, try again",
       "rate_limited": "Too often",
       "internal": "Something went wrong"
-    }
+    },
+    "replace": "Correct"
   },
   "rating": {
     "title": "Rating",
@@ -1429,7 +1431,11 @@
     "relocateGroups": "By-name eligibility groups of the old house",
     "relocateGroupsHint": "The resident is named in these groups. Not removed by default: they may come back, and a lost exclusion would become a silent permission.",
     "relocate": "Relocate",
-    "relocateNoBeds": "No free beds in other houses"
+    "relocateNoBeds": "No free beds in other houses",
+    "ratingShort": "Rating {value}",
+    "debtShort": "Debt",
+    "keysIssued": "Keys issued",
+    "keysNotIssued": "Keys not issued"
   },
   "rotationCalendar": {
     "assign": "Assign",

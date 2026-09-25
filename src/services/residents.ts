@@ -2,12 +2,13 @@ import { getDb, type Executor } from '@/db/client';
 import { findPlacementOfResidency } from '@/db/repositories/areas';
 import { listDocuments, listDocumentTypes } from '@/db/repositories/documents';
 import { listHouses } from '@/db/repositories/houses';
-import { listInvoices } from '@/db/repositories/invoices';
+import { listInvoices, paidTotals } from '@/db/repositories/invoices';
 import { listResidencies, requireResidency } from '@/db/repositories/residencies';
 import { findProfile, listHistoricNames } from '@/db/repositories/resident-profiles';
 import { requireUser } from '@/db/repositories/users';
 import { documentValidity } from '@/domain/documents';
-import { assertCan } from '@/lib/authz';
+import { readHouseRating } from './rating-views';
+import { assertCan, can } from '@/lib/authz';
 import {
   compareBusinessDates,
   parseBusinessDate,
@@ -38,6 +39,15 @@ export interface ResidentRow {
   price: number | null;
   /** Есть просроченный неоплаченный счёт. */
   hasDebt: boolean;
+  /**
+   * Сумма просроченного долга в тенге (модуль 1: колонка «долг»).
+   * Бинарного значка было мало: «должен» и «должен сколько» — разные ответы.
+   */
+  debt: number;
+  /** Рейтинг на сегодня; модуль 1 требует колонку рейтинга. */
+  rating: number;
+  /** Ключи выданы — модуль 1 требует видеть это в списке. */
+  keysIssued: boolean;
   /** Есть обязательный документ, который просрочен или не принят. */
   hasDocumentProblem: boolean;
   role: User['role'];
@@ -88,6 +98,7 @@ async function buildRow(
   residency: Residency,
   today: BusinessDate,
   houseNames: ReadonlyMap<string, string>,
+  ratings: ReadonlyMap<string, number>,
   executor: Executor,
 ): Promise<ResidentRow> {
   const [user, profile, placement, invoices, types, documents] = await Promise.all([
@@ -103,11 +114,27 @@ async function buildRow(
    * Долг — просроченный неоплаченный счёт (§3, «Просрочка»). Счёт без срока
    * оплаты долгом не считается: срок ещё не наступил, а не пропущен.
    */
-  const hasDebt = invoices.some(
+  const overdue = invoices.filter(
     (invoice) =>
       (invoice.status === 'issued' || invoice.status === 'partially_paid') &&
       invoice.dueDate !== null &&
       compareBusinessDates(parseBusinessDate(invoice.dueDate), today) < 0,
+  );
+
+  const hasDebt = overdue.length > 0;
+
+  /*
+   * Сумма долга — остаток по просроченным счётам, а не их итог: часть могла
+   * быть уже оплачена. Платежи считаются одним запросом на все счета.
+   */
+  const paid = await paidTotals(
+    overdue.map((invoice) => invoice.id),
+    executor,
+  );
+
+  const debt = overdue.reduce(
+    (sum, invoice) => sum + Math.max(0, invoice.total - (paid.get(invoice.id) ?? 0)),
+    0,
   );
 
   const byType = new Map(documents.map((document) => [document.documentTypeId, document]));
@@ -141,6 +168,9 @@ async function buildRow(
     bed: placement?.bed.label ?? null,
     price: placement?.price ?? null,
     hasDebt,
+    debt,
+    rating: ratings.get(residency.userId) ?? 0,
+    keysIssued: residency.keysIssued,
     hasDocumentProblem,
     role: user.role,
   };
@@ -171,10 +201,28 @@ export async function listHouseResidents(
     (await listHouses(actor.context, {}, executor)).map((house) => [house.id, house.name]),
   );
 
+  /*
+   * Рейтинг модуль 1 требует колонкой списка. Считается по домам, а не
+   * по жильцам: расчёт всё равно идёт по составу дома, и запрос на каждого
+   * стоил бы дороже. Дом, на который прав нет, просто не даёт рейтингов —
+   * список от этого не падает.
+   */
+  const ratings = new Map<string, number>();
+
+  for (const houseId of new Set(residencies.map((residency) => residency.houseId))) {
+    if (!can(actor.context, 'rating.history', { houseId })) {
+      continue;
+    }
+
+    for (const row of await readHouseRating(actor, houseId, { executor, today })) {
+      ratings.set(row.userId, row.rating);
+    }
+  }
+
   const rows: ResidentRow[] = [];
 
   for (const residency of residencies) {
-    const row = await buildRow(actor, residency, today, houseNames, executor);
+    const row = await buildRow(actor, residency, today, houseNames, ratings, executor);
 
     if (filter.withDebt === true && !row.hasDebt) {
       continue;
@@ -255,5 +303,16 @@ export async function readResidentCard(
     (await listHouses(actor.context, {}, executor)).map((house) => [house.id, house.name]),
   );
 
-  return { residency, row: await buildRow(actor, residency, today, houseNames, executor) };
+  const ratings = new Map<string, number>();
+
+  if (can(actor.context, 'rating.history', { houseId: residency.houseId })) {
+    for (const row of await readHouseRating(actor, residency.houseId, { executor, today })) {
+      ratings.set(row.userId, row.rating);
+    }
+  }
+
+  return {
+    residency,
+    row: await buildRow(actor, residency, today, houseNames, ratings, executor),
+  };
 }

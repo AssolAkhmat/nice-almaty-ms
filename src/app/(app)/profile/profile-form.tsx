@@ -2,7 +2,7 @@
 
 import { Eye } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 
 import { PhoneInput } from '@/components/ui/phone-input';
 import { Badge } from '@/components/ui/badge';
@@ -142,15 +142,11 @@ export function ProfileForm({
               name="idDocNumber"
               revealed={revealed('idDocNumber')}
             />
-          </div>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('profile.sections.study')}</CardTitle>
-          </CardHeader>
-
-          <div className="grid gap-3 md:grid-cols-3">
+            {/*
+              Орган выдачи и адрес прописки лежали в карточке «Учёба» —
+              ошибка вёрстки: это реквизиты удостоверения, и человек искал
+              их здесь (отзыв владельца, 25 сентября 2026).
+            */}
             <Field htmlFor="idDocIssuer" label={t('profile.fields.idDocIssuer')}>
               <Input defaultValue={values.idDocIssuer} id="idDocIssuer" name="idDocIssuer" />
             </Field>
@@ -161,6 +157,15 @@ export function ProfileForm({
                 name="registrationAddress"
               />
             </Field>
+          </div>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('profile.sections.study')}</CardTitle>
+          </CardHeader>
+
+          <div className="grid gap-3 md:grid-cols-3">
             <Field htmlFor="university" label={t('profile.fields.university')}>
               <Input defaultValue={values.university} id="university" name="university" />
             </Field>
@@ -271,20 +276,58 @@ export function ProfileForm({
   );
 }
 
-function SensitiveInput({
+export function SensitiveInput({
   name,
   label,
   hint,
   current,
   revealed,
+  canReplace = false,
 }: {
   name: 'iin' | 'idDocNumber';
   label: string;
   hint: string;
   current: string | null;
   revealed: string | null;
+  /**
+   * Можно ли исправить уже введённое значение (указание владельца,
+   * 25 сентября 2026). Поле исчезало навсегда после первого ввода,
+   * а опечатка в ИИН — вещь обычная, и исправить её было нечем.
+   *
+   * Право узкое: исправляет суперадмин. Сохранение и запись в журнал
+   * у этого пути те же, что у первого ввода, — сервис перезаписывает
+   * значение и пишет разницу.
+   */
+  canReplace?: boolean;
 }) {
   const t = useTranslations();
+  const [replacing, setReplacing] = useState(false);
+
+  if (current !== null && replacing) {
+    return (
+      <Field hint={t('profile.fields.replaceHint')} htmlFor={name} label={label}>
+        <div className="flex items-center gap-2">
+          <Input
+            autoFocus
+            data-testid={`${name}-replace`}
+            id={name}
+            inputMode="numeric"
+            name={name}
+          />
+          <Button
+            onClick={() => {
+              setReplacing(false);
+            }}
+            size="sm"
+            type="button"
+            variant="ghost"
+          >
+            {t('common.close')}
+          </Button>
+        </div>
+      </Field>
+    );
+  }
 
   return (
     <Field hint={hint} htmlFor={name} label={label}>
@@ -310,6 +353,20 @@ function SensitiveInput({
             </Button>
           ) : (
             <Badge tone="warning">{t('profile.revealed')}</Badge>
+          )}
+
+          {canReplace && (
+            <Button
+              data-testid={`replace-${name}`}
+              onClick={() => {
+                setReplacing(true);
+              }}
+              size="sm"
+              type="button"
+              variant="ghost"
+            >
+              {t('profile.replace')}
+            </Button>
           )}
         </div>
       )}
