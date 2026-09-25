@@ -44,7 +44,16 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   forbidOnly: process.env.CI === 'true',
   retries: process.env.CI === 'true' ? 1 : 0,
-  reporter: process.env.CI === 'true' ? [['github'], ['html', { open: 'never' }]] : [['list']],
+  /*
+   * В CI: свой компактный докладчик, список в журнал прогона и отчёт файлом.
+   * Штатный `github` заводил заметку на каждое падение и на каждый повтор,
+   * а GitHub показывает не больше десяти — при одиннадцати падениях причины
+   * пятого и дальше не были видны вовсе.
+   */
+  reporter:
+    process.env.CI === 'true'
+      ? [['./e2e/support/ci-reporter.ts'], ['list'], ['html', { open: 'never' }]]
+      : [['list']],
   use: {
     baseURL: BASE_URL,
     trace: 'on-first-retry',

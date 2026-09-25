@@ -10,6 +10,7 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Field, Input, Select } from '@/components/ui/input';
 import { Money } from '@/components/ui/money';
+import { PersonName, type PersonNameView } from '@/components/ui/person-name';
 import { parseInstant } from '@/lib/time';
 
 import { issueDepositInvoiceAction, recordPaymentAction, type DepositActionState } from './actions';
@@ -36,7 +37,12 @@ export interface DepositInvoiceView {
 
 export interface DepositScreenView {
   residencyId: string;
-  residentName: string | null;
+  /**
+   * Кто живёт. Подпись, а не строка с именем: без профиля здесь стоял
+   * идентификатор проживания, и экран показывал uuid вместо человека
+   * (проверка приёмки, 25 сентября 2026).
+   */
+  resident: PersonNameView | null;
   balance: number;
   year: number;
   movements: DepositMovementView[];
@@ -97,7 +103,9 @@ export function DepositScreen({ view }: { view: DepositScreenView }) {
   return (
     <Card data-testid="deposit-card">
       <CardHeader>
-        <CardTitle>{view.residentName ?? t('deposit.title')}</CardTitle>
+        <CardTitle>
+          {view.resident === null ? t('deposit.title') : <PersonName person={view.resident} />}
+        </CardTitle>
         <Money amount={view.balance} className="text-[15px]" />
       </CardHeader>
 

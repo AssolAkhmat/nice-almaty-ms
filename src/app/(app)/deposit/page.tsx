@@ -6,7 +6,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { getCurrentSession } from '@/lib/session';
 import { todayInAlmaty } from '@/lib/time';
 import { readDepositView } from '@/services/deposits';
-import { readProfile } from '@/services/resident-profiles';
+import { personLabels, type PersonLabel } from '@/services/person-labels';
 
 import { DepositList, DepositScreen, type DepositScreenView } from './deposit-view';
 
@@ -26,22 +26,20 @@ async function viewFor(
   actor: UserActor,
   residencyId: string,
   canManage: boolean,
-  withName: boolean,
+  labels: ReadonlyMap<string, PersonLabel>,
 ): Promise<DepositScreenView> {
   const view = await readDepositView(actor, residencyId);
 
-  let residentName: string | null = null;
-  if (withName) {
-    const profile = await readProfile(actor, view.residency.userId);
-    const name = [profile.lastName, profile.firstName]
-      .filter((part) => part !== null && part !== '')
-      .join(' ');
-    residentName = name.trim() === '' ? view.residency.userId : name;
-  }
+  /*
+   * Подпись берётся общей функцией: раньше при пустом профиле здесь
+   * подставлялся идентификатор проживания, и на экране стоял uuid вместо
+   * человека. Идентификатор человеку не нужен нигде.
+   */
+  const label = labels.get(view.residency.userId) ?? null;
 
   return {
     residencyId: view.residency.id,
-    residentName,
+    resident: label === null ? null : { name: label.name, phone: label.phone },
     balance: view.balance,
     // Движение показывается за текущий год по календарю Алматы (§8).
     year: Number(todayInAlmaty().slice(0, 4)),
@@ -81,8 +79,19 @@ export default async function DepositPage() {
   const canManage = context.role === 'admin' || context.role === 'superadmin';
   const residencies = await listResidencies(context, {});
 
+  /*
+   * Подписи читаются одним запросом на весь список: N запросов на N жильцов
+   * и раньше были лишними, а с подписью стали бы заметными.
+   */
+  const labels = canManage
+    ? await personLabels(
+        context,
+        residencies.map((residency) => residency.userId),
+      )
+    : new Map<string, PersonLabel>();
+
   const views = await Promise.all(
-    residencies.map((residency) => viewFor(actor, residency.id, canManage, canManage)),
+    residencies.map((residency) => viewFor(actor, residency.id, canManage, labels)),
   );
 
   const [own] = views;

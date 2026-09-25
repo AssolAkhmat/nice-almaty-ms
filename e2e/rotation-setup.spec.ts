@@ -213,7 +213,22 @@ test.describe('составы и нормы дней', () => {
 
   test('предпросмотр считается по тому, что стоит в полях', async ({ page }, testInfo) => {
     await login(page, E2E_ACCOUNTS.adminHouse1);
+
+    /*
+     * Своя зона со своим чек-листом: норма дня строится по зонам, у которых
+     * чек-лист есть, а в каркасе дома таких нет. Раньше тест молча опирался
+     * на зону, заведённую другим сценарием, и падал, когда её не оказывалось.
+     */
+    const areaName = await createArea(page);
     await page.goto('/settings/house/rotations');
+
+    const areaCard = page.locator('.rounded-card').filter({ hasText: areaName });
+    await areaCard.locator('input[name="title"]').first().fill('Уборка предпросмотра');
+    await areaCard.locator('input[name="peopleNeeded"]').first().fill('1');
+    await areaCard.locator('textarea[name="items"]').first().fill('подмести');
+    await areaCard.getByRole('button', { name: 'Сохранить', exact: true }).first().click();
+    await expect(areaCard.getByText('Человек: 1', { exact: true })).toBeVisible();
+
     await ensureRotationRow(page, testInfo.project.name);
 
     const card = page.locator('[data-testid^="day-form-"]').first();
@@ -222,15 +237,17 @@ test.describe('составы и нормы дней', () => {
     const rowId = (await card.getAttribute('data-testid'))?.replace('day-form-', '') ?? '';
     expect(rowId).not.toBe('');
 
-    // Черновик: два места на позициях 0 и 1 и одна зона на одного человека.
+    // Черновик: два места на позициях 0 и 1 и своя зона на одного человека.
     const beds = card.locator(`[data-testid^="roster-bed-${rowId}-"]`);
     await beds.nth(0).fill('0');
     await beds.nth(1).fill('1');
 
-    const zones = card.locator(`[data-testid^="norm-zone-${rowId}-"]`);
-    await zones.nth(0).fill('0');
-    const people = card.locator(`[data-testid^="norm-people-${rowId}-"]`);
-    await people.nth(0).fill('1');
+    const zoneRow = card.locator(`[data-testid^="norm-row-${rowId}-"]`).filter({
+      hasText: areaName,
+    });
+    await expect(zoneRow, 'зона с чек-листом не попала в нормы дня').toBeVisible();
+    await zoneRow.locator('input[type="number"]').nth(0).fill('0');
+    await zoneRow.locator('input[type="number"]').nth(1).fill('1');
 
     await page.getByTestId(`preview-${rowId}`).click();
 
@@ -238,6 +255,9 @@ test.describe('составы и нормы дней', () => {
     await expect(days).toBeVisible();
     // Предпросмотр показывает четыре недели вперёд (§5 плана фазы 10).
     await expect(days.locator('li')).toHaveCount(4);
+
+    /* Зона убирается за собой: она нужна была только этому сценарию. */
+    await archiveArea(page, areaName);
   });
 
   test('места вне рядов и версии названы на экране', async ({ page }, testInfo) => {

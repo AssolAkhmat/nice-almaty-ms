@@ -88,9 +88,26 @@ test.describe('экран коммуналки', () => {
     await expect(page.getByTestId('close-period')).toBeVisible();
   });
 
-  test('период без строк закрывается: дом мог не платить', async ({ page }) => {
+  /*
+   * Месяц у каждой ширины свой: период дома один на месяц, и копия, успевшая
+   * закрыть его первой, отбирала у остальных и форму строки, и кнопку
+   * закрытия — та же природа, что у домов в приёмках фаз 3 и 4.
+   */
+  const CLOSING_MONTH: Readonly<Record<string, string>> = {
+    'mobile-375': '2025-02',
+    'tablet-768': '2025-03',
+    'desktop-1440': '2025-04',
+  };
+
+  test('период без строк закрывается: дом мог не платить', async ({ page }, testInfo) => {
+    const month = CLOSING_MONTH[testInfo.project.name];
+
+    if (month === undefined) {
+      throw new Error(`Месяц закрытия не задан для ширины ${testInfo.project.name}`);
+    }
+
     await login(page, E2E_ACCOUNTS.adminHouse1);
-    await openPeriod(page, '2025-02');
+    await openPeriod(page, month);
 
     await page.getByTestId('close-period').click();
 
