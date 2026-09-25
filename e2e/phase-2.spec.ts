@@ -152,8 +152,18 @@ test.describe('приёмка фазы 2', () => {
     await signContract(page);
     await uploadDocuments(page);
 
-    await signInAs(page, E2E_ACCOUNTS.adminHouse1, E2E_PASSWORD);
+    /*
+     * Документы проверяет суперадмин: доступ админа к документам сеть
+     * по умолчанию не включает (D28), и очередь у него пуста — экран
+     * объясняет это вместо отказа. Приёмка ждала кнопку «Принять»
+     * в пустой очереди и висела до таймаута, а не проверяла систему.
+     * Что админ с включённым полномочием очередь видит — держат
+     * `documents.spec.ts` и интеграционные фикстуры доступа к файлам.
+     */
+    await signInAs(page, E2E_ACCOUNTS.superadmin, E2E_PASSWORD);
     await approveDocuments(page, lastName);
+
+    await signInAs(page, E2E_ACCOUNTS.adminHouse1, E2E_PASSWORD);
     await payDeposit(page, lastName);
 
     // Шаг 8 закрыт: жилец заселён, и закрытые модули открылись.
