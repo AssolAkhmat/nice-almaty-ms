@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { useActionState } from 'react';
 
+import { PhoneInput } from '@/components/ui/phone-input';
 import { Button } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/input';
 
@@ -26,15 +27,7 @@ export function LoginForm({ passwordChanged }: { passwordChanged: boolean }) {
       ) : null}
 
       <Field htmlFor="phone" label={t('auth.fields.phone')}>
-        <Input
-          autoComplete="tel"
-          data-testid="phone"
-          id="phone"
-          inputMode="tel"
-          name="phone"
-          placeholder="+7 700 000 00 00"
-          required
-        />
+        <PhoneInput data-testid="phone" id="phone" name="phone" required />
       </Field>
 
       <Field htmlFor="password" label={t('auth.fields.password')}>

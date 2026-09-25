@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isNormalizedPhone, normalizePhone, tryNormalizePhone } from './phone';
+import { formatPhone, isNormalizedPhone, normalizePhone, tryNormalizePhone } from './phone';
 
 /**
  * Формат хранения — `+7XXXXXXXXXX` (docs/02-DATA-MODEL.md, docs/01-ARCHITECTURE.md).
@@ -70,5 +70,68 @@ describe('нормализация телефона', () => {
     expect(isNormalizedPhone('+77011234567')).toBe(true);
     expect(isNormalizedPhone('87011234567')).toBe(false);
     expect(isNormalizedPhone('+7701123456')).toBe(false);
+  });
+
+  /*
+   * Отзыв жильца (25 сентября 2026): «номер, начинающийся с 8, не работает,
+   * человек просто не может войти». Сама восьмёрка принималась; ломались
+   * тире, скопированные из мессенджера, и международный префикс `00`.
+   * Здесь перечислены все ходовые формы записи — по тесту на каждую.
+   */
+  it('принимает все ходовые формы записи', () => {
+    const forms = [
+      '87771234567',
+      '8 777 123 45 67',
+      '8(777)123-45-67',
+      '8-777-123-45-67',
+      '8.777.123.45.67',
+      '8 777 123–45–67',
+      '8 777 123—45—67',
+      '8 777 123‑45‑67',
+      '+77771234567',
+      '+7 777 123 45 67',
+      '+7 (777) 123-45-67',
+      '+7\u00a0777\u00a0123\u00a045\u00a067',
+      '77771234567',
+      '7 777 123 45 67',
+      '7771234567',
+      '777 123 45 67',
+      /* Международный набор из-за границы: `00` вместо плюса. */
+      '0077771234567',
+      '00 7 777 123 45 67',
+      ' 8 777 123 45 67 ',
+      '8777/123/45/67',
+    ];
+
+    for (const form of forms) {
+      expect(normalizePhone(form), form).toBe('+77771234567');
+    }
+  });
+
+  it('городской номер Алматы и Астаны тоже принимает', () => {
+    expect(normalizePhone('8 727 123 45 67')).toBe('+77271234567');
+    expect(normalizePhone('+7 717 212 34 56')).toBe('+77172123456');
+  });
+
+  it('буквы вместо цифр не проходят даже среди разделителей', () => {
+    for (const bad of ['8 777 abc 45 67', '+7O7O1234567', '8777123456x']) {
+      expect(tryNormalizePhone(bad)).toBeNull();
+    }
+  });
+
+  it('сообщение об отказе называет ожидаемый вид, а не «не похоже»', () => {
+    expect(() => normalizePhone('+7 912 345 67 89')).toThrow(/8 7XX XXX XX XX/);
+  });
+
+  it('человеческий вид собирается группами', () => {
+    expect(formatPhone('87054100020')).toBe('+7 705 410 00 20');
+    expect(formatPhone('+77054100020')).toBe('+7 705 410 00 20');
+    expect(formatPhone('705 410 00 20')).toBe('+7 705 410 00 20');
+  });
+
+  it('неразобранное поле не портится', () => {
+    expect(formatPhone('87')).toBe('87');
+    expect(formatPhone('')).toBe('');
+    expect(formatPhone('телефон')).toBe('телефон');
   });
 });

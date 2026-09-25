@@ -343,6 +343,7 @@
     }
   },
   "common": {
+    "back": "Back",
     "close": "Close",
     "previous": "Previous",
     "next": "Next",

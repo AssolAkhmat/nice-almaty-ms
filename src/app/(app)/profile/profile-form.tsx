@@ -4,6 +4,7 @@ import { Eye } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useActionState } from 'react';
 
+import { PhoneInput } from '@/components/ui/phone-input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
@@ -116,7 +117,7 @@ export function ProfileForm({
               <Input defaultValue={values.birthDate} id="birthDate" name="birthDate" type="date" />
             </Field>
             <Field htmlFor="phone" label={t('profile.fields.phone')}>
-              <Input defaultValue={values.phone} id="phone" inputMode="tel" name="phone" />
+              <PhoneInput defaultValue={values.phone} id="phone" name="phone" />
             </Field>
           </div>
         </Card>

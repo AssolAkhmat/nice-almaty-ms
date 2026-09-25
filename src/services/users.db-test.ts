@@ -6,6 +6,8 @@ import { afterAll, describe, expect, it } from 'vitest';
 import * as schema from '@/db/schema';
 import { testDatabaseUrl } from '@/db/testing/database-url';
 import { listAuditEntries } from '@/db/repositories/audit-log';
+import { createUser, findUserByPhone } from '@/db/repositories/users';
+import { normalizePhone } from '@/domain/phone';
 import {
   ConflictError,
   ForbiddenError,
@@ -601,6 +603,62 @@ describe('смена номера телефона (T9.7)', () => {
           tx,
         ),
       ).rejects.toThrow(NotFoundError);
+    });
+  });
+});
+
+/*
+ * Отзыв жильца (25 сентября 2026): «номер, начинающийся с 8, не работает,
+ * человек просто не может войти». Нормализация обязана быть одной и той же
+ * при создании учётной записи и при входе — иначе номер в базе и номер,
+ * который набирает человек, никогда не совпадут. Проверяется сквозным
+ * путём, а не чтением кода.
+ */
+describe('телефон при создании и при входе — один и тот же', () => {
+  const FORMS = [
+    '8 705 410 00 20',
+    '87054100020',
+    '8-705-410-00-20',
+    '8 705 410–00–20',
+    '+77054100020',
+    '+7 705 410 00 20',
+    '+7 (705) 410-00-20',
+    '7054100020',
+    '705 410 00 20',
+    '0077054100020',
+  ];
+
+  it('заведённый как «8 …» находится по любой ходовой записи', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '100050');
+
+      const created = await createAccount(
+        { context: fixture.superadmin },
+        { phone: '8 705 410 00 20', role: 'resident', houseId: fixture.houseA },
+        tx,
+      );
+
+      expect(created.user.phone).toBe('+77054100020');
+
+      for (const form of FORMS) {
+        const found = await findUserByPhone(normalizePhone(form), tx);
+
+        expect(found?.id, form).toBe(created.user.id);
+      }
+    });
+  });
+
+  it('в базу иначе, чем +7XXXXXXXXXX, телефон не запишется', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '100051');
+
+      await expect(
+        createUser(
+          fixture.superadmin,
+          { phone: '87054100021', passwordHash: 'x', role: 'resident' },
+          tx,
+        ),
+      ).rejects.toBeInstanceOf(RangeError);
     });
   });
 });

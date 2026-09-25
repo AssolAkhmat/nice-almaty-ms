@@ -3,6 +3,7 @@ import { useTranslations } from 'next-intl';
 import { LocaleSwitcher } from '@/components/i18n/locale-switcher';
 import { ThemeSwitcher } from '@/components/theme/theme-switcher';
 
+import { BackLink } from './back-link';
 import { BottomNav } from './bottom-nav';
 import { Sidebar } from './sidebar';
 
@@ -37,7 +38,10 @@ export function AppShell({
       <Header />
       <div className="flex flex-1">
         <Sidebar unread={unread} />
-        <main className="min-w-0 flex-1 px-3 py-4 md:px-6 md:py-6">{children}</main>
+        <main className="min-w-0 flex-1 px-3 py-4 md:px-6 md:py-6">
+          <BackLink />
+          {children}
+        </main>
       </div>
       <BottomNav unread={unread} />
     </div>

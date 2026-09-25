@@ -3,10 +3,11 @@
 import { useFormatter, useTranslations } from 'next-intl';
 import { useActionState, useState } from 'react';
 
+import { PhoneInput } from '@/components/ui/phone-input';
 import { Badge, StatusPill } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Field, Input } from '@/components/ui/input';
+import { Field } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Pagination } from '@/components/ui/pagination';
 import { Table, type TableColumn } from '@/components/ui/table';
@@ -281,14 +282,12 @@ export function UsersTable({ rows }: { rows: readonly AccountRow[] }) {
           >
             <input name="userId" type="hidden" value={pendingPhone.id} />
             <Field htmlFor="change-phone-value" label={t('users.changePhone.newPhone')}>
-              <Input
+              <PhoneInput
                 data-testid="change-phone-value"
                 defaultValue={pendingPhone.phone}
                 id="change-phone-value"
-                inputMode="tel"
                 name="phone"
                 required
-                type="tel"
               />
             </Field>
             <div className="flex justify-end">

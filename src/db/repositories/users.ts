@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm';
 
+import { isNormalizedPhone } from '@/domain/phone';
 import { NotFoundError } from '@/lib/errors';
 import { now } from '@/lib/time';
 
@@ -138,11 +139,32 @@ export async function findUserInOrg(
   return user ?? null;
 }
 
+/**
+ * Телефон — логин, и хранится он в единственном виде `+7XXXXXXXXXX`
+ * (docs/02-DATA-MODEL.md).
+ *
+ * Правило было соглашением: нормализация стояла в сервисах, и ветка,
+ * забывшая её позвать, записала бы номер иначе — человек с тем же номером
+ * просто не вошёл бы (отзыв жильца, 25 сентября 2026). Теперь это проверка
+ * в единственной точке записи.
+ *
+ * Не проверкой базы: ею оказались бы связаны десятки тестовых фикстур
+ * с выдуманными короткими номерами, а выигрыш — только над сырым SQL,
+ * которого в боевых путях нет.
+ */
+function assertNormalizedPhone(phone: string | undefined): void {
+  if (phone !== undefined && !isNormalizedPhone(phone)) {
+    throw new RangeError(`Телефон записывается только в виде +7XXXXXXXXXX: ${phone}`);
+  }
+}
+
 export async function createUser(
   context: AccessContext,
   input: Omit<NewUser, 'orgId'>,
   executor: Executor = getDb(),
 ): Promise<User> {
+  assertNormalizedPhone(input.phone);
+
   const [user] = await executor
     .insert(users)
     .values({ ...input, orgId: context.orgId })
@@ -161,6 +183,8 @@ export async function updateUser(
   patch: Partial<Omit<NewUser, 'id' | 'orgId'>>,
   executor: Executor = getDb(),
 ): Promise<User | null> {
+  assertNormalizedPhone(patch.phone);
+
   const [user] = await executor
     .update(users)
     .set({ ...patch, updatedAt: now() })

@@ -15,27 +15,49 @@ export function isNormalizedPhone(value: string): boolean {
 }
 
 /**
+ * Разделители, которые человек вставляет в номер.
+ *
+ * `\p{Pd}` — все тире Unicode, а не только ASCII-дефис: номер, скопированный
+ * из мессенджера или документа, приходит с длинным тире, и жилец из-за этого
+ * не мог войти вовсе (отзыв жильца, 25 сентября 2026). Пробелы тоже любые,
+ * включая неразрывный.
+ */
+const SEPARATORS = /[\s().\u2011/\p{Pd}]/gu;
+
+/**
  * Приводит запись номера к формату хранения.
- * Принимает `+7…`, `8…`, `7…` и национальные десять цифр, разделители любые.
+ *
+ * Принимает `+7…`, `8…`, `7…`, `00 7…` и национальные десять цифр;
+ * разделители — пробелы любого вида, скобки, точки, дроби и любые тире.
  */
 export function normalizePhone(input: string): string {
   const trimmed = input.trim();
-  const hasPlus = trimmed.startsWith('+');
-  const rest = hasPlus ? trimmed.slice(1) : trimmed;
+  const hasLeadingPlus = trimmed.startsWith('+');
+  const rest = hasLeadingPlus ? trimmed.slice(1) : trimmed;
 
   // Плюс допустим только один и только первым символом.
   if (rest.includes('+')) {
     throw new RangeError(`Не похоже на номер телефона: ${input}`);
   }
 
-  const digits = rest.replace(/[\s()\-.]/g, '');
-  if (!/^\d+$/.test(digits)) {
+  const cleaned = rest.replace(SEPARATORS, '');
+  if (!/^\d+$/.test(cleaned)) {
     throw new RangeError(`Не похоже на номер телефона: ${input}`);
   }
 
+  /*
+   * `00` — международный префикс, та же роль, что у плюса: `00 7 777…`
+   * равно `+7 777…`. Набирается так с городских телефонов и из-за границы.
+   */
+  const international = cleaned.startsWith('00');
+  const digits = international ? cleaned.slice(2) : cleaned;
+  const hasPlus = hasLeadingPlus || international;
+
   const national = toNationalNumber(digits, hasPlus);
   if (national === null) {
-    throw new RangeError(`Не похоже на казахстанский номер телефона: ${input}`);
+    throw new RangeError(
+      `Номер должен быть казахстанским: +7 7XX XXX XX XX, 8 7XX XXX XX XX или 7XX XXX XX XX — получено ${input}`,
+    );
   }
 
   return `+7${national}`;
@@ -71,4 +93,24 @@ function toNationalNumber(digits: string, hasPlus: boolean): string | null {
   }
 
   return null;
+}
+
+/**
+ * Человеческий вид номера: `+7 705 410 00 20`.
+ *
+ * Нужен полю ввода: жилец вставляет номер как придётся, и поле показывает,
+ * что система поняла, — иначе «мусор в поле» остаётся мусором до отправки
+ * (отзыв жильца, 25 сентября 2026). Ненормализуемая строка возвращается
+ * как есть: поле не должно молча портить то, чего не разобрало.
+ */
+export function formatPhone(input: string): string {
+  const normalized = tryNormalizePhone(input);
+
+  if (normalized === null) {
+    return input;
+  }
+
+  const digits = normalized.slice(2);
+
+  return `+7 ${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6, 8)} ${digits.slice(8)}`;
 }

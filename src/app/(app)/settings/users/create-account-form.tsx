@@ -3,9 +3,10 @@
 import { useTranslations } from 'next-intl';
 import { useActionState } from 'react';
 
+import { PhoneInput } from '@/components/ui/phone-input';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
-import { Field, Input, Select } from '@/components/ui/input';
+import { Field, Select } from '@/components/ui/input';
 
 import { createAccountAction, type AccountActionState } from './actions';
 
@@ -28,14 +29,7 @@ export function CreateAccountForm({ houses }: { houses: readonly HouseOption[] }
 
       <form action={action} className="flex flex-col gap-3" data-testid="create-account-form">
         <Field htmlFor="phone" label={t('users.columns.phone')}>
-          <Input
-            data-testid="new-phone"
-            id="phone"
-            inputMode="tel"
-            name="phone"
-            placeholder="+7 700 000 00 00"
-            required
-          />
+          <PhoneInput data-testid="new-phone" id="phone" name="phone" required />
         </Field>
 
         <Field htmlFor="role" label={t('users.columns.role')}>
