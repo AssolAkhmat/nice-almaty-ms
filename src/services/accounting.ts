@@ -202,8 +202,13 @@ export async function readLedgerJournal(
 
     const row: JournalLine = {
       accountId: line.accountId,
-      code: account?.code ?? line.accountId,
-      name: account?.name ?? line.accountId,
+      /*
+       * Счёт из плана мог быть архивирован или удалён вместе с домом; тогда
+       * в книге стоит прочерк, а не идентификатор. Идентификатор человеку
+       * не нужен нигде (указание владельца, 25 сентября 2026).
+       */
+      code: account?.code ?? '—',
+      name: account?.name ?? '—',
       direction: line.direction,
       amount: line.amount,
     };
@@ -265,7 +270,7 @@ export async function readTaxReport(
     report: taxReport({ ...totals, taxRateBp, acquiringRateBp }),
     byHouse: totalsByHouse.map((row) => ({
       houseId: row.houseId,
-      houseName: nameOf.get(row.houseId) ?? row.houseId,
+      houseName: nameOf.get(row.houseId) ?? '—',
       income: row.income,
       turnover: row.turnover,
       report: taxReport({
