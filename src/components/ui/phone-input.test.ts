@@ -4,95 +4,131 @@ import { describe, expect, it } from 'vitest';
 
 import { normalizePhone } from '@/domain/phone';
 
-import { PhoneInput } from './phone-input';
+import { PHONE_PREFIX, PhoneInput } from './phone-input';
 
 /**
  * Поле телефона не спорит с тем, кто заполняет его не по одной букве
- * (322 упавших проверки приёмки, 25 сентября 2026).
+ * (305 упавших проверок приёмки, 25 сентября 2026).
  *
- * Пока поле было управляемым, подстановка `+7 ` доходила до узла после
- * события фокуса — то есть после того, как заполняющая сторона выделила
- * прежнее содержимое под замену. Перерисовка снимала выделение, номер
- * приклеивался к префиксу, и на верном номере человек читал
- * «Неверный телефон или пароль».
+ * Драйвер приёмки и автозаполнение браузера делают три шага в таком порядке:
+ * `input.select()`, `input.focus()`, вставка текста поверх выделения. Порядок
+ * взят из кода `playwright-core` (`selectText`), а не предположен, и здесь
+ * повторяется шаг в шаг: подстановка на фокусе приходила после выделения,
+ * снимала его, и номер приклеивался к префиксу.
  *
- * Обработчики здесь вызываются напрямую, с поддельным узлом: проверяется
- * ровно то свойство, которое и было сломано, — что поле пишет в узел,
- * а не в состояние. Браузер для этого не нужен, а приёмка на трёх ширинах
- * проверяет то же самое настоящей формой.
+ * Обработчики вызываются напрямую, с поддельным узлом: браузер для этого
+ * не нужен, а приёмка на трёх ширинах проверяет то же настоящей формой.
  */
 const SOURCE = readFileSync('src/components/ui/phone-input.tsx', 'utf8');
 
-/** Признаки управляемого поля: значение из состояния и само состояние. */
-const CONTROLLED = /\bvalue=\{|useState/;
+/** Признаки поля, спорящего с вставкой: состояние и подстановка на фокусе. */
+const FIGHTS_INPUT = /\bvalue=\{|useState|onFocus=\{/;
 
 interface FakeNode {
+  selectionEnd: number;
+  selectionStart: number;
   value: string;
 }
 
-function handlers() {
-  const field = PhoneInput({}) as unknown as {
-    props: {
-      onBlur: (event: { target: FakeNode }) => void;
-      onFocus: (event: { target: FakeNode }) => void;
-      onPaste: (event: {
-        clipboardData: { getData: (format: string) => string };
-        currentTarget: FakeNode;
-        preventDefault: () => void;
-      }) => void;
-    };
+function node(value: string): FakeNode {
+  return { selectionEnd: value.length, selectionStart: value.length, value };
+}
+
+interface FieldProps {
+  defaultValue?: unknown;
+  onBlur: (event: { target: FakeNode }) => void;
+  onFocus?: (event: { target: FakeNode }) => void;
+  onPaste: (event: {
+    clipboardData: { getData: (format: string) => string };
+    currentTarget: FakeNode;
+    preventDefault: () => void;
+  }) => void;
+}
+
+function field(defaultValue?: string): FieldProps {
+  const element = PhoneInput(defaultValue === undefined ? {} : { defaultValue }) as unknown as {
+    props: FieldProps;
   };
 
-  return field.props;
+  return element.props;
+}
+
+/**
+ * Заполнение чужими руками: выделить всё, перевести фокус, вставить текст
+ * поверх выделения. Ровно эти три шага и в этом порядке.
+ */
+function fillLikeDriver(props: FieldProps, target: FakeNode, text: string): string {
+  target.selectionStart = 0;
+  target.selectionEnd = target.value.length;
+
+  props.onFocus?.({ target });
+
+  target.value =
+    target.value.slice(0, target.selectionStart) + text + target.value.slice(target.selectionEnd);
+
+  /* Нажатие на кнопку уводит фокус из поля. */
+  props.onBlur({ target });
+
+  return target.value;
 }
 
 describe('поле телефона', () => {
-  it('подставляет +7 прямо в узел', () => {
-    const node: FakeNode = { value: '' };
-
-    handlers().onFocus({ target: node });
-
-    expect(node.value).toBe('+7 ');
+  it('пустое поле показывает префикс начальным значением', () => {
+    expect(field().defaultValue).toBe(PHONE_PREFIX);
   });
 
-  it('не трогает уже вставленный номер при переходе в поле', () => {
-    const node: FakeNode = { value: '+77010000000' };
-
-    handlers().onFocus({ target: node });
-
-    expect(node.value).toBe('+77010000000');
+  it('заполненное поле показывает номер разобранным', () => {
+    expect(field('87010000000').defaultValue).toBe('+7 701 000 00 00');
   });
 
-  it('при уходе показывает номер так, как его понял сервер', () => {
-    const node: FakeNode = { value: '87010000000' };
+  it('заполнение чужими руками кладёт в поле ровно вставленный номер', () => {
+    const props = field();
+    const target = node(String(props.defaultValue));
 
-    handlers().onBlur({ target: node });
+    const filled = fillLikeDriver(props, target, '+77010000000');
 
-    expect(node.value).toBe('+7 701 000 00 00');
+    expect(filled).toBe('+7 701 000 00 00');
+    expect(normalizePhone(filled)).toBe('+77010000000');
+  });
+
+  it('заполнение поверх прежнего номера тоже заменяет его целиком', () => {
+    const props = field('+77010000000');
+    const target = node(String(props.defaultValue));
+
+    expect(normalizePhone(fillLikeDriver(props, target, '87055550001'))).toBe('+77055550001');
+  });
+
+  it('при уходе из поля один префикс стирается: required ловит незаполненное', () => {
+    const props = field();
+    const target = node(PHONE_PREFIX);
+
+    props.onBlur({ target });
+
+    expect(target.value).toBe('');
   });
 
   it('непонятое при уходе оставляет как набрано', () => {
-    const node: FakeNode = { value: '701' };
+    const target = node('701');
 
-    handlers().onBlur({ target: node });
+    field().onBlur({ target });
 
-    expect(node.value).toBe('701');
+    expect(target.value).toBe('701');
   });
 
   it('вставка заменяет содержимое целиком, а не приклеивается к префиксу', () => {
-    const node: FakeNode = { value: '+7 ' };
+    const target = node(PHONE_PREFIX);
     let prevented = false;
 
-    handlers().onPaste({
+    field().onPaste({
       clipboardData: { getData: () => '8 (701) 000-00-00' },
-      currentTarget: node,
+      currentTarget: target,
       preventDefault: () => {
         prevented = true;
       },
     });
 
     expect(prevented).toBe(true);
-    expect(node.value).toBe('+7 701 000 00 00');
+    expect(target.value).toBe('+7 701 000 00 00');
   });
 
   it('приклеенный второй префикс номером не считается', () => {
@@ -103,12 +139,13 @@ describe('поле телефона', () => {
     expect(() => normalizePhone('+7 +77010000000')).toThrow();
   });
 
-  it('поле неуправляемое: значения из состояния в нём нет', () => {
-    expect(CONTROLLED.test(SOURCE)).toBe(false);
+  it('поле не спорит с вставкой: ни состояния, ни подстановки на фокусе', () => {
+    expect(FIGHTS_INPUT.test(SOURCE)).toBe(false);
   });
 
-  it('запрет живой: управляемое поле детектор краснит', () => {
-    expect(CONTROLLED.test('const [value, setValue] = useState("");')).toBe(true);
-    expect(CONTROLLED.test('<Input value={value} />')).toBe(true);
+  it('запрет живой: состояние и обработчик фокуса детектор краснит', () => {
+    expect(FIGHTS_INPUT.test('const [value, setValue] = useState("");')).toBe(true);
+    expect(FIGHTS_INPUT.test('<Input value={value} />')).toBe(true);
+    expect(FIGHTS_INPUT.test('onFocus={(event) => { event.target.value = "+7 "; }}')).toBe(true);
   });
 });
