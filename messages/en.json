@@ -1794,7 +1794,8 @@
       "nameRequired": "Enter a name",
       "periodEmpty": "The end must be after the start",
       "bedTaken": "The bed is taken on these dates — by a residency or another temporary resident",
-      "unknown": "Could not save"
+      "unknown": "Could not save",
+      "sexRequired": "Sex is required: eligibility filters do not work without it"
     },
     "female": "Female",
     "from": "From",
@@ -1808,7 +1809,8 @@
     "sex": "Sex",
     "title": "Temporary residents",
     "to": "To",
-    "updated": "Changes saved"
+    "updated": "Changes saved",
+    "edit": "Edit"
   },
   "terminations": {
     "title": "Contract termination",

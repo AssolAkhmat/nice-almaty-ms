@@ -7,11 +7,19 @@ import { listResidencies } from '@/db/repositories/residencies';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Money } from '@/components/ui/money';
+import { can } from '@/lib/authz';
 import { getCurrentSession } from '@/lib/session';
+import { todayInAlmaty } from '@/lib/time';
 import { houseLayout, myPlacement } from '@/services/beds';
 import { readProfile } from '@/services/resident-profiles';
+import { listTemporary } from '@/services/temporary-residents';
 
 import { HouseLayout, type RoomView, type UnplacedResident } from './house-layout';
+import {
+  TemporaryResidents,
+  type TemporaryBedOption,
+  type TemporaryRowView,
+} from './temporary-residents';
 
 import type { UserActor } from '@/services/users';
 
@@ -120,6 +128,31 @@ export default async function BedsPage({
       name: nameOf.get(residency.userId) ?? residency.userId,
     }));
 
+  /*
+   * Временные жильцы (T11.3, решение D23): имя и пол на месте, без входа,
+   * профиля, денег и рейтинга. Заводятся здесь, потому что временный жилец —
+   * это занятость места, а не учётная запись.
+   */
+  const canTemporary = houseId !== null && can(context, 'temporaryResident.read', { houseId });
+
+  const temporaries: TemporaryRowView[] =
+    canTemporary && houseId !== null
+      ? (await listTemporary(actor, { houseId })).map((row) => ({
+          id: row.id,
+          name: row.name,
+          sex: row.sex,
+          bedLabel: row.bedLabel,
+          areaName: row.areaName,
+          from: row.period.slice(1, 11),
+          to: row.period.length > 13 ? row.period.slice(12, 22) : null,
+          note: row.note,
+        }))
+      : [];
+
+  const temporaryBeds: TemporaryBedOption[] = layout.flatMap((area) =>
+    area.beds.map((bed) => ({ bedId: bed.bedId, label: `${area.area.name}, ${bed.label}` })),
+  );
+
   return (
     <section className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
@@ -148,6 +181,16 @@ export default async function BedsPage({
       )}
 
       <HouseLayout rooms={rooms} unplaced={unplaced} />
+
+      {canTemporary && houseId !== null && (
+        <TemporaryResidents
+          beds={temporaryBeds}
+          canWrite={can(context, 'temporaryResident.write', { houseId })}
+          houseId={houseId}
+          rows={temporaries}
+          today={todayInAlmaty()}
+        />
+      )}
     </section>
   );
 }

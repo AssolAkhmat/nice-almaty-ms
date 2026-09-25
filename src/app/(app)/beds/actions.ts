@@ -5,8 +5,9 @@ import { revalidatePath } from 'next/cache';
 
 import { actionErrorKey } from '@/lib/action-failure';
 import { getCurrentSession } from '@/lib/session';
-import { tryParseBusinessDate } from '@/lib/time';
+import { tryParseBusinessDate, type BusinessDate } from '@/lib/time';
 import { assignBedToResidency } from '@/services/beds';
+import { addTemporary, editTemporary, removeTemporary } from '@/services/temporary-residents';
 
 import type { UserActor } from '@/services/users';
 
@@ -73,4 +74,130 @@ export async function assignBedAction(
   revalidatePath('/beds');
 
   return { done: 'beds.assigned' };
+}
+
+/** Временные жильцы для ротаций (T11.3): заводятся на «Схеме мест» (D23). */
+export interface TemporaryActionState {
+  error?: string;
+  done?: string;
+}
+
+function period(formData: FormData): { from: BusinessDate; to: BusinessDate | null } | null {
+  const from = tryParseBusinessDate(text(formData, 'from'));
+
+  if (from === null) {
+    return null;
+  }
+
+  const rawTo = text(formData, 'to');
+  const to = rawTo === '' ? null : tryParseBusinessDate(rawTo);
+
+  if (rawTo !== '' && to === null) {
+    return null;
+  }
+
+  return { from, to };
+}
+
+function sexOf(formData: FormData): 'male' | 'female' | null {
+  const value = text(formData, 'sex');
+
+  return value === 'male' || value === 'female' ? value : null;
+}
+
+export async function addTemporaryAction(
+  _previous: TemporaryActionState,
+  formData: FormData,
+): Promise<TemporaryActionState> {
+  const current = await actor();
+  if (current === null) {
+    return { error: 'beds.errors.unauthorized' };
+  }
+
+  const range = period(formData);
+  const sex = sexOf(formData);
+
+  if (range === null) {
+    return { error: 'beds.errors.date' };
+  }
+
+  /* Пол обязателен: на нём держатся фильтры допуска «парни» и «девушки» (D23). */
+  if (sex === null) {
+    return { error: 'temporaryResidents.errors.sexRequired' };
+  }
+
+  try {
+    await addTemporary(current, {
+      houseId: text(formData, 'houseId'),
+      bedId: text(formData, 'bedId'),
+      name: text(formData, 'name'),
+      sex,
+      period: range,
+      note: text(formData, 'note') === '' ? null : text(formData, 'note'),
+    });
+  } catch (error) {
+    return { error: actionErrorKey(error, 'temporaryResidents.errors.unknown') };
+  }
+
+  refreshRotations();
+
+  return { done: 'temporaryResidents.added' };
+}
+
+export async function editTemporaryAction(
+  _previous: TemporaryActionState,
+  formData: FormData,
+): Promise<TemporaryActionState> {
+  const current = await actor();
+  if (current === null) {
+    return { error: 'beds.errors.unauthorized' };
+  }
+
+  const range = period(formData);
+  const sex = sexOf(formData);
+
+  if (range === null || sex === null) {
+    return { error: 'beds.errors.date' };
+  }
+
+  try {
+    await editTemporary(current, text(formData, 'id'), {
+      name: text(formData, 'name'),
+      sex,
+      period: range,
+      note: text(formData, 'note') === '' ? null : text(formData, 'note'),
+    });
+  } catch (error) {
+    return { error: actionErrorKey(error, 'temporaryResidents.errors.unknown') };
+  }
+
+  refreshRotations();
+
+  return { done: 'temporaryResidents.updated' };
+}
+
+export async function removeTemporaryAction(
+  _previous: TemporaryActionState,
+  formData: FormData,
+): Promise<TemporaryActionState> {
+  const current = await actor();
+  if (current === null) {
+    return { error: 'beds.errors.unauthorized' };
+  }
+
+  try {
+    await removeTemporary(current, text(formData, 'id'));
+  } catch (error) {
+    return { error: actionErrorKey(error, 'temporaryResidents.errors.unknown') };
+  }
+
+  refreshRotations();
+
+  return { done: 'temporaryResidents.removed' };
+}
+
+/** Временный жилец стоит в ряду ротаций, поэтому обновляется и расписание. */
+function refreshRotations(): void {
+  revalidatePath('/beds');
+  revalidatePath('/rotations', 'layout');
 }
