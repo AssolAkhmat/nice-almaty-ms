@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ClipboardEvent, type FocusEvent } from 'react';
+import type { ClipboardEvent, FocusEvent } from 'react';
 
 import { formatPhone } from '@/domain/phone';
 
@@ -23,36 +23,53 @@ import { Input } from './input';
  * Разбирать номер здесь нечем и незачем: разбор один на всё приложение,
  * в `src/domain/phone.ts`, и отправляется на сервер исходная строка —
  * нормализацию всё равно делает он.
+ *
+ * ### Почему поле неуправляемое
+ *
+ * Содержимое пишется прямо в узел, без состояния React, и `value` здесь
+ * нет — только `defaultValue`. Это не вкусовщина, а условие работы.
+ *
+ * Управляемое поле перерисовывается **после** события: подстановка `+7 `
+ * на фокусе доходила до узла тогда, когда вставлявшая номер сторона уже
+ * выделила прежнее содержимое под замену. Перерисовка снимала выделение,
+ * и вставка не заменяла `+7 `, а приклеивалась к нему — получался
+ * `+7 +77010000000`, который не разбирается, и человек читал
+ * «Неверный телефон или пароль» на верном номере.
+ *
+ * Так ведёт себя всё, что заполняет поле не по одной букве: автозаполнение
+ * браузера, менеджер паролей, приёмка. Для приёмки это стоило 322 упавших
+ * проверок; для жильца это был бы вход, который «просто не работает».
+ * Запись в узел из обработчика происходит внутри самого события, до того
+ * как вставляющая сторона успеет что-либо сделать, и выделение остаётся
+ * в силе.
+ *
+ * Запрет держится проверкой `phone-input.test.ts`: `value` или состояние
+ * в этом файле её краснят.
  */
 export function PhoneInput({
   defaultValue = '',
   ...rest
 }: Omit<React.ComponentProps<typeof Input>, 'onFocus' | 'onBlur' | 'onPaste' | 'value'>) {
-  const [value, setValue] = useState(defaultValue === '' ? '' : formatPhone(String(defaultValue)));
-
   return (
     <Input
       {...rest}
       autoComplete="tel"
+      defaultValue={defaultValue === '' ? '' : formatPhone(String(defaultValue))}
       inputMode="tel"
       onBlur={(event: FocusEvent<HTMLInputElement>) => {
-        setValue(formatPhone(event.target.value));
-      }}
-      onChange={(event) => {
-        setValue(event.target.value);
+        event.target.value = formatPhone(event.target.value);
       }}
       onFocus={(event: FocusEvent<HTMLInputElement>) => {
         if (event.target.value === '') {
-          setValue('+7 ');
+          event.target.value = '+7 ';
         }
       }}
       onPaste={(event: ClipboardEvent<HTMLInputElement>) => {
         event.preventDefault();
-        setValue(formatPhone(event.clipboardData.getData('text')));
+        event.currentTarget.value = formatPhone(event.clipboardData.getData('text'));
       }}
       placeholder="+7 700 000 00 00"
       type="tel"
-      value={value}
     />
   );
 }

@@ -24,8 +24,19 @@ export async function login(page: Page, phone: string = E2E_ACCOUNTS.superadmin)
    * не говорит, почему вход не прошёл, а текст ошибки говорит. Ровно из-за
    * этой немоты 322 упавшие проверки трое суток выглядели одинаково
    * (25 сентября 2026).
+   *
+   * Ждётся первый из двух исходов, и только потом читается сообщение:
+   * `count()` не ждёт ничего, и при первой же попытке отказ ещё не успевал
+   * отрисоваться — тогда вместо причины в отчёте снова оказывалась немота
+   * «панель не найдена» на пятнадцатой секунде.
    */
   const failure = page.getByTestId('login-error');
+
+  await page
+    .locator('[data-testid="sidebar"], [data-testid="login-error"]')
+    .first()
+    .waitFor({ state: 'attached' })
+    .catch(() => undefined);
 
   if ((await failure.count()) > 0) {
     expect(await failure.textContent(), `вход не прошёл: ${phone}`).toBe('');
