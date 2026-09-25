@@ -5,12 +5,13 @@ import { getPdfRenderer } from '@/adapters/pdf';
 import { getDb, type Executor } from '@/db/client';
 import { findPlacementOfResidency } from '@/db/repositories/areas';
 import { requireHouseOfResidency } from '@/db/repositories/houses';
-import { createFile, requireFile, updateFile } from '@/db/repositories/files';
+import { createFile, findFileInOrg, requireFile, updateFile } from '@/db/repositories/files';
 import { requireProfile } from '@/db/repositories/resident-profiles';
 import { requireResidency, updateResidency } from '@/db/repositories/residencies';
 import { requireUser } from '@/db/repositories/users';
 import { contractTemplates, type ContractTemplate } from '@/db/schema';
 import { hasToken, renderContractTemplate, unknownTokens } from '@/domain/contract-template';
+import { readOwnerSignatureFileId } from './settings';
 import { documentStorageKey } from '@/domain/files';
 import { assertCan } from '@/lib/authz';
 import { ConflictError, NotFoundError, ValidationError } from '@/lib/errors';
@@ -210,13 +211,60 @@ function renderContract(
   bodyHtml: string,
   values: Readonly<Record<string, string>>,
   dataUrl: string | null,
+  ownerDataUrl: string | null = null,
 ): string {
   const html = renderContractTemplate(bodyHtml, {
     ...values,
     'resident.signature': dataUrl === null ? '' : signatureImage(dataUrl),
+    /*
+     * Подпись исполнителя ставится только там, где её ждёт шаблон: блоком
+     * в конце она не приклеивается. Шаблон без токена — это шаблон, который
+     * про подпись исполнителя не знает, и дописывать её за автора незачем.
+     */
+    'owner.signature': ownerDataUrl === null ? '' : signatureImage(ownerDataUrl),
   });
 
   return hasToken(bodyHtml, 'resident.signature') ? html : withSignature(html, dataUrl);
+}
+
+/**
+ * Картинка подписи исполнителя как data-URL.
+ *
+ * Берётся из снимка проживания, если договор уже подписан, и из настройки
+ * сети, если ещё нет: смена подписи не должна переписывать подписанное
+ * (указание владельца, 22 сентября 2026).
+ */
+async function ownerSignatureDataUrl(
+  actor: UserActor,
+  residency: Residency,
+  resolved: { executor: Executor; storage: StorageProvider },
+): Promise<{ dataUrl: string | null; fileId: string | null }> {
+  const fileId =
+    residency.ownerSignatureFileId ??
+    (residency.contractSignedAt === null
+      ? await readOwnerSignatureFileId(actor.context, resolved.executor)
+      : null);
+
+  if (fileId === null) {
+    return { dataUrl: null, fileId: null };
+  }
+
+  const file = await findFileInOrg(actor.context, fileId, resolved.executor);
+
+  if (file === null || file.status !== 'ready') {
+    return { dataUrl: null, fileId: null };
+  }
+
+  const bytes = await resolved.storage.get(file.path);
+
+  if (bytes === null) {
+    return { dataUrl: null, fileId: null };
+  }
+
+  return {
+    dataUrl: `data:${file.mime};base64,${Buffer.from(bytes).toString('base64')}`,
+    fileId: file.id,
+  };
 }
 
 async function storeServerFile(
@@ -306,8 +354,9 @@ export async function buildContract(
 
   const contractNumber = await ensureContractNumber(actor.context, residency, executor);
   const values = await contractValues(actor, residency, resolved, contractNumber);
-  // Договор до подписания: токен подписи получает пустое значение.
-  const html = renderContract(template.bodyHtml, values, null);
+  const owner = await ownerSignatureDataUrl(actor, residency, resolved);
+  // Договор до подписания: токен подписи жильца получает пустое значение.
+  const html = renderContract(template.bodyHtml, values, null, owner.dataUrl);
   const pdf = await resolved.pdf.render(html);
 
   const file = await storeServerFile(
@@ -397,7 +446,13 @@ export async function signContract(
   const dataUrl = `data:image/png;base64,${Buffer.from(bytes).toString('base64')}`;
   const contractNumber = await ensureContractNumber(actor.context, residency, executor);
   const values = await contractValues(actor, residency, resolved, contractNumber);
-  const html = renderContract(template.bodyHtml, values, dataUrl);
+  /*
+   * Подпись исполнителя вкладывается в документ и запоминается в проживании:
+   * смена подписи владелицей не должна переписать уже подписанный договор
+   * (указание владельца, 22 сентября 2026).
+   */
+  const owner = await ownerSignatureDataUrl(actor, residency, resolved);
+  const html = renderContract(template.bodyHtml, values, dataUrl, owner.dataUrl);
   const pdf = await resolved.pdf.render(html);
 
   const file = await storeServerFile(
@@ -417,7 +472,12 @@ export async function signContract(
     const updated = await updateResidency(
       actor.context,
       residency.id,
-      { contractFileId: file.id, signatureFileId: signature.id, contractSignedAt: signedAt },
+      {
+        contractFileId: file.id,
+        signatureFileId: signature.id,
+        contractSignedAt: signedAt,
+        ownerSignatureFileId: owner.fileId,
+      },
       tx,
     );
 
@@ -436,6 +496,7 @@ export async function signContract(
         after: {
           contractFileId: file.id,
           signatureFileId: signature.id,
+          ownerSignatureFileId: owner.fileId,
           contractSignedAt: signedAt.toISOString(),
         },
       },

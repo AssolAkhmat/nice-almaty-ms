@@ -778,3 +778,98 @@ describe('реквизиты нанимателя: документ, депоз�
     });
   });
 });
+
+/*
+ * Подпись исполнителя (указание владельца, 22 сентября 2026). Главное здесь —
+ * что смена подписи не переписывает уже подписанный договор: подпись входит
+ * в снимок, как версия шаблона в T8.5.
+ */
+describe('подпись исполнителя', () => {
+  async function ownerSignature(
+    tx: Transaction,
+    fixture: Awaited<ReturnType<typeof seed>>,
+    storage: StorageProvider,
+  ) {
+    const path = `_network/owner-signature/${fixture.orgId}.png`;
+    await storage.put(path, new Uint8Array([0x89, 0x50, 0x4e, 0x47]));
+
+    const [file] = await tx
+      .insert(schema.files)
+      .values({
+        orgId: fixture.orgId,
+        provider: 'local',
+        path,
+        mime: 'image/png',
+        sizeBytes: 128,
+        originalName: 'owner-signature.png',
+        status: 'ready',
+        uploadedBy: fixture.superadmin.context.userId,
+        scope: { purpose: 'owner-signature' },
+      })
+      .returning();
+
+    await tx.insert(schema.settings).values({
+      scope: 'org',
+      scopeId: fixture.orgId,
+      key: 'contract.ownerSignatureFileId',
+      value: file?.id ?? '',
+    });
+
+    return file?.id ?? '';
+  }
+
+  it('подписание запоминает подпись исполнителя снимком', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '8801');
+      const storage = freshStorage();
+      const pdf = fakePdf();
+      const fileId = await ownerSignature(tx, fixture, storage);
+
+      const signatureId = await signatureFile(tx, storage, fixture);
+
+      await signContract(fixture.resident, fixture.residencyId, signatureId, {
+        executor: tx,
+        storage,
+        pdf: pdf.renderer,
+        today: TODAY,
+      });
+
+      const [residency] = await tx
+        .select()
+        .from(schema.residencies)
+        .where(eq(schema.residencies.id, fixture.residencyId));
+
+      expect(residency?.ownerSignatureFileId).toBe(fileId);
+    });
+  });
+
+  it('смена подписи не переписывает подписанный договор', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '8802');
+      const storage = freshStorage();
+      const pdf = fakePdf();
+      const first = await ownerSignature(tx, fixture, storage);
+
+      const signatureId = await signatureFile(tx, storage, fixture);
+      await signContract(fixture.resident, fixture.residencyId, signatureId, {
+        executor: tx,
+        storage,
+        pdf: pdf.renderer,
+        today: TODAY,
+      });
+
+      /* Владелица сменила подпись: настройка новая, снимок прежний. */
+      await tx
+        .update(schema.settings)
+        .set({ value: '00000000-0000-4000-8000-000000000000' })
+        .where(eq(schema.settings.key, 'contract.ownerSignatureFileId'));
+
+      const [residency] = await tx
+        .select()
+        .from(schema.residencies)
+        .where(eq(schema.residencies.id, fixture.residencyId));
+
+      expect(residency?.ownerSignatureFileId).toBe(first);
+    });
+  });
+});

@@ -38,6 +38,15 @@ export const CONTRACT_TOKENS = [
    * где ему положено быть по тексту договора.
    */
   'resident.signature',
+  /*
+   * Подпись исполнителя — владелицы сети (указание владельца,
+   * 22 сентября 2026). Работает так же, как подпись жильца: место задаётся
+   * токеном, значение вставляется разметкой. Разница в том, откуда берётся
+   * картинка: у жильца из его проживания, у исполнителя — из настройки сети,
+   * а у подписанного договора — из снимка, чтобы смена подписи не переписала
+   * уже подписанное (та же мысль, что версия шаблона в T8.5).
+   */
+  'owner.signature',
 ] as const;
 
 export type ContractToken = (typeof CONTRACT_TOKENS)[number];
@@ -63,7 +72,7 @@ function isKnown(token: string): token is ContractToken {
  * кто-то сможет положить разметку в договор через поле профиля, поэтому
  * такому токену нужна своя причина и своя негативная фикстура.
  */
-const RAW_TOKENS: readonly ContractToken[] = ['resident.signature'];
+const RAW_TOKENS: readonly ContractToken[] = ['resident.signature', 'owner.signature'];
 
 function escapeHtml(value: string): string {
   return value
@@ -158,4 +167,7 @@ export const SAMPLE_CONTRACT_VALUES: Readonly<Record<ContractToken, string>> = {
   'resident.signature':
     '<span style="display:inline-block;min-width:180px;border-bottom:1px solid #999">' +
     '<span style="color:#999;font-size:12px">место подписи</span></span>',
+  'owner.signature':
+    '<span style="display:inline-block;min-width:180px;border-bottom:1px solid #999">' +
+    '<span style="color:#999;font-size:12px">подпись исполнителя</span></span>',
 };

@@ -1765,7 +1765,8 @@
       "personalSaved": "Settings saved",
       "networkSaved": "Network settings saved",
       "phoneChanged": "Number changed. Sign in with the new number.",
-      "capabilitySaved": "Permission saved"
+      "capabilitySaved": "Permission saved",
+      "ownerSignatureSaved": "Contractor's signature saved"
     },
     "errors": {
       "unauthorized": "Sign-in required",
@@ -1776,7 +1777,8 @@
       "rate_limited": "Too often, try later",
       "internal": "Something went wrong",
       "wrongPassword": "Wrong current password",
-      "phoneTaken": "This number is already used by another account"
+      "phoneTaken": "This number is already used by another account",
+      "upload": "Could not upload the file"
     },
     "phone": {
       "title": "Phone number",
@@ -1784,6 +1786,17 @@
       "newPhone": "New number",
       "currentPassword": "Current password",
       "submit": "Change number"
+    },
+    "ownerSignature": {
+      "title": "Contractor's signature",
+      "hint": "Placed into the contract at the {{owner.signature}} token. Already signed contracts keep the signature in force at signing time.",
+      "replace": "Replace signature",
+      "clear": "Clear",
+      "prepare": "Upload signature",
+      "save": "Save signature",
+      "cancel": "Cancel",
+      "empty": "The signature is empty",
+      "upload": "Could not upload the signature"
     }
   },
   "temporaryResidents": {

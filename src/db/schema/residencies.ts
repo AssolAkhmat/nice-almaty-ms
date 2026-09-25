@@ -81,6 +81,16 @@ export const residencies = pgTable(
     contractTemplateId: uuid('contract_template_id'),
     contractFileId: uuid('contract_file_id'),
     signatureFileId: uuid('signature_file_id'),
+    /**
+     * Подпись исполнителя, вложенная в договор при подписании
+     * (указание владельца, 22 сентября 2026).
+     *
+     * Снимок, а не ссылка на настройку сети: владелица может сменить подпись,
+     * и уже подписанные договоры обязаны сохранить ту, что была на момент
+     * подписания. Та же мысль, что версия шаблона в T8.5 — документ,
+     * который уже подписали, не меняется задним числом.
+     */
+    ownerSignatureFileId: uuid('owner_signature_file_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

@@ -373,6 +373,12 @@ export const HOUSE_FILE_PURPOSES = [
   'damage-receipt',
   'expense-receipt',
   'utility-receipt',
+  /*
+   * Подпись исполнителя в договоре (указание владельца, 22 сентября 2026).
+   * Файл уровня сети: дома у него нет, и лежит он в `_network`. Загружает
+   * суперадмин, а подписанные договоры держат свою копию снимком.
+   */
+  'owner-signature',
 ] as const;
 
 export type HouseFilePurpose = (typeof HOUSE_FILE_PURPOSES)[number];

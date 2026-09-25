@@ -57,6 +57,8 @@ describe('палитра токенов', () => {
       'resident.university',
       'resident.course',
       'resident.signature',
+      // Подпись исполнителя — владелицы сети (22 сентября 2026).
+      'owner.signature',
     ]);
   });
 });
@@ -195,8 +197,13 @@ describe('токен подписи', () => {
   it('остальные значения по-прежнему экранируются', () => {
     const attack = '<script>alert(1)</script>';
 
+    /*
+     * Разметкой вставляются только подписи: их собирает сервер из байтов
+     * файла. Всё остальное — данные, пришедшие от человека, и экранируется
+     * без исключений. Список закрыт, и этот цикл проверяет именно закрытость.
+     */
     for (const token of CONTRACT_TOKENS) {
-      if (token === 'resident.signature') {
+      if (token === 'resident.signature' || token === 'owner.signature') {
         continue;
       }
 

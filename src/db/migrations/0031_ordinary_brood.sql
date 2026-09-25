@@ -1,0 +1,1 @@
+ALTER TABLE "residencies" ADD COLUMN "owner_signature_file_id" uuid;

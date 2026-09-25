@@ -9,6 +9,7 @@ import { readOrgSettings } from '@/services/settings';
 
 import { CapabilityToggles } from './capability-toggles';
 import { NetworkForm } from './network-form';
+import { OwnerSignature } from './owner-signature';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,6 +44,8 @@ export default async function NetworkSettingsPage() {
           ratingVisibleToResidents={settings.ratingVisibleToResidents}
         />
       </Card>
+
+      <OwnerSignature fileId={settings.ownerSignatureFileId} />
 
       <CapabilityToggles capabilities={capabilities} />
     </section>

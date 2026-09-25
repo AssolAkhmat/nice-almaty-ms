@@ -95,3 +95,48 @@ export async function setCapabilityAction(
     throw error;
   }
 }
+
+/**
+ * Подпись исполнителя в договоре (указание владельца, 22 сентября 2026).
+ *
+ * Сохраняется идентификатор уже загруженного файла: сама загрузка идёт
+ * двухшаговой сессией, как у подписи жильца (D4). Подписанные договоры
+ * держат свою копию снимком и от смены не меняются.
+ */
+export async function saveOwnerSignatureAction(
+  _previous: NetworkActionState,
+  formData: FormData,
+): Promise<NetworkActionState> {
+  const session = await getCurrentSession();
+  if (session === null) {
+    return { error: 'settings.errors.unauthorized' };
+  }
+
+  const store = await headers();
+  const actor = {
+    context: session.context,
+    ip: store.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined,
+  };
+
+  const fileId = formData.get('fileId');
+
+  if (typeof fileId !== 'string' || fileId === '') {
+    return { error: 'settings.errors.validation_error' };
+  }
+
+  try {
+    await writeOrgSetting(actor, ORG_SETTINGS.ownerSignatureFileId.key, fileId);
+
+    revalidatePath('/settings/network');
+    /* Договор собирается с подписью исполнителя — обновляется и он. */
+    revalidatePath('/contract', 'layout');
+
+    return { done: 'settings.done.ownerSignatureSaved' };
+  } catch (error) {
+    if (error instanceof AppError) {
+      return { error: `settings.errors.${error.code}` };
+    }
+
+    throw error;
+  }
+}

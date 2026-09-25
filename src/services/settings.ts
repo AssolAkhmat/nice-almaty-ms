@@ -30,6 +30,18 @@ export const ORG_SETTINGS = {
     key: 'locale.default',
     defaultValue: 'ru' as Locale,
   },
+  /**
+   * Подпись исполнителя в договоре: идентификатор файла PNG
+   * (указание владельца, 22 сентября 2026). Пусто — подписи нет,
+   * и на месте токена будет пусто, а не ошибка.
+   *
+   * Настройкой сети, а не колонкой организации: подпись меняется,
+   * и каждая смена обязана попадать в журнал — `writeOrgSetting` это делает.
+   */
+  ownerSignatureFileId: {
+    key: 'contract.ownerSignatureFileId',
+    defaultValue: null as string | null,
+  },
 } as const;
 
 /**
@@ -44,6 +56,8 @@ export const ORG_SETTINGS = {
 export interface OrgSettings {
   ratingVisibleToResidents: boolean;
   defaultLocale: Locale;
+  /** Подпись исполнителя в договоре; пусто — не загружена. */
+  ownerSignatureFileId: string | null;
 }
 
 function isLocale(value: unknown): value is Locale {
@@ -83,12 +97,35 @@ export async function readOrgSettings(
 
   const visible = byKey.get(ORG_SETTINGS.ratingVisibleToResidents.key);
   const locale = byKey.get(ORG_SETTINGS.defaultLocale.key);
+  const signature = byKey.get(ORG_SETTINGS.ownerSignatureFileId.key);
 
   return {
     ratingVisibleToResidents:
       typeof visible === 'boolean' ? visible : ORG_SETTINGS.ratingVisibleToResidents.defaultValue,
     defaultLocale: isLocale(locale) ? locale : ORG_SETTINGS.defaultLocale.defaultValue,
+    ownerSignatureFileId: typeof signature === 'string' ? signature : null,
   };
+}
+
+/**
+ * Подпись исполнителя для сборки договора.
+ *
+ * Читается без права на настройки сети: договор собирает админ дома,
+ * а настройки сети ему не положены. Отдаётся только идентификатор файла —
+ * ни прав на файл, ни самих байтов здесь нет.
+ */
+export async function readOwnerSignatureFileId(
+  context: AccessContext,
+  executor: Executor = getDb(),
+): Promise<string | null> {
+  const value = await readSettingValue(
+    'org',
+    context.orgId,
+    ORG_SETTINGS.ownerSignatureFileId.key,
+    executor,
+  );
+
+  return typeof value === 'string' ? value : null;
 }
 
 /**

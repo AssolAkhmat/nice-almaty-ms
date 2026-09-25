@@ -39,6 +39,7 @@ export const MIGRATIONS = [
   '0028_brown_king_cobra.sql',
   '0029_low_the_order.sql',
   '0030_unknown_next_avengers.sql',
+  '0031_ordinary_brood.sql',
 ] as const;
 
 export const EXPECTED_MIGRATIONS = MIGRATIONS.length;
