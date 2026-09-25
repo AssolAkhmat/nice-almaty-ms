@@ -32,7 +32,7 @@ export function StartPeriod({ houseId, month }: { houseId: string; month: string
         <p className="text-text-muted text-[13px]">{t('utilities.notStartedHint')}</p>
 
         {state.error !== undefined && (
-          <p className="text-danger text-[13px]" role="alert">
+          <p className="text-danger text-[13px]" data-testid="start-period-error" role="alert">
             {t(state.error)}
           </p>
         )}

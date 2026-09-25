@@ -46,14 +46,19 @@ function codeFor(projectName: string): string {
 async function declareField(page: Page, code: string): Promise<void> {
   await page.goto('/settings/profile-fields');
 
-  const restore = page.getByTestId(`restore-${code}`);
+  /*
+   * Таблица рисует строку дважды: карточками для телефона и таблицей для
+   * широкого экрана. Видимая на этой ширине одна, поэтому берётся первая
+   * из найденных — иначе строгий режим отказывает на двух совпадениях.
+   */
+  const restore = page.getByTestId(`restore-${code}`).first();
 
   if ((await restore.count()) > 0) {
     await restore.click();
     await page.goto('/settings/profile-fields');
   }
 
-  const edit = page.getByTestId(`edit-${code}`);
+  const edit = page.getByTestId(`edit-${code}`).first();
 
   if ((await edit.count()) > 0) {
     return;
@@ -66,7 +71,7 @@ async function declareField(page: Page, code: string): Promise<void> {
 
   await page.getByTestId('create-field-submit').click();
 
-  await expect(page.getByTestId(`edit-${code}`)).toBeVisible();
+  await expect(page.getByTestId(`edit-${code}`).first()).toBeVisible();
 }
 
 test.describe('приёмка фазы 12', () => {
@@ -92,9 +97,9 @@ test.describe('приёмка фазы 12', () => {
 
     /* Архивация: поле уходит из формы, а значение остаётся на экране. */
     await page.goto('/settings/profile-fields');
-    await page.getByTestId(`archive-${code}`).click();
+    await page.getByTestId(`archive-${code}`).first().click();
     await page.getByTestId('archive-field-submit').click();
-    await expect(page.getByTestId(`restore-${code}`)).toBeVisible();
+    await expect(page.getByTestId(`restore-${code}`).first()).toBeVisible();
 
     await page.goto('/profile');
 

@@ -35,19 +35,19 @@ interface Failure {
  * отрицательную длительность.
  */
 function pendingStep(steps: readonly TestStep[]): string | null {
-  for (const step of [...steps].reverse()) {
-    const deeper = pendingStep(step.steps);
+  const unfinished = [...steps].reverse().find((step) => step.duration < 0);
+  const chosen = unfinished ?? steps[steps.length - 1];
 
-    if (deeper !== null) {
-      return deeper;
-    }
-
-    if (step.duration < 0) {
-      return step.titlePath().join(' › ');
-    }
+  if (chosen === undefined) {
+    return null;
   }
 
-  return null;
+  /*
+   * Незавершённый шаг у Playwright помечен отрицательной длительностью.
+   * Если такого нет — берётся последний: для таймаута это и есть место,
+   * где проверка остановилась.
+   */
+  return pendingStep(chosen.steps) ?? chosen.titlePath().join(' › ');
 }
 
 /** Первая содержательная строка ошибки: она называет причину. */

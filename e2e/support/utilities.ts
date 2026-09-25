@@ -18,6 +18,25 @@ export async function openUtilityPeriod(page: Page, month?: string): Promise<voi
 
   if ((await start.count()) > 0) {
     await start.click();
+
+    /*
+     * Период дома один на месяц, а ширин три: пока одна нажимала «завести»,
+     * другая могла успеть первой, и тогда сервер отказывает. Это не поломка
+     * приложения — это гонка приёмок, и разрешается она перечитыванием
+     * экрана: период к этому моменту уже есть.
+     */
+    const form = page.getByTestId('utility-title');
+    const failure = page.getByTestId('start-period-error');
+
+    await page
+      .locator('[data-testid="utility-title"], [data-testid="start-period-error"]')
+      .first()
+      .waitFor({ state: 'attached' })
+      .catch(() => undefined);
+
+    if ((await failure.count()) > 0 && (await form.count()) === 0) {
+      await page.reload();
+    }
   }
 
   /*
