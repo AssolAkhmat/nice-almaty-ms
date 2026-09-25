@@ -94,7 +94,12 @@ export function HouseLayout({
 
       <div className="grid gap-4 md:grid-cols-2">
         {rooms.map((current) => (
-          <Card data-testid="room-card" key={current.areaId}>
+          /*
+           * `min-w-0`: у элемента решётки ширина по содержимому не сжимается,
+           * и карточка комнаты растягивалась до ширины самой длинной строки
+           * места — 408 пикселей при 375.
+           */
+          <Card className="min-w-0" data-testid="room-card" key={current.areaId}>
             <CardHeader>
               <CardTitle>{current.name}</CardTitle>
               <Badge tone="neutral">
@@ -107,14 +112,24 @@ export function HouseLayout({
 
             <ul className="flex flex-col gap-2 p-4 pt-0">
               {current.beds.map((bed) => (
-                <li className="flex items-center justify-between gap-4 text-[13px]" key={bed.bedId}>
-                  <span>
+                /*
+                 * `min-w-0` и перенос по словам: у флекс-элемента ширина
+                 * по содержимому не сжимается, и длинное имя жильца выносило
+                 * строку за экран — 408 пикселей при 375 (приёмка ширины,
+                 * 25 сентября 2026). Цена не сжимается никогда: перенос
+                 * суммы читается как другая сумма.
+                 */
+                <li className="flex items-start justify-between gap-3 text-[13px]" key={bed.bedId}>
+                  <span className="min-w-0 break-words">
                     {bed.label}
                     <span className="text-text-muted ml-2">
                       {bed.occupantName ?? t('beds.free')}
                     </span>
                   </span>
-                  <Money amount={bed.occupantPrice ?? bed.defaultPrice} />
+                  <Money
+                    amount={bed.occupantPrice ?? bed.defaultPrice}
+                    className="shrink-0 whitespace-nowrap"
+                  />
                 </li>
               ))}
             </ul>

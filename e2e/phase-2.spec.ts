@@ -47,7 +47,14 @@ async function buildContract(page: Page, resident: string): Promise<void> {
   const row = page.getByTestId('contract-row').filter({ hasText: resident });
   await row.getByRole('button', { name: 'Собрать договор' }).click();
 
-  await expect(row).toContainText('Открыть договор', { timeout: CONTRACT_BUILD_TIMEOUT });
+  /*
+   * Сборка подтверждается тем, что кнопка стала «Собрать заново»: файл есть.
+   * Ссылки «Открыть договор» у админа нет и не должно быть — чтение готового
+   * договора сеть админу по умолчанию не включает (D28), а сборка остаётся
+   * шагом заселения. Раньше здесь ждали именно ссылку, и приёмка ловила
+   * не поломку, а собственное устаревшее ожидание.
+   */
+  await expect(row).toContainText('Собрать заново', { timeout: CONTRACT_BUILD_TIMEOUT });
 }
 
 async function signContract(page: Page): Promise<void> {

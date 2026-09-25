@@ -11,6 +11,7 @@ import {
   signInAs,
   unique,
 } from './support/onboarding';
+import { openUtilityPeriod } from './support/utilities';
 
 /**
  * Приёмка фазы 3 (docs/07-ROADMAP.md).
@@ -71,7 +72,7 @@ async function issueInvoice(
  * Закрытие дописывает долю в уже выставленный счёт следующего месяца (§4).
  */
 async function closePeriod(page: Page, title: string): Promise<void> {
-  await page.goto(`/utilities?month=${monthStart(0)}`);
+  await openUtilityPeriod(page, monthStart(0));
 
   await page.getByTestId('utility-title').fill(title);
   await page.getByTestId('utility-amount').fill(String(UTILITIES));

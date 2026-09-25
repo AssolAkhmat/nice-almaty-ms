@@ -168,12 +168,53 @@ test.describe('настройка ротаций', () => {
  * и ничего при этом не сохраняет — поэтому сценарий безопасно идёт
  * на всех трёх ширинах сразу, не мешая соседним прогонам.
  */
+/**
+ * Дом 1 в каркасе приёмки идёт без рядов ротаций, и оба сценария ниже
+ * читают то, что появляется только при заведённом ряде: составы, нормы
+ * и предпросмотр. Раньше они молча опирались на ряд, заведённый кем-то
+ * другим, — и падали, когда того ряда не оказывалось.
+ *
+ * День недели у каждой ширины свой: ряд в доме один на день, и три копии
+ * приёмки отбирали бы его друг у друга, как коммунальный период.
+ */
+const WEEKDAY_BY_PROJECT: Readonly<Record<string, string>> = {
+  'mobile-375': '2',
+  'tablet-768': '4',
+  'desktop-1440': '6',
+};
+
+async function ensureRotationRow(page: Page, projectName: string): Promise<void> {
+  const weekday = WEEKDAY_BY_PROJECT[projectName];
+
+  if (weekday === undefined) {
+    throw new Error(`День ряда не задан для ширины ${projectName}`);
+  }
+
+  const existing = page.locator('[data-testid^="day-form-"]');
+
+  if ((await existing.count()) > 0) {
+    return;
+  }
+
+  const form = page.getByTestId('row-form-new');
+  await form.getByTestId('row-name-new').fill(`Приёмка ${weekday}`);
+  await form.getByTestId('row-weekday-new').selectOption(weekday);
+  await form.getByTestId('row-start-new').fill('2026-09-01');
+  await form.getByTestId('row-save-new').click();
+
+  await expect(
+    page.locator('[data-testid^="day-form-"]').first(),
+    'ряд ротаций не появился на экране настройки',
+  ).toBeVisible();
+}
+
 test.describe('составы и нормы дней', () => {
   test.slow();
 
-  test('предпросмотр считается по тому, что стоит в полях', async ({ page }) => {
+  test('предпросмотр считается по тому, что стоит в полях', async ({ page }, testInfo) => {
     await login(page, E2E_ACCOUNTS.adminHouse1);
     await page.goto('/settings/house/rotations');
+    await ensureRotationRow(page, testInfo.project.name);
 
     const card = page.locator('[data-testid^="day-form-"]').first();
     await expect(card).toBeVisible();
@@ -199,9 +240,10 @@ test.describe('составы и нормы дней', () => {
     await expect(days.locator('li')).toHaveCount(4);
   });
 
-  test('места вне рядов и версии названы на экране', async ({ page }) => {
+  test('места вне рядов и версии названы на экране', async ({ page }, testInfo) => {
     await login(page, E2E_ACCOUNTS.adminHouse1);
     await page.goto('/settings/house/rotations');
+    await ensureRotationRow(page, testInfo.project.name);
 
     const main = page.locator('main');
     await expect(main).toContainText('Составы и нормы дней');

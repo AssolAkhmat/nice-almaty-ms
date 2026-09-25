@@ -11,6 +11,7 @@ import {
   signInAs,
   unique,
 } from './support/onboarding';
+import { openUtilityPeriod } from './support/utilities';
 
 /**
  * Приёмка фазы 5 (docs/07-ROADMAP.md).
@@ -193,7 +194,7 @@ test.describe('приёмка фазы 5', () => {
     await expect(page.getByTestId('absence-queue')).toHaveCount(0);
 
     // Коммуналка следующего месяца: доля отсутствовавшего меньше на три дня.
-    await page.goto(`/utilities?month=${nextMonthStart()}`);
+    await openUtilityPeriod(page, nextMonthStart());
     await page.getByTestId('utility-title').fill('Электричество');
     await page.getByTestId('utility-amount').fill(String(UTILITIES));
     await page.getByRole('button', { name: 'Добавить строку' }).click();

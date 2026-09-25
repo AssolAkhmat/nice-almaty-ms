@@ -1,7 +1,8 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import { E2E_ACCOUNTS } from './global-setup';
 import { login } from './support/login';
+import { openUtilityPeriod as openPeriod } from './support/utilities';
 
 /**
  * Экран коммунального периода (T3.7) на трёх ширинах.
@@ -15,17 +16,6 @@ import { login } from './support/login';
  * заводился сам при отрисовке, и приёмки этим пользовались, ничего не нажимая.
  */
 
-/** Открыть месяц и завести период, если его ещё нет. */
-async function openPeriod(page: Page, month?: string): Promise<void> {
-  await page.goto(month === undefined ? '/utilities' : `/utilities?month=${month}`);
-
-  const start = page.getByTestId('start-period');
-
-  if ((await start.count()) > 0) {
-    await start.click();
-    await expect(page.getByTestId('utility-title')).toBeVisible();
-  }
-}
 test.describe('экран коммуналки', () => {
   test('админ видит период своего дома', async ({ page }) => {
     await login(page, E2E_ACCOUNTS.adminHouse1);
