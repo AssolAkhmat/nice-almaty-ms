@@ -35,18 +35,43 @@ export APP_COMMIT
 readonly APP_COMMIT
 
 echo "deploy: коммит ${APP_COMMIT}"
-echo "deploy: сборка ${SERVICES}"
+
+#
+# Собирается и служебный образ: 25 сентября `docker compose run --rm migrate`
+# отчитался «migrations applied successfully» и не применил ничего, потому
+# что образ миграций был собран раньше, чем появился файл миграции. Здоровье
+# это поймало и отказало в подтверждении, но сайт к тому моменту уже
+# пересоздали (разбор I21).
+#
+echo "deploy: сборка ${SERVICES} и migrate"
 
 # shellcheck disable=SC2086
-docker compose build ${SERVICES}
+docker compose build ${SERVICES} migrate
 
 #
 # Миграции — до пересоздания контейнера: приложение, поднятое на отставшей
-# базе, падает при первом обращении к ней. Сборка образа сначала, потому что
+# базе, падает при первом обращении к ней. Сборка образов сначала, потому что
 # упавшая сборка не должна оставлять базу изменённой.
 #
 echo "deploy: миграции"
 docker compose run --rm migrate
+
+#
+# И сверка: «применено успешно» без проверки — то же самое «развёрнуто»,
+# которое означает меньше, чем говорит. Считаем файлы миграций и строки
+# в журнале базы, и при расхождении не трогаем работающий контейнер.
+#
+expected_migrations="$(find src/db/migrations -maxdepth 1 -name '*.sql' | wc -l | tr -d ' ')"
+applied_migrations="$(docker compose exec -T postgres psql -U "${POSTGRES_USER:-nice}" \
+  -d "${POSTGRES_DB:-nice_almaty}" -tAc 'select count(*) from drizzle.__drizzle_migrations')"
+
+echo "deploy: миграций применено ${applied_migrations}, файлов ${expected_migrations}"
+
+if [ "${applied_migrations}" != "${expected_migrations}" ]; then
+  echo "deploy: схема не совпала с файлами миграций — контейнер не пересоздаётся." >&2
+  echo "deploy: работающий сайт остаётся на прежней версии." >&2
+  exit 1
+fi
 
 echo "deploy: запуск"
 # shellcheck disable=SC2086
