@@ -10,6 +10,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
+import { files } from './files';
 import { users } from './users';
 
 export const sexEnum = pgEnum('sex', ['male', 'female']);
@@ -64,7 +65,13 @@ export const residentProfiles = pgTable('resident_profiles', {
   emergencyRelation: text('emergency_relation'),
   preferredPayment: preferredPaymentEnum('preferred_payment'),
   /* Ссылка на файл без внешнего ключа: таблица `files` появляется в T2.6. */
-  photoFileId: uuid('photo_file_id'),
+  /*
+   * Фото 3×4. Внешний ключ обещан был ещё в T2.6 и не поставлен: таблица
+   * `files` тогда появлялась в том же такте. Ставится теперь, вместе с показом
+   * фото в карточке жильца (25 сентября 2026) — висячая ссылка на удалённый
+   * файл давала бы карточку с битым изображением и без объяснения.
+   */
+  photoFileId: uuid('photo_file_id').references(() => files.id),
   noEpilepsy: boolean('no_epilepsy'),
   noAsthma: boolean('no_asthma'),
   healthDeclaredAt: timestamp('health_declared_at', { withTimezone: true }),

@@ -1,0 +1,1 @@
+ALTER TABLE "resident_profiles" ADD CONSTRAINT "resident_profiles_photo_file_id_files_id_fk" FOREIGN KEY ("photo_file_id") REFERENCES "public"."files"("id") ON DELETE no action ON UPDATE no action;
