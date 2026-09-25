@@ -3,6 +3,8 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { EXPECTED_MIGRATIONS, MIGRATIONS } from './migrations-manifest';
+
 const MIGRATIONS_DIR = join(import.meta.dirname, 'migrations');
 
 function readMigration(name: string): string {
@@ -99,5 +101,49 @@ describe('миграции', () => {
     };
 
     expect(journal.entries.map((entry) => `${entry.tag}.sql`).sort()).toEqual(migrationFiles());
+  });
+});
+
+/*
+ * Три списка миграций обязаны совпадать: файлы на диске, журнал `drizzle-kit`
+ * и манифест, по которому приложение решает, отстала ли база.
+ *
+ * 25 сентября 2026 они разошлись: я удалил лишнюю миграцию и запись журнала,
+ * а манифест не перегенерировал. Код стал ждать 31 миграцию, в базе осталось
+ * 30, и защищённая зона легла целиком при зелёном `/api/health` (разбор I21).
+ * Расхождение видно только этой проверкой — ни typecheck, ни тесты его
+ * не замечали.
+ */
+describe('список миграций', () => {
+  const journalEntries = (): string[] => {
+    const journal = JSON.parse(
+      readFileSync(join(MIGRATIONS_DIR, 'meta', '_journal.json'), 'utf8'),
+    ) as { entries: { tag: string }[] };
+
+    return journal.entries.map((entry) => `${entry.tag}.sql`);
+  };
+
+  const sqlFiles = migrationFiles;
+
+  it('манифест совпадает с файлами на диске', () => {
+    expect([...MIGRATIONS].sort()).toEqual(sqlFiles());
+  });
+
+  it('манифест совпадает с журналом drizzle-kit', () => {
+    expect([...MIGRATIONS].sort()).toEqual(journalEntries().sort());
+  });
+
+  it('ожидаемое число миграций равно числу файлов', () => {
+    expect(EXPECTED_MIGRATIONS).toBe(sqlFiles().length);
+  });
+
+  /*
+   * Негативная фикстура: сама сверка обязана ловить лишнее имя в манифесте —
+   * ровно та поломка, которая уронила боевой.
+   */
+  it('сверка ловит лишнюю запись в манифесте', () => {
+    const withExtra = [...MIGRATIONS, '9999_never_generated.sql'].sort();
+
+    expect(withExtra).not.toEqual(sqlFiles());
   });
 });

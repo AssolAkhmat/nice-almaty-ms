@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 import { getPdfRenderer } from '@/adapters/pdf';
 import { getStorageProvider } from '@/adapters/storage';
 import { getDb } from '@/db/client';
+import { appliedMigrations, schemaProblem, EXPECTED_MIGRATIONS } from '@/db/schema-version';
 import { newRequestId, requestLogger } from '@/lib/logger';
 
 import type { PdfHealth } from '@/adapters/pdf';
@@ -23,6 +24,38 @@ async function checkDatabase(): Promise<CheckResult> {
     return {
       status: 'error',
       reason: error instanceof Error ? error.message : 'база данных недоступна',
+    };
+  }
+}
+
+/**
+ * Схема базы против того, что ждёт код (указание владельца, 25 сентября 2026).
+ *
+ * `select 1` отвечал «ок» на лежащем сайте: база жива, а приложение при первом
+ * же обращении к ней падает `SchemaOutdatedError`, потому что применённых
+ * миграций меньше, чем в манифесте. Здоровье, которое не видит того, что
+ * ломает рендер, — пятое утверждение, означающее меньше, чем говорит (I21).
+ *
+ * Числа под рукой: применённые миграции спрашиваются у базы, ожидаемые
+ * лежат в манифесте.
+ */
+async function checkSchema(): Promise<CheckResult & { applied?: number; expected?: number }> {
+  try {
+    const applied = await appliedMigrations();
+    const problem = schemaProblem(applied);
+
+    return problem === null
+      ? { status: 'ok', applied, expected: EXPECTED_MIGRATIONS }
+      : {
+          status: 'error',
+          reason: `схема отстала от кода: ${problem}`,
+          applied,
+          expected: EXPECTED_MIGRATIONS,
+        };
+  } catch (error) {
+    return {
+      status: 'error',
+      reason: error instanceof Error ? error.message : 'версию схемы прочитать не удалось',
     };
   }
 }
@@ -50,14 +83,16 @@ export async function GET(request: Request): Promise<Response> {
 
   const storage = getStorageProvider();
   const pdf = withPdf ? getPdfRenderer() : null;
-  const [database, storageHealth, pdfHealth] = await Promise.all([
+  const [database, schema, storageHealth, pdfHealth] = await Promise.all([
     checkDatabase(),
+    checkSchema(),
     storage.checkHealth(),
     pdf === null ? Promise.resolve(null) : pdf.checkHealth(),
   ]);
 
   const checks = {
     database,
+    schema,
     storage: { ...toCheckResult(storageHealth), driver: storage.driver },
     ...(pdf !== null && pdfHealth !== null
       ? { pdf: { ...toCheckResult(pdfHealth), driver: pdf.driver } }
@@ -66,6 +101,7 @@ export async function GET(request: Request): Promise<Response> {
 
   const isHealthy =
     database.status === 'ok' &&
+    schema.status === 'ok' &&
     checks.storage.status !== 'error' &&
     (pdfHealth === null || pdfHealth.status === 'ok');
 

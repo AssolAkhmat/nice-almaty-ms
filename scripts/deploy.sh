@@ -19,6 +19,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 readonly HEALTH_URL="${HEALTH_URL:-https://nice.aqy.kz/api/health}"
+# Настоящая страница, а не только health: 25 сентября health был зелёным
+# на лежащем сайте, потому что делал `select 1` (разбор I21).
+readonly PAGE_URL="${PAGE_URL:-https://nice.aqy.kz/login}"
 readonly SERVICES="${SERVICES:-app}"
 
 if ! git diff --quiet || ! git diff --cached --quiet; then
@@ -37,6 +40,11 @@ echo "deploy: сборка ${SERVICES}"
 # shellcheck disable=SC2086
 docker compose build ${SERVICES}
 
+#
+# Миграции — до пересоздания контейнера: приложение, поднятое на отставшей
+# базе, падает при первом обращении к ней. Сборка образа сначала, потому что
+# упавшая сборка не должна оставлять базу изменённой.
+#
 echo "deploy: миграции"
 docker compose run --rm migrate
 
@@ -60,6 +68,7 @@ for _ in $(seq 1 30); do
   deployed="$(printf '%s' "${body}" | sed -n 's/.*"commit":"\([^"]*\)".*/\1/p')"
 
   if [ -n "${deployed}" ]; then
+    health_body="${body}"
     break
   fi
 done
@@ -75,4 +84,31 @@ if [ "${deployed}" != "${APP_COMMIT}" ]; then
   exit 1
 fi
 
-echo "deploy: подтверждено, запущен ${deployed}"
+#
+# Здоровье целиком, а не только наличие версии: health знает про схему,
+# и «зелёный health на лежащем сайте» больше не должен быть возможен.
+#
+status="$(printf '%s' "${health_body:-}" | sed -n 's/.*"status":"\([^"]*\)".*/\1/p')"
+
+if [ "${status}" != "ok" ]; then
+  echo "deploy: health отвечает «${status}», а не «ok»:" >&2
+  printf '%s\n' "${health_body:-}" >&2
+  exit 1
+fi
+
+#
+# И настоящая страница: она проверяет, что приложение вообще отдаёт разметку.
+# Расхождение схемы ловится шагом выше — в health: страницы защищённой зоны
+# без сессии отдают перенаправление, и раскладку с её проверкой схемы
+# неавторизованным запросом не достать.
+#
+echo "deploy: проверка страницы ${PAGE_URL}"
+
+page_code="$(curl -s -o /dev/null -w '%{http_code}' "${PAGE_URL}")"
+
+if [ "${page_code}" != "200" ]; then
+  echo "deploy: страница ответила ${page_code}, а не 200 — развёртывание не подтверждено." >&2
+  exit 1
+fi
+
+echo "deploy: подтверждено, запущен ${deployed}, схема и страница в порядке"
