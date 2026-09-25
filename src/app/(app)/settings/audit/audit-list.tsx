@@ -103,7 +103,17 @@ export function AuditList({ rows }: { rows: readonly AuditRow[] }) {
             </div>
 
             {row.before !== null || row.after !== null ? (
-              <div className="border-border mt-3 grid gap-3 border-t pt-3 md:grid-cols-2">
+              /*
+               * Снимки «до» и «после» — сырая запись: значения показаны теми,
+               * какими легли в базу, включая идентификаторы. Подменять их
+               * именами значило бы заставить журнал говорить не то, что
+               * записано, поэтому проверка «ни одного видимого uuid» этот
+               * блок не смотрит — по этой метке.
+               */
+              <div
+                className="border-border mt-3 grid gap-3 border-t pt-3 md:grid-cols-2"
+                data-raw-record="true"
+              >
                 <div>
                   <p className="text-label mb-1">{t('audit.columns.before')}</p>
                   {row.before === null ? (

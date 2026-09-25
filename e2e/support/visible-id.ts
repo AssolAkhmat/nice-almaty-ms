@@ -16,10 +16,25 @@ import { expect, type Page } from '@playwright/test';
  */
 export async function findVisibleIds(page: Page): Promise<string[]> {
   return page.evaluate(() => {
-    const text = document.body.innerText;
+    /*
+     * Сырая запись журнала — исключение, помеченное в разметке
+     * (`data-raw-record`). Журнал аудита показывает снимки «до» и «после»
+     * ровно теми значениями, какими они легли в базу: там идентификатор —
+     * это и есть данные, а не подпись вместо человека. Подменять их именами
+     * значило бы заставить журнал говорить не то, что записано.
+     *
+     * Исключение узкое и объявленное в самой разметке: страница вокруг
+     * снимка проверяется как любая другая.
+     */
+    const copy = document.body.cloneNode(true) as HTMLElement;
+
+    for (const raw of copy.querySelectorAll('[data-raw-record]')) {
+      raw.remove();
+    }
+
     const pattern = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 
-    return [...new Set(text.match(pattern) ?? [])];
+    return [...new Set((copy.innerText || copy.textContent || '').match(pattern) ?? [])];
   });
 }
 

@@ -17,6 +17,12 @@ import type { Reporter, TestCase, TestResult } from '@playwright/test/reporter';
  */
 const MAX_FAILURES = 60;
 
+/**
+ * Длина причины. GitHub обрезает слишком длинную заметку целиком, и одна
+ * причина со списком из тридцати идентификаторов съедала остальные пять.
+ */
+const MAX_CAUSE = 240;
+
 interface Failure {
   cause: string;
   title: string;
@@ -35,7 +41,9 @@ function causeOf(result: TestResult): string {
     .map((line) => line.trim())
     .filter((line) => line !== '');
 
-  return lines[0] ?? 'причина не названа';
+  const first = lines[0] ?? 'причина не названа';
+
+  return first.length > MAX_CAUSE ? `${first.slice(0, MAX_CAUSE)}…` : first;
 }
 
 /** GitHub принимает многострочную заметку только с экранированными переводами. */
