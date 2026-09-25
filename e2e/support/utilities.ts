@@ -14,6 +14,14 @@ import { expect, type Page } from '@playwright/test';
 export async function openUtilityPeriod(page: Page, month?: string): Promise<void> {
   await page.goto(month === undefined ? '/utilities' : `/utilities?month=${month}`);
 
+  await ensurePeriodOnScreen(page);
+}
+
+/**
+ * То же на уже открытом экране: месяц выбран переходом по ссылке, и повторный
+ * `goto` увёл бы приёмку с проверяемого пути.
+ */
+export async function ensurePeriodOnScreen(page: Page): Promise<void> {
   const start = page.getByTestId('start-period');
 
   if ((await start.count()) > 0) {

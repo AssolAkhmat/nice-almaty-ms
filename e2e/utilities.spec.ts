@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import { E2E_ACCOUNTS } from './global-setup';
 import { login } from './support/login';
-import { openUtilityPeriod as openPeriod } from './support/utilities';
+import { ensurePeriodOnScreen, openUtilityPeriod as openPeriod } from './support/utilities';
 
 /**
  * Экран коммунального периода (T3.7) на трёх ширинах.
@@ -78,13 +78,13 @@ test.describe('экран коммуналки', () => {
 
     await months.first().click();
 
-    const start = page.getByTestId('start-period');
+    /*
+     * Заведение периода — общим помощником: своя копия этого шага попадала
+     * в ту же гонку трёх ширин за один период дома и падала на планшете
+     * («expect toBeVisible», 25 сентября 2026).
+     */
+    await ensurePeriodOnScreen(page);
 
-    if ((await start.count()) > 0) {
-      await start.click();
-    }
-
-    await expect(page.getByTestId('utility-title')).toBeVisible();
     await expect(page.getByTestId('close-period')).toBeVisible();
   });
 
