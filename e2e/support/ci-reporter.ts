@@ -64,7 +64,12 @@ function pendingStep(steps: readonly TestStep[]): string | null {
    * Если такого нет — берётся последний: для таймаута это и есть место,
    * где проверка остановилась.
    */
-  return pendingStep(chosen.steps) ?? chosen.titlePath().join(' › ');
+  const place =
+    chosen.location === undefined
+      ? ''
+      : ` (${chosen.location.file.split('/').slice(-2).join('/')}:${String(chosen.location.line)})`;
+
+  return pendingStep(chosen.steps) ?? `${chosen.titlePath().join(' › ')}${place}`;
 }
 
 /** Первая содержательная строка ошибки: она называет причину. */

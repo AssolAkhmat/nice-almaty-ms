@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { E2E_ACCOUNTS, E2E_PASSWORD } from './global-setup';
 import { login } from './support/login';
+import { visible } from './support/table';
 import { signInAs } from './support/onboarding';
 
 /**
@@ -52,17 +53,18 @@ async function declareField(page: Page, code: string): Promise<void> {
 
   /*
    * Таблица рисует строку дважды: карточками для телефона и таблицей для
-   * широкого экрана. Видимая на этой ширине одна, поэтому берётся первая
-   * из найденных — иначе строгий режим отказывает на двух совпадениях.
+   * широкого экрана. Одна из копий скрыта, и `first()` на широком экране
+   * попадал именно в скрытую — нажатие ждало её появления до самого
+   * таймаута. Берём видимую.
    */
-  const restore = page.getByTestId(`restore-${code}`).first();
+  const restore = visible(page, `restore-${code}`);
 
   if ((await restore.count()) > 0) {
     await restore.click();
     await page.goto('/settings/profile-fields');
   }
 
-  const edit = page.getByTestId(`edit-${code}`).first();
+  const edit = visible(page, `edit-${code}`);
 
   if ((await edit.count()) > 0) {
     return;
@@ -75,7 +77,7 @@ async function declareField(page: Page, code: string): Promise<void> {
 
   await page.getByTestId('create-field-submit').click();
 
-  await expect(page.getByTestId(`edit-${code}`).first()).toBeVisible();
+  await expect(visible(page, `edit-${code}`)).toBeVisible();
 }
 
 test.describe('приёмка фазы 12', () => {
@@ -103,9 +105,9 @@ test.describe('приёмка фазы 12', () => {
     /* Архивация: поле уходит из формы, а значение остаётся на экране. */
     await signInAs(page, E2E_ACCOUNTS.superadmin, E2E_PASSWORD);
     await page.goto('/settings/profile-fields');
-    await page.getByTestId(`archive-${code}`).first().click();
+    await visible(page, `archive-${code}`).click();
     await page.getByTestId('archive-field-submit').click();
-    await expect(page.getByTestId(`restore-${code}`).first()).toBeVisible();
+    await expect(visible(page, `restore-${code}`)).toBeVisible();
 
     await signInAs(page, filler, E2E_PASSWORD);
     await page.goto('/profile');
