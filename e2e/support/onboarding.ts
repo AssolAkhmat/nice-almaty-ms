@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
 import { E2E_ACCOUNTS } from '../global-setup';
+import { clearLoginLimits } from './login-limits';
 import { login } from './login';
 
 /**
@@ -32,6 +33,9 @@ export async function signInAs(
   password: string,
   options: { temporary?: boolean } = {},
 ): Promise<void> {
+  /* Счётчики попыток входа — те же, что у `login` (P1-2, 25 сентября 2026). */
+  await clearLoginLimits();
+
   await page.context().clearCookies();
   await page.goto('/login');
   await page.getByTestId('phone').fill(phone);
