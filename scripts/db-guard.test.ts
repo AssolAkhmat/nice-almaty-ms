@@ -367,6 +367,15 @@ function runGuardPrinting(
   delete environment.DATABASE_URL;
   delete environment.DIRECT_DATABASE_URL;
 
+  /*
+   * Переменная, которую проверяем, убирается из унаследованного окружения:
+   * иначе значение оболочки перебивает файл, и проверка «значение из .env
+   * доходит до команды» измеряет не то. Локально она проходила, а в CI
+   * та же переменная задана в `env:` конвейера — и прогон был красным
+   * сутки, пока я смотрел только на локальный `pnpm verify` (25 сентября 2026).
+   */
+  delete environment[variable];
+
   for (const [key, value] of Object.entries(options.shellEnv ?? {})) {
     if (value === undefined) {
       delete environment[key];

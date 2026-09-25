@@ -23,6 +23,7 @@ readonly HEALTH_URL="${HEALTH_URL:-https://nice.aqy.kz/api/health}"
 # на лежащем сайте, потому что делал `select 1` (разбор I21).
 readonly PAGE_URL="${PAGE_URL:-https://nice.aqy.kz/login}"
 readonly SERVICES="${SERVICES:-app}"
+readonly CI_REPO="${CI_REPO:-AssolAkhmat/nice-almaty-ms}"
 
 if ! git diff --quiet || ! git diff --cached --quiet; then
   echo "deploy: в рабочем дереве есть незакоммиченные изменения." >&2
@@ -35,6 +36,40 @@ export APP_COMMIT
 readonly APP_COMMIT
 
 echo "deploy: коммит ${APP_COMMIT}"
+
+#
+# Состояние CI для этого коммита (25 сентября 2026).
+#
+# Сутки конвейер был красным, а я докладывал о зелёных тестах: гонял
+# `pnpm verify` локально и не смотрел на прогон. Локально зелено и в CI
+# зелено — разные утверждения: в CI другое окружение, и тест, зависевший
+# от переменной оболочки, падал только там.
+#
+# «Ещё выполняется» и «прогонов нет» — не повод отказывать: коммит мог
+# быть отправлен только что. Известное падение — повод.
+#
+check_ci() {
+  local body
+  body="$(curl -fsS "https://api.github.com/repos/${CI_REPO}/commits/${APP_COMMIT}/check-runs" \
+    -H 'Accept: application/vnd.github+json' 2>/dev/null || true)"
+
+  if [ -z "${body}" ]; then
+    echo "deploy: состояние CI недоступно — продолжаю"
+    return 0
+  fi
+
+  if printf '%s' "${body}" | grep -q '"conclusion":"failure"'; then
+    echo "deploy: CI для этого коммита красный." >&2
+    echo "deploy: https://github.com/${CI_REPO}/commits/${APP_COMMIT}" >&2
+    echo "deploy: обход — DEPLOY_IGNORE_CI=1" >&2
+
+    [ "${DEPLOY_IGNORE_CI:-0}" = "1" ] || return 1
+  fi
+
+  return 0
+}
+
+check_ci
 
 #
 # Собирается и служебный образ: 25 сентября `docker compose run --rm migrate`
