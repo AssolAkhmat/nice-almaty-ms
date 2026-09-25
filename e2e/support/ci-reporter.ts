@@ -1,4 +1,4 @@
-import type { Reporter, TestCase, TestResult } from '@playwright/test/reporter';
+import type { Reporter, TestCase, TestResult, TestStep } from '@playwright/test/reporter';
 
 /**
  * Докладчик приёмок для CI: все причины в одной заметке.
@@ -26,6 +26,28 @@ const MAX_CAUSE = 240;
 interface Failure {
   cause: string;
   title: string;
+}
+
+/**
+ * Шаг, на котором проверка висела. Таймаут сам по себе называет факт
+ * («не уложилось в 240 секунд»), а не причину; незавершённый шаг называет
+ * причину — что именно ждали. Playwright оставляет у такого шага
+ * отрицательную длительность.
+ */
+function pendingStep(steps: readonly TestStep[]): string | null {
+  for (const step of [...steps].reverse()) {
+    const deeper = pendingStep(step.steps);
+
+    if (deeper !== null) {
+      return deeper;
+    }
+
+    if (step.duration < 0) {
+      return step.titlePath().join(' › ');
+    }
+  }
+
+  return null;
 }
 
 /** Первая содержательная строка ошибки: она называет причину. */
@@ -64,8 +86,10 @@ export default class CompactCiReporter implements Reporter {
       return;
     }
 
+    const pending = pendingStep(result.steps);
+
     this.failures.push({
-      cause: causeOf(result),
+      cause: pending === null ? causeOf(result) : `${causeOf(result)} — ждали: ${pending}`,
       title: `${test.titlePath().slice(1).join(' › ')}`,
     });
   }

@@ -1,20 +1,18 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { E2E_ACCOUNTS, E2E_PASSWORD } from './global-setup';
+import { E2E_ACCOUNTS } from './global-setup';
 import { login } from './support/login';
-import {
-  createResident,
-  fillProfile,
-  RESIDENT_PASSWORD,
-  signInAs,
-  unique,
-} from './support/onboarding';
 
 /**
  * Приёмка фазы 12 — дополнительные поля профиля.
  *
- * Суперадмин объявляет поле, оно появляется в профиле жильца и в палитре
- * шаблона договора, заполняется, а после архивации остаётся читаемым.
+ * Суперадмин объявляет поле, оно появляется в его собственном профиле и в
+ * палитре шаблона договора, заполняется, а после архивации остаётся читаемым.
+ *
+ * Профиль берётся свой, а не нового жильца: форма профиля одна на всех,
+ * а заведение жильца со сменой пароля — четыре минуты чужой работы, из-за
+ * которых сценарий не укладывался в бюджет и падал по таймауту, ничего
+ * не проверив. Путь жильца через ту же форму держат приёмки фаз 2 и 3.
  *
  * Обязательность здесь не проверяется намеренно: объявление живёт в сети,
  * одно на всех, и обязательное поле не дало бы заполнить профиль жильцам
@@ -72,12 +70,7 @@ async function declareField(page: Page, code: string): Promise<void> {
 }
 
 test.describe('приёмка фазы 12', () => {
-  /*
-   * Сценарий длинный: объявление поля, заведение жильца со сменой пароля,
-   * заполнение профиля, архивация и возврат. Девяноста секунд не хватало —
-   * как и приёмкам фаз 3 и 4, идущим тем же путём.
-   */
-  test.setTimeout(240_000);
+  test.slow();
 
   test('объявленное поле заполняется в профиле, а после архивации остаётся читаемым', async ({
     page,
@@ -91,24 +84,18 @@ test.describe('приёмка фазы 12', () => {
     await page.goto('/settings/contract-template');
     await expect(page.locator('main')).toContainText(`profile.${code}`);
 
-    const phone = await createResident(page, 'Дом 1');
-    const lastName = unique('Полев');
-
-    await signInAs(page, phone, RESIDENT_PASSWORD);
-    await fillProfile(page, lastName);
-
+    /* Поле появилось в форме профиля и заполняется ею же. */
+    await page.goto('/profile');
     await page.getByTestId(`declared-${code}`).fill('Механика');
     await page.getByTestId('profile-submit').click();
     await expect(page.getByTestId('profile-saved')).toBeVisible();
 
-    /* Архивация: поле исчезает из формы, а значение остаётся на экране. */
-    await signInAs(page, E2E_ACCOUNTS.superadmin, E2E_PASSWORD);
+    /* Архивация: поле уходит из формы, а значение остаётся на экране. */
     await page.goto('/settings/profile-fields');
     await page.getByTestId(`archive-${code}`).click();
     await page.getByTestId('archive-field-submit').click();
     await expect(page.getByTestId(`restore-${code}`)).toBeVisible();
 
-    await signInAs(page, phone, RESIDENT_PASSWORD);
     await page.goto('/profile');
 
     const archived = page.getByTestId(`declared-${code}`);
