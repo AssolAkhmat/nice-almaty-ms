@@ -70,6 +70,19 @@ PostgreSQL 16. Все таблицы: `id uuid pk default gen_random_uuid()`, `c
 `issue_date date null`, `valid_from date`, `valid_until date null`,
 `status enum(uploaded, approved, rejected)`, `reject_reason`, `reviewed_by`, `reviewed_at`.
 
+**profile_field_defs** — `org_id`, `code`, `name_i18n jsonb`,
+`type enum(text, number, date, boolean, choice)`, `is_required bool`, `options jsonb`
+(варианты выбора; у прочих типов пусто), `sort_order`, `archived_at`. Объявляет
+суперадмин; код уникален в сети, архивацией не освобождается и служит хвостом
+токена договора `profile.<код>` (D31).
+
+**profile_field_values** — `org_id`, `user_id`, `field_id`, `value text`.
+Значение в единой записи на тип: число без пробелов, дата `ГГГГ-ММ-ДД`,
+да/нет `true`/`false`, выбор — код варианта, строка — как введена. Соответствие
+значения объявлению и запрет записи в архивированное поле проверяет триггер
+`profile_field_values_match_def`; принадлежность сети — составные ключи
+`(field_id, org_id)` и `(user_id, org_id)`.
+
 **contract_templates** — `org_id`, `name`, `version int`, `body_html`,
 `tokens jsonb` (список доступных подстановок), `is_active bool`.
 

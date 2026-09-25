@@ -37,6 +37,12 @@ export const users = pgTable(
   },
   (table) => [
     uniqueIndex('users_phone_unique').on(table.phone),
+    /*
+     * Опора для составного внешнего ключа `(user_id, org_id)` из значений
+     * дополнительных полей профиля: он даёт базе право отвергнуть значение,
+     * приписанное человеку чужой сети, не полагаясь на фильтр в сервисе.
+     */
+    uniqueIndex('users_id_org_unique').on(table.id, table.orgId),
     /* Один админ — один дом; у суперадмина и жильца дома в учётной записи нет. */
     check(
       'users_admin_has_house',

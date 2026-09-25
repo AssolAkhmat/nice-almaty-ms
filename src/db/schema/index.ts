@@ -16,6 +16,7 @@ export * from './job-runs';
 export * from './notifications';
 export * from './organizations';
 export * from './permission-overrides';
+export * from './profile-fields';
 export * from './rate-limits';
 export * from './rating';
 export * from './residencies';
