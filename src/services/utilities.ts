@@ -4,6 +4,7 @@ import { listApprovedAbsences } from '@/db/repositories/rating';
 import { listMonthStaysInHouse, listResidencies } from '@/db/repositories/residencies';
 import {
   addUtilityLine,
+  listClosedReceipts,
   createUtilityPeriod,
   deleteUtilityLine,
   findUtilityLine,
@@ -641,6 +642,25 @@ export async function listPeriodsOfHouse(
   assertCan(actor.context, 'utility.read', { houseId });
 
   return listUtilityPeriods(actor.context, { houseId }, executor);
+}
+
+/**
+ * Чеки закрытых периодов месяца для жильца (указание владельца,
+ * 25 сентября 2026).
+ *
+ * В счёте у жильца есть строка коммуналки, а приложенный админом чек ему
+ * был недоступен. Чек — это расход дома, а не данные других жильцов,
+ * поэтому он показывается: у закрытого периода того дома, где жилец жил.
+ * У открытого периода чеков не отдаём — расчёт там ещё меняется.
+ */
+export async function listUtilityReceiptsFor(
+  actor: UserActor,
+  target: { userId: string; month: BusinessDate },
+  deps: UtilityDeps = {},
+): Promise<{ fileId: string; title: string }[]> {
+  const { executor } = resolve(deps);
+
+  return listClosedReceipts(actor.context, target.userId, startOfMonth(target.month), executor);
 }
 
 /** Первое число месяца, к которому относится дата: для экрана периода. */

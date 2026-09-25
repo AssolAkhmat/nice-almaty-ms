@@ -6,8 +6,15 @@ import { listHouses } from '@/db/repositories/houses';
 import { listResidencies } from '@/db/repositories/residencies';
 import { EmptyState } from '@/components/ui/empty-state';
 import { getCurrentSession } from '@/lib/session';
-import { startOfMonth, todayInAlmaty, tryParseBusinessDate } from '@/lib/time';
+import {
+  addMonths,
+  parseBusinessDate,
+  startOfMonth,
+  todayInAlmaty,
+  tryParseBusinessDate,
+} from '@/lib/time';
 import { listInvoicesFor, readInvoice } from '@/services/invoices';
+import { listUtilityReceiptsFor } from '@/services/utilities';
 import { readProfile } from '@/services/resident-profiles';
 import { houseHistoryNames } from '@/services/residents';
 
@@ -62,6 +69,19 @@ export default async function InvoicesPage({
       rows.map(async (row) => {
         const view = await readInvoice(actor, row.invoice.id);
 
+        /*
+         * Чеки коммуналки за месяц, к которому относится строка счёта
+         * (указание владельца, 25 сентября 2026). Коммуналка идёт за
+         * предыдущий месяц (§3), и чеки берутся у закрытого периода дома.
+         */
+        const receipts =
+          view.invoice.periodMonth === null
+            ? []
+            : await listUtilityReceiptsFor(actor, {
+                userId: context.userId,
+                month: addMonths(parseBusinessDate(view.invoice.periodMonth), -1),
+              });
+
         return {
           id: view.invoice.id,
           type: view.invoice.type,
@@ -78,6 +98,7 @@ export default async function InvoicesPage({
             kind: line.kind,
             title: line.title,
             amount: line.amount,
+            ...(line.kind === 'utilities' ? { receipts } : {}),
           })),
           payments: view.payments.map((payment) => ({
             id: payment.id,

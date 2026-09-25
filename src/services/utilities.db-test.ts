@@ -7,6 +7,8 @@ import * as schema from '@/db/schema';
 import { seedChartOfAccounts } from '@/db/testing/chart-of-accounts';
 import { testDatabaseUrl } from '@/db/testing/database-url';
 import { ConflictError, ForbiddenError, NotFoundError } from '@/lib/errors';
+
+import { grantFileView } from './files';
 import { parseBusinessDate, parseInstant } from '@/lib/time';
 
 import { createInvoice, readInvoice } from './invoices';
@@ -14,6 +16,7 @@ import { generateMonthlyInvoices } from './monthly-invoices';
 import {
   addPeriodLine,
   closeUtilityPeriod,
+  listUtilityReceiptsFor,
   findPeriodOfMonth,
   listPeriodsOfHouse,
   openUtilityPeriod,
@@ -172,6 +175,8 @@ async function seed(tx: Transaction, suffix: string, moveIns: readonly string[] 
     admin: actor(context('admin', adminUser?.id ?? '', houseId)),
     adminOfB: actor(context('admin', adminUser?.id ?? '', houseB?.id ?? '')),
     resident: actor(context('resident', residents[0]?.userId ?? '', null)),
+    /* Жилец без проживания в этом доме: чек дома ему не положен. */
+    foreignResident: actor(context('resident', superUser?.id ?? '', null)),
   };
 }
 
@@ -641,6 +646,98 @@ describe('история по дому', () => {
 
       await expect(
         readUtilityHistory(fixture.adminOfB, fixture.houseA, { executor: tx }),
+      ).rejects.toBeInstanceOf(NotFoundError);
+    });
+  });
+});
+
+/*
+ * Чек коммуналки жильцу (указание владельца, 25 сентября 2026): в счёте
+ * есть строка, пусть будет видно и основание. Граница: только закрытый
+ * период и только свой дом.
+ */
+describe('чек коммуналки у жильца', () => {
+  async function periodWithReceipt(tx: Transaction, tag: string) {
+    const fixture = await seed(tx, tag);
+
+    const [file] = await tx
+      .insert(schema.files)
+      .values({
+        orgId: fixture.orgId,
+        houseId: fixture.houseA,
+        provider: 'local',
+        path: `utl-${tag}/чек`,
+        mime: 'image/jpeg',
+        sizeBytes: 1024,
+        originalName: 'свет.jpg',
+        status: 'ready',
+        uploadedBy: fixture.admin.context.userId,
+        scope: { purpose: 'utility-receipt' },
+      })
+      .returning();
+
+    const fileId = file?.id ?? '';
+
+    const period = await openUtilityPeriod(fixture.admin, fixture.houseA, OCTOBER, {
+      executor: tx,
+    });
+
+    await addPeriodLine(
+      fixture.admin,
+      period.id,
+      { title: 'Свет', amount: 30_000, receiptFileId: fileId },
+      { executor: tx },
+    );
+
+    return { fixture, fileId, periodId: period.id };
+  }
+
+  it('у открытого периода чек жильцу не отдаётся: расчёт ещё меняется', async () => {
+    await inRollback(async (tx) => {
+      const { fixture, fileId } = await periodWithReceipt(tx, '9960');
+
+      await expect(
+        grantFileView(fixture.resident, fileId, 'inline', { executor: tx }),
+      ).rejects.toBeInstanceOf(NotFoundError);
+    });
+  });
+
+  it('у закрытого периода своего дома чек открывается', async () => {
+    await inRollback(async (tx) => {
+      const { fixture, fileId, periodId } = await periodWithReceipt(tx, '9961');
+
+      await closeUtilityPeriod(fixture.admin, periodId, {
+        executor: tx,
+        today: IN_NOVEMBER,
+        instant: INSTANT,
+      });
+
+      const grant = await grantFileView(fixture.resident, fileId, 'inline', { executor: tx });
+
+      expect(grant).toContain('inline');
+
+      const receipts = await listUtilityReceiptsFor(
+        fixture.resident,
+        { userId: fixture.resident.context.userId, month: OCTOBER },
+        { executor: tx },
+      );
+
+      expect(receipts).toEqual([{ fileId, title: 'Свет' }]);
+    });
+  });
+
+  it('жильцу чужого дома чек не отдаётся', async () => {
+    await inRollback(async (tx) => {
+      const { fixture, fileId, periodId } = await periodWithReceipt(tx, '9962');
+
+      await closeUtilityPeriod(fixture.admin, periodId, {
+        executor: tx,
+        today: IN_NOVEMBER,
+        instant: INSTANT,
+      });
+
+      await expect(
+        grantFileView(fixture.foreignResident, fileId, 'inline', { executor: tx }),
       ).rejects.toBeInstanceOf(NotFoundError);
     });
   });

@@ -86,6 +86,33 @@ export async function findFile(
   return file ?? null;
 }
 
+/**
+ * Файл по идентификатору в пределах сети, без фильтра видимости.
+ *
+ * Нужен двум путям отдачи содержимого, где решение принимает
+ * `assertFileAccess`: он и так проверяет проживание, дом и полномочия,
+ * а фильтр видимости здесь повторял ту же проверку — и повторял неточно.
+ * Из-за этого чек дома не доставался жильцу, которому он положен
+ * (указание владельца, 25 сентября 2026): запрос не находил файл раньше,
+ * чем кто-либо успевал разрешить доступ.
+ *
+ * Отказ наружу по-прежнему «не найдено»: `assertFileAccess` для чужого
+ * файла отвечает 404, и перебором идентификаторов состав сети не узнать.
+ */
+export async function findFileInOrg(
+  context: AccessContext,
+  fileId: string,
+  executor: Executor = getDb(),
+): Promise<FileRecord | null> {
+  const [file] = await executor
+    .select()
+    .from(files)
+    .where(and(eq(files.orgId, context.orgId), eq(files.id, fileId)))
+    .limit(1);
+
+  return file ?? null;
+}
+
 export async function requireFile(
   context: AccessContext,
   fileId: string,

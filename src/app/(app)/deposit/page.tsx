@@ -52,6 +52,7 @@ async function viewFor(
       note: transaction.note,
       createdAt: transaction.createdAt.toISOString(),
       participants: view.participantsOf[transaction.id] ?? null,
+      receiptFileId: view.receiptOf[transaction.id] ?? null,
     })),
     invoice:
       view.invoice === null

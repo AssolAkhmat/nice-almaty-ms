@@ -1,6 +1,7 @@
 import { getStorageProvider } from '@/adapters/storage';
 import { getDb, type Executor } from '@/db/client';
-import { createFile, requireFile, updateFile } from '@/db/repositories/files';
+import { createFile, findFileInOrg, requireFile, updateFile } from '@/db/repositories/files';
+import { receiptVisibleToResident } from '@/db/repositories/receipts';
 import { listAssignmentsById, requireOccurrence } from '@/db/repositories/rotations';
 import { requireHouse, requireHouseOfResidency } from '@/db/repositories/houses';
 import { listResidencies, requireResidency } from '@/db/repositories/residencies';
@@ -107,6 +108,7 @@ async function assertFileAccess(
   owner: { residencyId: string | null; houseId: string | null },
   executor: Executor,
   gate?: Action,
+  fileId?: string,
 ): Promise<void> {
   if (owner.residencyId !== null) {
     const residency = await requireResidency(actor.context, owner.residencyId, executor);
@@ -140,6 +142,26 @@ async function assertFileAccess(
     assertCan(actor.context, action);
 
     return;
+  }
+
+  /*
+   * Чек дома жильцу (указание владельца, 25 сентября 2026). В депозите он
+   * видит списание за ущерб, в счёте — строку коммуналки, а основание ему
+   * было недоступно: это расходы дома, а не данные других жильцов.
+   *
+   * Правило узкое и сидит в данных, а не в роли: чек ущерба — только при
+   * своей доле, чек коммуналки — только у закрытого периода своего дома.
+   * Чек расхода сети сюда не относится вовсе.
+   */
+  if (actor.context.role === 'resident' && action === 'file.read') {
+    const receipt =
+      fileId === undefined
+        ? { kind: 'none' as const }
+        : await receiptVisibleToResident(fileId, actor.context.userId, executor);
+
+    if (receipt.kind !== 'none' && receipt.visible) {
+      return;
+    }
   }
 
   assertCan(actor.context, action, { houseId: owner.houseId });
@@ -576,8 +598,13 @@ export async function readFileContent(
 ): Promise<FileContent> {
   const { executor, storage } = resolve(deps);
 
-  const file = await requireFile(actor.context, fileId, executor);
-  await assertFileAccess(actor, 'file.read', file, executor, documentGateOf(file));
+  const file = await findFileInOrg(actor.context, fileId, executor);
+
+  if (file === null) {
+    throw new NotFoundError('Файл не найден');
+  }
+
+  await assertFileAccess(actor, 'file.read', file, executor, documentGateOf(file), file.id);
 
   // Незавершённая загрузка содержимым не является.
   if (file.status !== 'ready') {
@@ -639,8 +666,13 @@ export async function grantFileView(
 ): Promise<string> {
   const { executor } = resolve(deps);
 
-  const file = await requireFile(actor.context, fileId, executor);
-  await assertFileAccess(actor, 'file.read', file, executor, documentGateOf(file));
+  const file = await findFileInOrg(actor.context, fileId, executor);
+
+  if (file === null) {
+    throw new NotFoundError('Файл не найден');
+  }
+
+  await assertFileAccess(actor, 'file.read', file, executor, documentGateOf(file), file.id);
 
   if (file.status !== 'ready') {
     throw new NotFoundError('Файл не найден');

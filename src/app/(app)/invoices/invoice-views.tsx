@@ -1,5 +1,6 @@
 'use client';
 
+import { FileLinks } from '@/components/files/file-links';
 import { AppLink } from '@/components/ui/app-link';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useActionState, useState } from 'react';
@@ -26,6 +27,11 @@ export interface InvoiceLineView {
   kind: string;
   title: string;
   amount: number;
+  /**
+   * Чеки, объясняющие строку: у коммуналки — чеки закрытого периода дома
+   * (указание владельца, 25 сентября 2026). Жильцу видно, за что платит.
+   */
+  receipts?: readonly { fileId: string; title: string }[];
 }
 
 export interface PaymentView {
@@ -124,9 +130,15 @@ export function InvoiceCard({ invoice }: { invoice: InvoiceCardView }) {
 
         <ul className="flex flex-col gap-1">
           {invoice.lines.map((line) => (
-            <li className="flex items-center justify-between gap-4" key={line.id}>
-              <span>{line.title}</span>
-              <Money amount={line.amount} />
+            <li className="flex flex-col gap-1" key={line.id}>
+              <span className="flex items-center justify-between gap-4">
+                <span>{line.title}</span>
+                <Money amount={line.amount} />
+              </span>
+
+              {(line.receipts ?? []).map((receipt) => (
+                <FileLinks fileId={receipt.fileId} key={receipt.fileId} label={receipt.title} />
+              ))}
             </li>
           ))}
         </ul>

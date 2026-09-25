@@ -3,6 +3,7 @@
 import { useFormatter, useTranslations } from 'next-intl';
 import { useActionState } from 'react';
 
+import { FileLinks } from '@/components/files/file-links';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,6 +22,8 @@ export interface DepositMovementView {
   createdAt: string;
   /** Сколько человек делили ущерб; у остальных движений пусто (§8). */
   participants: number | null;
+  /** Чек ущерба: жилец видит списание — видит и основание (25 сентября 2026). */
+  receiptFileId: string | null;
 }
 
 export interface DepositInvoiceView {
@@ -71,7 +74,12 @@ function Movements({ movements }: { movements: readonly DepositMovementView[] })
               </span>
             )}
           </span>
-          <Money amount={movement.amount} />
+          <span className="flex items-center gap-3">
+            {movement.receiptFileId !== null && (
+              <FileLinks fileId={movement.receiptFileId} label={t('files.receipt')} />
+            )}
+            <Money amount={movement.amount} />
+          </span>
         </li>
       ))}
     </ul>

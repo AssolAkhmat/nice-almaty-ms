@@ -8,7 +8,7 @@ import {
   listInvoices,
   listPayments,
 } from '@/db/repositories/invoices';
-import { countDamageShares } from '@/db/repositories/damages';
+import { countDamageShares, listDamageReceipts } from '@/db/repositories/damages';
 import { requireResidency, updateResidency } from '@/db/repositories/residencies';
 import { depositBalance, remainingToPay } from '@/domain/invoice';
 import { assertCan } from '@/lib/authz';
@@ -56,6 +56,12 @@ export interface DepositView {
    * Только для списаний и сторно ущерба; у остальных движений ключа нет.
    */
   participantsOf: Record<string, number>;
+  /**
+   * Чек ущерба по идентификатору движения (указание владельца,
+   * 25 сентября 2026). Жилец видит списание — пусть видит и основание:
+   * это расход дома, а не данные других жильцов.
+   */
+  receiptOf: Record<string, string>;
   invoice: (Invoice & { paid: number; remaining: number; lines: InvoiceLine[] }) | null;
 }
 
@@ -76,6 +82,33 @@ async function participantsOf(
 
     if (count !== undefined) {
       result[transaction.id] = count;
+    }
+  }
+
+  return result;
+}
+
+/** Чек по каждому движению, порождённому ущербом. */
+async function receiptsOf(
+  transactions: readonly DepositTransaction[],
+  executor: Executor,
+): Promise<Record<string, string>> {
+  const damageIds = [
+    ...new Set(
+      transactions
+        .filter((transaction) => transaction.refType === 'damage' && transaction.refId !== null)
+        .map((transaction) => transaction.refId ?? ''),
+    ),
+  ];
+
+  const receipts = await listDamageReceipts(damageIds, executor);
+  const result: Record<string, string> = {};
+
+  for (const transaction of transactions) {
+    const fileId = transaction.refId === null ? undefined : receipts.get(transaction.refId);
+
+    if (fileId !== undefined) {
+      result[transaction.id] = fileId;
     }
   }
 
@@ -332,6 +365,7 @@ export async function readDepositView(
       ),
       transactions,
       participantsOf: await participantsOf(transactions, executor),
+      receiptOf: await receiptsOf(transactions, executor),
       invoice: null,
     };
   }
@@ -349,6 +383,7 @@ export async function readDepositView(
     balance: depositBalance(allTransactions.map((transaction) => transaction.amount)),
     transactions,
     participantsOf: await participantsOf(transactions, executor),
+    receiptOf: await receiptsOf(transactions, executor),
     invoice: { ...invoice, paid, remaining: remainingToPay(invoice.total, paid), lines },
   };
 }

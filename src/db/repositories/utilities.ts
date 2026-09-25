@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 
 import { NotFoundError } from '@/lib/errors';
 import { now, type BusinessDate } from '@/lib/time';
@@ -7,6 +7,7 @@ import { assertHouseVisible, visibleHouseIds, type AccessContext } from '../acce
 import { getDb, type Executor } from '../client';
 import {
   houses,
+  residencies,
   utilityAllocations,
   utilityLines,
   utilityPeriods,
@@ -339,6 +340,49 @@ export async function listClosedAllocationsOfMonth(
     .orderBy(asc(houses.name), asc(utilityPeriods.houseId), asc(utilityAllocations.id));
 
   return rows;
+}
+
+/**
+ * Чеки строк закрытого периода за месяц — в домах, где жил этот человек.
+ *
+ * Видимость выведена из проживания, а не из роли: жильцу показываются чеки
+ * его дома за закрытый месяц, и только они (решение по указанию владельца
+ * 25 сентября 2026).
+ */
+export async function listClosedReceipts(
+  context: AccessContext,
+  userId: string,
+  month: BusinessDate,
+  executor: Executor = getDb(),
+): Promise<{ fileId: string; title: string }[]> {
+  const houses = executor
+    .select({ id: residencies.houseId })
+    .from(residencies)
+    .where(and(eq(residencies.orgId, context.orgId), eq(residencies.userId, userId)));
+
+  const rows = await executor
+    .select({ fileId: utilityLines.receiptFileId, title: utilityLines.title })
+    .from(utilityLines)
+    .innerJoin(utilityPeriods, eq(utilityPeriods.id, utilityLines.periodId))
+    .where(
+      and(
+        /*
+         * Область здесь — дома самого жильца, а не область роли: у жильца
+         * домов в контексте нет вовсе (D11), и `periodScope` отдал бы пусто.
+         * Сеть проверяется отдельно, чтобы чужая организация не просочилась.
+         */
+        eq(utilityPeriods.orgId, context.orgId),
+        eq(utilityPeriods.month, month),
+        eq(utilityPeriods.status, 'closed'),
+        inArray(utilityPeriods.houseId, houses),
+        isNotNull(utilityLines.receiptFileId),
+      ),
+    )
+    .orderBy(asc(utilityLines.title), asc(utilityLines.id));
+
+  return rows
+    .filter((row): row is { fileId: string; title: string } => row.fileId !== null)
+    .map((row) => ({ fileId: row.fileId, title: row.title }));
 }
 
 export async function saveUtilityAllocations(

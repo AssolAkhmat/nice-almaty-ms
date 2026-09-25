@@ -122,6 +122,31 @@ export async function addDamageShares(
  * ему не только сумму списания, но и с кем она разделена — иначе доля
  * выглядела бы взятой с потолка.
  */
+/**
+ * Чеки по ущербам: идентификатор ущерба — идентификатор файла.
+ * Нужно депозиту: жилец видит списание и должен видеть основание
+ * (указание владельца, 25 сентября 2026).
+ */
+export async function listDamageReceipts(
+  damageIds: readonly string[],
+  executor: Executor = getDb(),
+): Promise<Map<string, string>> {
+  if (damageIds.length === 0) {
+    return new Map();
+  }
+
+  const rows = await executor
+    .select({ id: damages.id, receiptFileId: damages.receiptFileId })
+    .from(damages)
+    .where(inArray(damages.id, [...damageIds]));
+
+  return new Map(
+    rows
+      .filter((row): row is { id: string; receiptFileId: string } => row.receiptFileId !== null)
+      .map((row) => [row.id, row.receiptFileId]),
+  );
+}
+
 export async function countDamageShares(
   damageIds: readonly string[],
   executor: Executor = getDb(),

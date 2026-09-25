@@ -10,6 +10,7 @@ import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '@
 import { parseBusinessDate, parseInstant } from '@/lib/time';
 
 import { createDamage, listHouseDamages, previewDamage, reverseDamage } from './damages';
+import { grantFileView } from './files';
 import { readDepositView } from './deposits';
 import { createRefundInvoice, terminateResidency } from './terminations';
 
@@ -180,6 +181,26 @@ async function seed(tx: Transaction, suffix: string, count = 4) {
     admin: actor(context('admin', adminUser?.id ?? '', houseAId)),
     adminOfB: actor(context('admin', adminUser?.id ?? '', houseB?.id ?? '')),
     resident: actor(context('resident', residents[0]?.userId ?? '', null)),
+    otherResident: actor(context('resident', residents[1]?.userId ?? '', null)),
+    receiptFile: async (suffixTag: string) => {
+      const [file] = await tx
+        .insert(schema.files)
+        .values({
+          orgId,
+          houseId: houseAId,
+          provider: 'local',
+          path: `dmg-${suffix}/${suffixTag}`,
+          mime: 'image/jpeg',
+          sizeBytes: 1024,
+          originalName: 'чек.jpg',
+          status: 'ready',
+          uploadedBy: adminUser?.id ?? '',
+          scope: { purpose: 'damage-receipt' },
+        })
+        .returning();
+
+      return file?.id ?? '';
+    },
   };
 }
 
@@ -523,6 +544,55 @@ describe('жилец видит списание в движении депоз�
 
       expect(movement?.note).toBe('Ручка в туалете');
       expect(view.participantsOf[movement?.id ?? '']).toBe(4);
+    });
+  });
+});
+
+/*
+ * Чек ущерба жильцу (указание владельца, 25 сентября 2026). Жилец видит
+ * списание депозита — значит должен видеть и основание: это расход дома,
+ * а не данные других жильцов. Граница: своя доля, и ничего больше.
+ */
+describe('чек ущерба у жильца', () => {
+  async function damageWithReceipt(tx: Transaction, tag: string) {
+    const fixture = await seed(tx, tag, 4);
+    const fileId = await fixture.receiptFile(tag);
+
+    const result = await createDamage(
+      fixture.admin,
+      {
+        houseId: fixture.houseA,
+        title: 'Разбито стекло',
+        amount: 30_000,
+        splitMode: 'all',
+        receiptFileId: fileId,
+      },
+      { executor: tx, today: TODAY },
+    );
+
+    return { fixture, fileId, damageId: result.damage.id };
+  }
+
+  it('жилец со своей долей чек открывает', async () => {
+    await inRollback(async (tx) => {
+      const { fixture, fileId } = await damageWithReceipt(tx, '6301');
+
+      /* Пропуск на просмотр выдаётся ровно тем, кому файл отдадут. */
+      const grant = await grantFileView(fixture.resident, fileId, 'inline', { executor: tx });
+
+      expect(grant).toContain('inline');
+    });
+  });
+
+  it('жилец без доли в этом ущербе чек не открывает', async () => {
+    await inRollback(async (tx) => {
+      const { fixture, fileId, damageId } = await damageWithReceipt(tx, '6302');
+
+      await tx.delete(schema.damageShares).where(eq(schema.damageShares.damageId, damageId));
+
+      await expect(
+        grantFileView(fixture.resident, fileId, 'inline', { executor: tx }),
+      ).rejects.toBeInstanceOf(NotFoundError);
     });
   });
 });
