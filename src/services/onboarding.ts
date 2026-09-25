@@ -1,9 +1,11 @@
 import { getDb, type Executor } from '@/db/client';
 import { findPlacementOfResidency } from '@/db/repositories/areas';
 import { listDocuments, listDocumentTypes } from '@/db/repositories/documents';
+import { listFieldDefs, listFieldValues } from '@/db/repositories/profile-fields';
 import { listResidencies } from '@/db/repositories/residencies';
 import { findProfile } from '@/db/repositories/resident-profiles';
 import { documentValidity } from '@/domain/documents';
+import { missingRequiredFields } from '@/domain/profile-fields';
 import { accessScopeOf, type ResidencyAccessScope } from '@/lib/residency-access';
 import { parseBusinessDate, todayInAlmaty, type BusinessDate } from '@/lib/time';
 
@@ -97,12 +99,34 @@ export async function readOnboarding(
     };
   }
 
-  const [profile, placement, types, documents] = await Promise.all([
+  const [profile, placement, types, documents, declaredDefs, declaredValues] = await Promise.all([
     findProfile(actor.context, residency.userId, executor),
     findPlacementOfResidency(actor.context, residency.id, executor),
     listDocumentTypes(actor.context, {}, executor),
     listDocuments(actor.context, { residencyId: residency.id }, executor),
+    /*
+     * Объявленные сетью поля тоже часть профиля (T12.2): пока обязательное
+     * поле пусто, шаг «профиль» не закрыт. Иначе мастер показывал бы зелёный
+     * шаг там, где сохранение отказывает.
+     */
+    listFieldDefs(actor.context, {}, executor),
+    listFieldValues(actor.context, residency.userId, executor),
   ]);
+
+  const declaredMissing = missingRequiredFields(
+    declaredDefs.map((def) => ({
+      code: def.code,
+      isRequired: def.isRequired,
+      options: def.options as string[],
+      type: def.type,
+    })),
+    Object.fromEntries(
+      declaredDefs.map((def) => [
+        def.code,
+        declaredValues.find((row) => row.fieldId === def.id)?.value ?? null,
+      ]),
+    ),
+  );
 
   const approved = new Set(
     documents
@@ -121,7 +145,7 @@ export async function readOnboarding(
     requiredTypes.length > 0 && requiredTypes.every((type) => approved.has(type.id));
 
   const done: Readonly<Record<OnboardingStepKey, boolean>> = {
-    profile: isProfileComplete(profile),
+    profile: isProfileComplete(profile) && declaredMissing.length === 0,
     bed: placement !== null,
     contract: residency.contractSignedAt !== null,
     documents: documentsDone,

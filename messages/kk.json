@@ -213,7 +213,9 @@
       "setting": "Баптау",
       "temporary_resident": "Уақытша тұрғын",
       "user": "Есептік жазба",
-      "utility_period": "Коммуналдық кезең"
+      "utility_period": "Коммуналдық кезең",
+      "profile_field_def": "профильдің қосымша өрісі",
+      "profile_field_value": "қосымша өрістің мәні"
     }
   },
   "auth": {
@@ -1214,7 +1216,8 @@
       "documents": "Құжаттар",
       "study": "Оқу",
       "emergency": "Шұғыл байланыс",
-      "other": "Басқа"
+      "other": "Басқа",
+      "declared": "Қосымша өрістер"
     },
     "placement": {
       "title": "Бөлме және орын",
@@ -1266,7 +1269,30 @@
       "rate_limited": "Тым жиі",
       "internal": "Бірдеңе дұрыс болмады"
     },
-    "replace": "Түзету"
+    "replace": "Түзету",
+    "declared": {
+      "archived": "өріс мұрағатталған",
+      "no": "жоқ",
+      "yes": "иә"
+    },
+    "fieldErrors": {
+      "profileFieldArchived": "«{field}» өрісі мұрағатталған: жаңа мән қабылданбайды",
+      "profileFieldCodeInvalid": "Өріс коды — кіші латын әріптері, цифрлар және астыңғы сызық",
+      "profileFieldCodeTaken": "«{code}» коды бос емес, мұрағатталған өрісті қоса",
+      "profileFieldNameRequired": "Атауы желінің барлық тілінде қажет",
+      "profileFieldNeedsMark": "«{field}» өрісі міндетті: белгі қажет",
+      "profileFieldNoSuchDate": "«{field}» өрісі: мұндай күн жоқ — «{value}»",
+      "profileFieldNoSuchOption": "«{field}» өрісі: «{value}» нұсқасы жоқ, бар нұсқалар {options}",
+      "profileFieldNotBoolean": "«{field}» өрісі иә/жоқ белгісімен толтырылады",
+      "profileFieldNotDate": "«{field}» өрісі КК.АА.ЖЖЖЖ түріндегі күнмен толтырылады, келгені «{value}»",
+      "profileFieldNotNumber": "«{field}» өрісі санмен толтырылады, келгені «{value}»",
+      "profileFieldOptionsDuplicate": "Нұсқалар қайталанады",
+      "profileFieldOptionsRequired": "Тізімнен таңдауда кемінде бір нұсқа болуы керек",
+      "profileFieldOptionsUnexpected": "Нұсқалар тек тізімнен таңдауда болады",
+      "profileFieldRequired": "«{field}» өрісі толтырылуы міндетті",
+      "profileFieldUnknown": "«{field}» өрісі желіде жарияланбаған",
+      "profileFieldsRequired": "Міндетті қосымша өрістер толтырылмаған: {codes}"
+    }
   },
   "rating": {
     "title": "Рейтинг",

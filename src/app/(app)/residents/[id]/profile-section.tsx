@@ -4,6 +4,7 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 
 import { ProfileForm } from '../../profile/profile-form';
 
+import type { DeclaredFieldView } from '@/services/profile-fields';
 import type { ProfileView } from '@/services/resident-profiles';
 
 /**
@@ -19,12 +20,14 @@ import type { ProfileView } from '@/services/resident-profiles';
  */
 export async function ProfileSection({
   profile,
+  declaredFields,
   userId,
   room,
   bed,
   canReplaceSecrets,
 }: {
   profile: ProfileView;
+  declaredFields: DeclaredFieldView[];
   userId: string;
   room: string | null;
   bed: string | null;
@@ -41,6 +44,7 @@ export async function ProfileSection({
       <div className="p-4 pt-0">
         <ProfileForm
           canReplaceSecrets={canReplaceSecrets}
+          declaredFields={declaredFields}
           placement={{ room, bed }}
           userId={userId}
           values={{

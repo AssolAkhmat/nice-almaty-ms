@@ -213,7 +213,9 @@
       "setting": "Setting",
       "temporary_resident": "Temporary resident",
       "user": "Account",
-      "utility_period": "Utility period"
+      "utility_period": "Utility period",
+      "profile_field_def": "additional profile field",
+      "profile_field_value": "additional field value"
     }
   },
   "auth": {
@@ -1214,7 +1216,8 @@
       "documents": "Documents",
       "study": "Study",
       "emergency": "Emergency contact",
-      "other": "Other"
+      "other": "Other",
+      "declared": "Additional fields"
     },
     "placement": {
       "title": "Room and bed",
@@ -1266,7 +1269,30 @@
       "rate_limited": "Too often",
       "internal": "Something went wrong"
     },
-    "replace": "Correct"
+    "replace": "Correct",
+    "declared": {
+      "archived": "field archived",
+      "no": "no",
+      "yes": "yes"
+    },
+    "fieldErrors": {
+      "profileFieldArchived": "Field \"{field}\" is archived: a new value is not accepted",
+      "profileFieldCodeInvalid": "Field code is lowercase latin letters, digits and underscore",
+      "profileFieldCodeTaken": "Code \"{code}\" is taken, including by an archived field",
+      "profileFieldNameRequired": "The name is needed in every language of the network",
+      "profileFieldNeedsMark": "Field \"{field}\" is required: the mark is needed",
+      "profileFieldNoSuchDate": "Field \"{field}\": no such date — \"{value}\"",
+      "profileFieldNoSuchOption": "Field \"{field}\": no option \"{value}\", available: {options}",
+      "profileFieldNotBoolean": "Field \"{field}\" takes a yes/no mark",
+      "profileFieldNotDate": "Field \"{field}\" takes a date as DD.MM.YYYY, got \"{value}\"",
+      "profileFieldNotNumber": "Field \"{field}\" takes a number, got \"{value}\"",
+      "profileFieldOptionsDuplicate": "Options repeat",
+      "profileFieldOptionsRequired": "A choice field needs at least one option",
+      "profileFieldOptionsUnexpected": "Options belong to a choice field only",
+      "profileFieldRequired": "Field \"{field}\" is required",
+      "profileFieldUnknown": "Field \"{field}\" is not declared in the network",
+      "profileFieldsRequired": "Required additional fields are empty: {codes}"
+    }
   },
   "rating": {
     "title": "Rating",

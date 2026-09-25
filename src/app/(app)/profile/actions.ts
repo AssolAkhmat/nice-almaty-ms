@@ -7,6 +7,7 @@ import { actionErrorKey } from '@/lib/action-failure';
 import { AppError } from '@/lib/errors';
 import { getCurrentSession } from '@/lib/session';
 import { subscribeToPush, unsubscribeFromPush } from '@/services/notifications';
+import { saveDeclaredFields } from '@/services/profile-fields';
 import {
   revealSensitiveField,
   saveProfile,
@@ -15,6 +16,12 @@ import {
 
 export interface ProfileActionState {
   error?: string;
+  /**
+   * Подстановки в сообщение об отказе: какое поле и что в нём не так.
+   * Без них отказ по дополнительному полю читался бы как «проверьте
+   * введённые данные» — это факт, а не причина (CLAUDE.md §2).
+   */
+  errorParams?: Record<string, string>;
   done?: string;
 }
 
@@ -168,6 +175,24 @@ export async function saveProfileAction(
         : { idDocNumber: text(formData, 'idDocNumber') }),
     });
 
+    /*
+     * Дополнительные поля идут той же формой и тем же действием (T12.2).
+     * Список кодов приходит скрытым полем: снятый флажок в форму не попадает,
+     * и без списка «нет» было бы не отличить от «не присылали».
+     */
+    const codes = text(formData, 'declaredCodes')
+      .split(',')
+      .map((code) => code.trim())
+      .filter((code) => code !== '');
+
+    if (codes.length > 0) {
+      await saveDeclaredFields(
+        current.actor,
+        userId,
+        Object.fromEntries(codes.map((code) => [code, text(formData, `field_${code}`)])),
+      );
+    }
+
     revalidatePath('/profile');
     /* Профиль правится и из карточки жильца — обновляется и она. */
     revalidatePath('/residents', 'layout');
@@ -175,6 +200,19 @@ export async function saveProfileAction(
     return { done: 'profile.done.saved' };
   } catch (error) {
     if (error instanceof AppError) {
+      /*
+       * Отказ по дополнительному полю называет поле и причину: его сообщение —
+       * ключ словаря `profile.fieldErrors.*`, а подробности идут подстановками.
+       */
+      if (error.message.startsWith('profileField')) {
+        return {
+          error: `profile.fieldErrors.${error.message}`,
+          errorParams: Object.fromEntries(
+            Object.entries(error.details ?? {}).map(([key, value]) => [key, String(value)]),
+          ),
+        };
+      }
+
       return { error: `profile.errors.${error.code}` };
     }
 

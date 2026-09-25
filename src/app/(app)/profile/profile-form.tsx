@@ -11,12 +11,15 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Field, Input, Select } from '@/components/ui/input';
 
+import { DeclaredFields } from './declared-fields';
 import {
   revealAction,
   saveProfileAction,
   type ProfileActionState,
   type RevealState,
 } from './actions';
+
+import type { DeclaredFieldView } from '@/services/profile-fields';
 
 export interface ProfileFormValues {
   lastName: string;
@@ -52,10 +55,13 @@ export function ProfileForm({
   values,
   placement,
   userId,
+  declaredFields = [],
   canReplaceSecrets = false,
 }: {
   values: ProfileFormValues;
   placement: PlacementView;
+  /** Объявленные сетью поля со значениями этого человека (T12.2). */
+  declaredFields?: DeclaredFieldView[];
   /**
    * Чей профиль. Пусто — свой: так эту форму открывает жилец. Заполнено —
    * чужой, и тогда её открывает карточка жильца: форма одна на оба случая,
@@ -256,9 +262,11 @@ export function ProfileForm({
           </div>
         </Card>
 
+        <DeclaredFields fields={declaredFields} />
+
         {state.error !== undefined ? (
           <p className="text-danger text-[13px]" data-testid="profile-error" role="alert">
-            {t(state.error)}
+            {t(state.error, state.errorParams)}
           </p>
         ) : null}
         {state.done !== undefined ? (

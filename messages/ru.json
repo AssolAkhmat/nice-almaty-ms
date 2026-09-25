@@ -213,7 +213,9 @@
       "setting": "Настройка",
       "temporary_resident": "Временный жилец",
       "user": "Учётная запись",
-      "utility_period": "Период коммуналки"
+      "utility_period": "Период коммуналки",
+      "profile_field_def": "дополнительное поле профиля",
+      "profile_field_value": "значение дополнительного поля"
     }
   },
   "auth": {
@@ -1214,7 +1216,8 @@
       "documents": "Документы",
       "study": "Учёба",
       "emergency": "Экстренный контакт",
-      "other": "Прочее"
+      "other": "Прочее",
+      "declared": "Дополнительные поля"
     },
     "placement": {
       "title": "Комната и место",
@@ -1266,7 +1269,30 @@
       "rate_limited": "Слишком часто",
       "internal": "Что-то пошло не так"
     },
-    "replace": "Исправить"
+    "replace": "Исправить",
+    "declared": {
+      "archived": "поле архивировано",
+      "no": "нет",
+      "yes": "да"
+    },
+    "fieldErrors": {
+      "profileFieldArchived": "Поле «{field}» архивировано: новое значение не принимается",
+      "profileFieldCodeInvalid": "Код поля — латиница в нижнем регистре, цифры и подчёркивание",
+      "profileFieldCodeTaken": "Код «{code}» уже занят, в том числе архивированным полем",
+      "profileFieldNameRequired": "Название нужно на всех языках сети",
+      "profileFieldNeedsMark": "Поле «{field}» обязательно: нужна отметка",
+      "profileFieldNoSuchDate": "Поле «{field}»: такой даты нет — «{value}»",
+      "profileFieldNoSuchOption": "Поле «{field}»: варианта «{value}» нет, есть {options}",
+      "profileFieldNotBoolean": "Поле «{field}» заполняется отметкой да/нет",
+      "profileFieldNotDate": "Поле «{field}» заполняется датой в виде ДД.ММ.ГГГГ, а получено «{value}»",
+      "profileFieldNotNumber": "Поле «{field}» заполняется числом, а получено «{value}»",
+      "profileFieldOptionsDuplicate": "Варианты повторяются",
+      "profileFieldOptionsRequired": "У выбора из списка должен быть хотя бы один вариант",
+      "profileFieldOptionsUnexpected": "Варианты есть только у выбора из списка",
+      "profileFieldRequired": "Поле «{field}» обязательно к заполнению",
+      "profileFieldUnknown": "Поле «{field}» не объявлено в сети",
+      "profileFieldsRequired": "Не заполнены обязательные дополнительные поля: {codes}"
+    }
   },
   "rating": {
     "title": "Рейтинг",

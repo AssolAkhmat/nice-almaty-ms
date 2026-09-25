@@ -14,6 +14,8 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
+import { PROFILE_FIELD_TYPES } from '@/domain/profile-fields';
+
 import { organizations } from './organizations';
 import { users } from './users';
 
@@ -27,13 +29,7 @@ import { users } from './users';
  * превратилась бы в гадание, а договор печатал бы что угодно. Шестой тип
  * отвергает база — перечислением, а не проверкой в сервисе.
  */
-export const profileFieldTypeEnum = pgEnum('profile_field_type', [
-  'text',
-  'number',
-  'date',
-  'boolean',
-  'choice',
-]);
+export const profileFieldTypeEnum = pgEnum('profile_field_type', PROFILE_FIELD_TYPES);
 
 export const profileFieldDefs = pgTable(
   'profile_field_defs',
@@ -138,4 +134,4 @@ export type ProfileFieldDef = typeof profileFieldDefs.$inferSelect;
 export type NewProfileFieldDef = typeof profileFieldDefs.$inferInsert;
 export type ProfileFieldValue = typeof profileFieldValues.$inferSelect;
 export type NewProfileFieldValue = typeof profileFieldValues.$inferInsert;
-export type ProfileFieldType = (typeof profileFieldTypeEnum.enumValues)[number];
+export type { ProfileFieldType } from '@/domain/profile-fields';

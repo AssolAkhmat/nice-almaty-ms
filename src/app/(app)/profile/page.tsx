@@ -7,6 +7,8 @@ import { myPlacement } from '@/services/beds';
 import { listOwnPushSubscriptions, pushKeyForBrowser } from '@/services/notifications';
 import { readProfile } from '@/services/resident-profiles';
 
+import { readDeclaredFields } from '@/services/profile-fields';
+
 import { ProfileForm, type PlacementView, type ProfileFormValues } from './profile-form';
 import { PushSubscription } from './push-subscription';
 
@@ -32,6 +34,7 @@ export default async function ProfilePage() {
   const { context } = session;
 
   const profile = await readProfile({ context }, session.user.id);
+  const declaredFields = await readDeclaredFields({ context }, session.user.id);
 
   const subscriptions = await listOwnPushSubscriptions(context);
 
@@ -70,7 +73,7 @@ export default async function ProfilePage() {
         <p className="text-text-muted text-[13px]">{t('subtitle')}</p>
       </div>
 
-      <ProfileForm placement={placement} values={values} />
+      <ProfileForm declaredFields={declaredFields} placement={placement} values={values} />
 
       <PushSubscription active={subscriptions.length > 0} publicKey={pushKeyForBrowser()} />
     </section>

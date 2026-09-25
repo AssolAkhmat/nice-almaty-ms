@@ -111,6 +111,10 @@ export const AUDIT_ACTIONS = {
   temporaryResidentUpdated: 'temporary_resident.updated',
   temporaryResidentRemoved: 'temporary_resident.removed',
   temporaryResidentReleased: 'temporary_resident.released',
+  profileFieldDeclared: 'profile_field.declared',
+  profileFieldUpdated: 'profile_field.updated',
+  profileFieldArchived: 'profile_field.archived',
+  profileFieldValueChanged: 'profile_field_value.changed',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

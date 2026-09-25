@@ -171,6 +171,58 @@ describe('шаги заселения', () => {
     });
   });
 
+  /**
+   * Объявленное сетью обязательное поле — тоже часть профиля (T12.2).
+   * Без этой проверки мастер показывал бы зелёный шаг там, где сохранение
+   * профиля отказывает, и жилец не понимал бы, чего от него хотят.
+   */
+  it('незаполненное обязательное объявленное поле шага не закрывает', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9012');
+      await tx.insert(schema.residentProfiles).values({
+        userId: fixture.userId,
+        lastName: 'Иванов',
+        firstName: 'Иван',
+        sex: 'male',
+        birthDate: '2005-01-01',
+        phone: '+77009999999',
+        university: 'КБТУ',
+        course: 2,
+        major: 'ИТ',
+        emergencyName: 'Мама',
+        emergencyPhone: '+77009999998',
+        preferredPayment: 'kaspi',
+        iinLast4: '0123',
+        idDocLast4: '4567',
+      });
+
+      const [def] = await tx
+        .insert(schema.profileFieldDefs)
+        .values({
+          orgId: fixture.orgId,
+          code: 'kafedra',
+          nameI18n: { ru: 'Кафедра', kk: 'Кафедра', en: 'Department' },
+          type: 'text',
+          isRequired: true,
+        })
+        .returning();
+
+      const before = await readOnboarding(fixture.actor, { executor: tx, today: TODAY });
+
+      await tx.insert(schema.profileFieldValues).values({
+        orgId: fixture.orgId,
+        userId: fixture.userId,
+        fieldId: def?.id ?? '',
+        value: 'Механика',
+      });
+
+      const after = await readOnboarding(fixture.actor, { executor: tx, today: TODAY });
+
+      expect(stepDone(before.steps, 'profile')).toBe(false);
+      expect(stepDone(after.steps, 'profile')).toBe(true);
+    });
+  });
+
   it('назначенное место закрывает второй шаг', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '9003');

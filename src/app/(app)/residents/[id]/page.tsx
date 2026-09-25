@@ -17,6 +17,7 @@ import { listDocumentCards } from '@/services/documents';
 import { listInvoicesFor } from '@/services/invoices';
 import { readResidentRating } from '@/services/rating-views';
 import { groupsNamingUser } from '@/services/relocations';
+import { readDeclaredFields } from '@/services/profile-fields';
 import { readProfile } from '@/services/resident-profiles';
 import { readResidentCard } from '@/services/residents';
 import { readRotationStats } from '@/services/rotation-stats';
@@ -136,20 +137,22 @@ export default async function ResidentCardPage({ params }: { params: Promise<{ i
   const mayEditProfile = can(context, 'user.updateProfile', target);
   const mayReadHistory = context.role === 'superadmin';
 
-  const [profile, documents, deposit, invoices, rating, stats, history] = await Promise.all([
-    mayEditProfile ? readProfile(actor, userId) : null,
-    mayReadDocuments ? listDocumentCards(actor, card.residency.id) : null,
-    mayReadDeposit ? readDepositView(actor, card.residency.id) : null,
-    mayReadInvoices ? listInvoicesFor(actor, { residencyId: card.residency.id }) : null,
-    mayReadRating ? readResidentRating(actor, userId) : null,
-    mayReadRotations
-      ? readRotationStats(actor, houseId, {
-          from: addMonths(startOfMonth(todayInAlmaty()), -11),
-          to: todayInAlmaty(),
-        })
-      : null,
-    mayReadHistory ? listAuditEntries(context, { entityId: card.residency.id, limit: 20 }) : null,
-  ]);
+  const [profile, declaredFields, documents, deposit, invoices, rating, stats, history] =
+    await Promise.all([
+      mayEditProfile ? readProfile(actor, userId) : null,
+      mayEditProfile ? readDeclaredFields(actor, userId) : [],
+      mayReadDocuments ? listDocumentCards(actor, card.residency.id) : null,
+      mayReadDeposit ? readDepositView(actor, card.residency.id) : null,
+      mayReadInvoices ? listInvoicesFor(actor, { residencyId: card.residency.id }) : null,
+      mayReadRating ? readResidentRating(actor, userId) : null,
+      mayReadRotations
+        ? readRotationStats(actor, houseId, {
+            from: addMonths(startOfMonth(todayInAlmaty()), -11),
+            to: todayInAlmaty(),
+          })
+        : null,
+      mayReadHistory ? listAuditEntries(context, { entityId: card.residency.id, limit: 20 }) : null,
+    ]);
 
   /* Фото 3×4 живёт типом документа, а не полем профиля: так его и грузят. */
   const photoFileId =
@@ -249,6 +252,7 @@ export default async function ResidentCardPage({ params }: { params: Promise<{ i
       {profile !== null && (
         <ProfileSection
           canReplaceSecrets={context.role === 'superadmin'}
+          declaredFields={declaredFields}
           profile={profile}
           room={card.row.room}
           bed={card.row.bed}
