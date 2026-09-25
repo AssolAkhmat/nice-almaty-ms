@@ -2073,5 +2073,76 @@
       "mimeMismatch": "The file contents did not match the declared type",
       "invalidBody": "The upload request is filled in incorrectly"
     }
+  },
+  "profileFields": {
+    "title": "Additional profile fields",
+    "subtitle": "Fields the network declares itself: they appear in the profile and become contract tokens",
+    "empty": "No fields yet",
+    "columns": {
+      "name": "Name",
+      "code": "Code",
+      "token": "Contract token",
+      "type": "Type",
+      "required": "Required",
+      "order": "Order",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "types": {
+      "text": "Text",
+      "number": "Number",
+      "date": "Date",
+      "boolean": "Yes/no",
+      "choice": "Choice"
+    },
+    "values": {
+      "yes": "Yes",
+      "no": "No"
+    },
+    "statuses": {
+      "active": "Active",
+      "archived": "Archived"
+    },
+    "actions": {
+      "edit": "Edit",
+      "archive": "Archive",
+      "restore": "Restore"
+    },
+    "create": {
+      "title": "New field",
+      "submit": "Declare field",
+      "codeHint": "Lowercase latin letters, digits and underscore. The code never changes and is never freed: contracts are built on it"
+    },
+    "edit": {
+      "title": "Field \"{name}\"",
+      "submit": "Save"
+    },
+    "fields": {
+      "nameRu": "Name in Russian",
+      "nameKk": "Name in Kazakh",
+      "nameEn": "Name in English",
+      "isRequired": "Required for onboarding",
+      "options": "Choice options",
+      "optionsHint": "One per line. For a choice field only"
+    },
+    "archiveConfirm": {
+      "title": "Archive field \"{name}\"?",
+      "description": "The field disappears from the form, filled values stay readable. There is no delete: signed contracts refer to the field",
+      "inTemplate": "This field’s token is in the active contract template: in new contracts it will render empty. Filled values and signed contracts do not change"
+    },
+    "done": {
+      "saved": "Field saved",
+      "archived": "Field archived",
+      "restored": "Field restored"
+    },
+    "errors": {
+      "unauthorized": "Sign in required",
+      "forbidden": "Action not available",
+      "not_found": "Not found",
+      "validation_error": "Check the entered data",
+      "conflict": "Data changed, try again",
+      "rate_limited": "Too often",
+      "internal": "Something went wrong"
+    }
   }
 }
