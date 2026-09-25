@@ -4,7 +4,9 @@ import { redirect } from 'next/navigation';
 import { listHouses } from '@/db/repositories/houses';
 import { listResidencies } from '@/db/repositories/residencies';
 import { can } from '@/lib/authz';
+import { loadEnv } from '@/lib/env/load';
 import { getCurrentSession } from '@/lib/session';
+import { readWelcomeMessage } from '@/services/settings';
 import { listAccounts } from '@/services/users';
 
 import { CreateAccountForm } from './create-account-form';
@@ -75,6 +77,17 @@ export default async function UsersPage() {
       }),
   }));
 
+  /*
+   * Шаблон приветствия: настройка сети, а если её нет — текст из словаря
+   * на локали сети. Текст живёт в словарях, а не в коде (указание владельца,
+   * 25 сентября 2026).
+   */
+  const welcomeTemplate =
+    (await readWelcomeMessage(context)) ?? (await getTranslations('users.welcome'))('default');
+
+  /* Первая строка сообщения — адрес приложения без схемы. */
+  const appHost = new URL(loadEnv().APP_URL).host;
+
   return (
     <section className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
@@ -83,7 +96,11 @@ export default async function UsersPage() {
       </div>
 
       {can(context, 'user.create') ? (
-        <CreateAccountForm houses={houses.map((house) => ({ id: house.id, name: house.name }))} />
+        <CreateAccountForm
+          appHost={appHost}
+          houses={houses.map((house) => ({ id: house.id, name: house.name }))}
+          welcomeTemplate={welcomeTemplate}
+        />
       ) : null}
 
       <UsersTable rows={rows} />

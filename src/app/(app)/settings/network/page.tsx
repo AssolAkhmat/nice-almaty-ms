@@ -10,6 +10,7 @@ import { readOrgSettings } from '@/services/settings';
 import { CapabilityToggles } from './capability-toggles';
 import { NetworkForm } from './network-form';
 import { OwnerSignature } from './owner-signature';
+import { WelcomeForm } from './welcome-form';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,6 +45,11 @@ export default async function NetworkSettingsPage() {
           ratingVisibleToResidents={settings.ratingVisibleToResidents}
         />
       </Card>
+
+      <WelcomeForm
+        fallback={(await getTranslations('users.welcome'))('default')}
+        message={settings.welcomeMessage}
+      />
 
       <OwnerSignature fileId={settings.ownerSignatureFileId} />
 

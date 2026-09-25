@@ -1767,7 +1767,8 @@
       "networkSaved": "Network settings saved",
       "phoneChanged": "Number changed. Sign in with the new number.",
       "capabilitySaved": "Permission saved",
-      "ownerSignatureSaved": "Contractor's signature saved"
+      "ownerSignatureSaved": "Contractor's signature saved",
+      "welcomeSaved": "Message saved"
     },
     "errors": {
       "unauthorized": "Sign-in required",
@@ -1957,6 +1958,14 @@
       "description": "The new number becomes the account login. The password stays the same and active sessions continue.",
       "newPhone": "New number",
       "submit": "Change"
+    },
+    "welcome": {
+      "default": "nice.aqy.kz\nLogin: {login}\nTemporary password: {password}\nThe password must be changed at first sign-in.",
+      "title": "Welcome message",
+      "hint": "Sent to a new resident on WhatsApp together with the temporary password. {url}, {login} and {password} are available — nothing else goes into the message.",
+      "save": "Save the message",
+      "reset": "Restore the default text",
+      "send": "Send on WhatsApp"
     }
   },
   "utilities": {

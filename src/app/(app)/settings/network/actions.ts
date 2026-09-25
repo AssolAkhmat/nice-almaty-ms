@@ -140,3 +140,42 @@ export async function saveOwnerSignatureAction(
     throw error;
   }
 }
+
+/**
+ * Приветственное сообщение новому жильцу (указание владельца,
+ * 25 сентября 2026). Пустое поле означает «вернуть текст по умолчанию»:
+ * в настройке остаётся пусто, и экран берёт текст из словаря.
+ */
+export async function saveWelcomeMessageAction(
+  _previous: NetworkActionState,
+  formData: FormData,
+): Promise<NetworkActionState> {
+  const session = await getCurrentSession();
+  if (session === null) {
+    return { error: 'settings.errors.unauthorized' };
+  }
+
+  const store = await headers();
+  const actor = {
+    context: session.context,
+    ip: store.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined,
+  };
+
+  const raw = formData.get('message');
+  const message = typeof raw === 'string' ? raw.trim() : '';
+
+  try {
+    await writeOrgSetting(actor, ORG_SETTINGS.welcomeMessage.key, message === '' ? null : message);
+
+    revalidatePath('/settings/network');
+    revalidatePath('/settings/users');
+
+    return { done: 'settings.done.welcomeSaved' };
+  } catch (error) {
+    if (error instanceof AppError) {
+      return { error: `settings.errors.${error.code}` };
+    }
+
+    throw error;
+  }
+}

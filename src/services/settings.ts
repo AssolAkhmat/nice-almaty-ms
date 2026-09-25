@@ -42,6 +42,17 @@ export const ORG_SETTINGS = {
     key: 'contract.ownerSignatureFileId',
     defaultValue: null as string | null,
   },
+  /**
+   * Приветственное сообщение новому жильцу (указание владельца,
+   * 25 сентября 2026). Пусто — берётся текст из словаря на локали сети.
+   *
+   * Хранится одной строкой, а не по локали: сообщение отправляет человек
+   * человеку, и язык у него один — тот, на котором говорит сеть.
+   */
+  welcomeMessage: {
+    key: 'users.welcomeMessage',
+    defaultValue: null as string | null,
+  },
 } as const;
 
 /**
@@ -58,6 +69,8 @@ export interface OrgSettings {
   defaultLocale: Locale;
   /** Подпись исполнителя в договоре; пусто — не загружена. */
   ownerSignatureFileId: string | null;
+  /** Приветственное сообщение; пусто — текст из словаря. */
+  welcomeMessage: string | null;
 }
 
 function isLocale(value: unknown): value is Locale {
@@ -86,6 +99,27 @@ export async function isRatingVisibleToResidents(
   return typeof value === 'boolean' ? value : ORG_SETTINGS.ratingVisibleToResidents.defaultValue;
 }
 
+/**
+ * Приветственное сообщение сети; пусто — текста нет и берётся словарь.
+ *
+ * Читается без права на настройки сети: аккаунт заводит суперадмин, но
+ * сообщение — не настройка, а подсказка экрана, и прав на раздел настроек
+ * для неё спрашивать незачем.
+ */
+export async function readWelcomeMessage(
+  context: AccessContext,
+  executor: Executor = getDb(),
+): Promise<string | null> {
+  const value = await readSettingValue(
+    'org',
+    context.orgId,
+    ORG_SETTINGS.welcomeMessage.key,
+    executor,
+  );
+
+  return typeof value === 'string' && value !== '' ? value : null;
+}
+
 export async function readOrgSettings(
   actor: UserActor,
   executor: Executor = getDb(),
@@ -98,12 +132,14 @@ export async function readOrgSettings(
   const visible = byKey.get(ORG_SETTINGS.ratingVisibleToResidents.key);
   const locale = byKey.get(ORG_SETTINGS.defaultLocale.key);
   const signature = byKey.get(ORG_SETTINGS.ownerSignatureFileId.key);
+  const welcome = byKey.get(ORG_SETTINGS.welcomeMessage.key);
 
   return {
     ratingVisibleToResidents:
       typeof visible === 'boolean' ? visible : ORG_SETTINGS.ratingVisibleToResidents.defaultValue,
     defaultLocale: isLocale(locale) ? locale : ORG_SETTINGS.defaultLocale.defaultValue,
     ownerSignatureFileId: typeof signature === 'string' ? signature : null,
+    welcomeMessage: typeof welcome === 'string' && welcome !== '' ? welcome : null,
   };
 }
 

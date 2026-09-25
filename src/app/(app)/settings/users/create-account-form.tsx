@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { useActionState } from 'react';
 
+import { welcomeMessageFor, whatsAppLink } from '@/domain/welcome-message';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,7 +18,17 @@ export interface HouseOption {
   name: string;
 }
 
-export function CreateAccountForm({ houses }: { houses: readonly HouseOption[] }) {
+export function CreateAccountForm({
+  houses,
+  welcomeTemplate,
+  appHost,
+}: {
+  houses: readonly HouseOption[];
+  /** Шаблон приветствия: из настроек сети либо из словаря. */
+  welcomeTemplate: string;
+  /** Адрес приложения без схемы: он же первая строка сообщения. */
+  appHost: string;
+}) {
   const t = useTranslations();
   const [state, action, isPending] = useActionState(createAccountAction, INITIAL);
 
@@ -75,6 +86,30 @@ export function CreateAccountForm({ houses }: { houses: readonly HouseOption[] }
               {state.temporaryPassword}
             </p>
             <p className="text-text-muted mt-1 text-[13px]">{state.createdPhone}</p>
+
+            {/*
+              Передать пароль человеку надо тут же: показывается он один раз.
+              В сообщение уходят только адрес, логин и пароль — ни ИИН,
+              ни дома, ни ФИО (указание владельца, 25 сентября 2026).
+            */}
+            {state.createdPhone !== undefined && (
+              <a
+                className="text-accent mt-2 inline-block text-[13px] underline"
+                data-testid="send-whatsapp"
+                href={whatsAppLink(
+                  state.createdPhone,
+                  welcomeMessageFor(welcomeTemplate, {
+                    phone: state.createdPhone,
+                    password: state.temporaryPassword,
+                    url: appHost,
+                  }),
+                )}
+                rel="noreferrer"
+                target="_blank"
+              >
+                {t('users.welcome.send')}
+              </a>
+            )}
           </div>
         ) : null}
 
