@@ -24,9 +24,14 @@ echo "коммит:    ${commit}"
 
 deployed="$(curl -fsS "${HEALTH_URL}" 2>/dev/null | sed -n 's/.*"commit":"\([^"]*\)".*/\1/p' || true)"
 
+#
+# Сравнение по началу строки: коммит приходит и полным хешем, и коротким,
+# а `/api/health` отдаёт полный. Точное сравнение говорило «ДРУГОЙ» про тот
+# же самый коммит — механизм, который врёт, хуже отсутствующего.
+#
 if [ -z "${deployed}" ]; then
   echo "на боевой: версия недоступна"
-elif [ "${deployed}" = "${commit}" ]; then
+elif [ "${deployed#"${commit}"}" != "${deployed}" ] || [ "${commit#"${deployed}"}" != "${commit}" ]; then
   echo "на боевой: он же"
 else
   echo "на боевой: ДРУГОЙ — ${deployed}"
