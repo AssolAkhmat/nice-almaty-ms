@@ -819,6 +819,91 @@ describe('подпись исполнителя', () => {
     return file?.id ?? '';
   }
 
+  /*
+   * Указание владельца, 26 сентября 2026: без подписи исполнителя договор
+   * не собирается, а не печатается с пустым местом. На боевой так уже вышли
+   * три договора — токен в шаблоне был, подписи не было, и сказать об этом
+   * было некому.
+   */
+  it('шаблон с токеном подписи без самой подписи не собирается', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '8811');
+
+      await tx
+        .update(schema.contractTemplates)
+        .set({ bodyHtml: '<p>{{house.name}}</p><p>{{owner.signature}}</p>' });
+
+      await expect(
+        buildContract(fixture.admin, fixture.residencyId, {
+          executor: tx,
+          storage: freshStorage(),
+          pdf: fakePdf().renderer,
+          today: TODAY,
+        }),
+      ).rejects.toThrow(/ownerSignatureMissing/);
+    });
+  });
+
+  it('с заданной подписью тот же шаблон собирается и печатает картинку', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '8812');
+      const storage = freshStorage();
+      const pdf = fakePdf();
+
+      await ownerSignature(tx, fixture, storage);
+      await tx
+        .update(schema.contractTemplates)
+        .set({ bodyHtml: '<p>{{house.name}}</p><p>{{owner.signature}}</p>' });
+
+      await buildContract(fixture.admin, fixture.residencyId, {
+        executor: tx,
+        storage,
+        pdf: pdf.renderer,
+        today: TODAY,
+      });
+
+      expect(pdf.printed[0] ?? '').toContain('<img');
+    });
+  });
+
+  it('шаблон без токена подписи исполнителя её не требует', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '8813');
+      const pdf = fakePdf();
+
+      await tx.update(schema.contractTemplates).set({ bodyHtml: '<p>{{house.name}}</p>' });
+
+      const result = await buildContract(fixture.admin, fixture.residencyId, {
+        executor: tx,
+        storage: freshStorage(),
+        pdf: pdf.renderer,
+        today: TODAY,
+      });
+
+      expect(result.file.status).toBe('ready');
+    });
+  });
+
+  it('подпись задана, а файла нет: отказ говорит именно это', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '8814');
+      const storage = freshStorage();
+
+      await ownerSignature(tx, fixture, storage);
+      /* Файл записан в настройку, но байтов в хранилище нет. */
+      await tx.update(schema.contractTemplates).set({ bodyHtml: '<p>{{owner.signature}}</p>' });
+
+      await expect(
+        buildContract(fixture.admin, fixture.residencyId, {
+          executor: tx,
+          storage: freshStorage(),
+          pdf: fakePdf().renderer,
+          today: TODAY,
+        }),
+      ).rejects.toThrow(/ownerSignatureUnavailable/);
+    });
+  });
+
   it('подписание запоминает подпись исполнителя снимком', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '8801');

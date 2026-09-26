@@ -396,7 +396,9 @@
       "unknown": "The action could not be completed",
       "upload": "The signature could not be sent",
       "emptySignature": "Draw your signature first"
-    }
+    },
+    "ownerSignatureMissing": "The executor signature is not set: the superadmin draws it in the network settings. A contract with a signature slot is not assembled without it",
+    "ownerSignatureUnavailable": "The executor signature is set but its file is unavailable: draw the signature again in the network settings"
   },
   "contractTemplate": {
     "title": "Contract template",

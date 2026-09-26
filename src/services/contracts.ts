@@ -247,11 +247,14 @@ function renderContract(
  * сети, если ещё нет: смена подписи не должна переписывать подписанное
  * (указание владельца, 22 сентября 2026).
  */
+/** Почему подписи исполнителя нет: причина уходит в отказ, а не теряется. */
+type OwnerSignatureState = 'ok' | 'notSet' | 'unavailable';
+
 async function ownerSignatureDataUrl(
   actor: UserActor,
   residency: Residency,
   resolved: { executor: Executor; storage: StorageProvider },
-): Promise<{ dataUrl: string | null; fileId: string | null }> {
+): Promise<{ dataUrl: string | null; fileId: string | null; state: OwnerSignatureState }> {
   const fileId =
     residency.ownerSignatureFileId ??
     (residency.contractSignedAt === null
@@ -259,25 +262,53 @@ async function ownerSignatureDataUrl(
       : null);
 
   if (fileId === null) {
-    return { dataUrl: null, fileId: null };
+    return { dataUrl: null, fileId: null, state: 'notSet' };
   }
 
   const file = await findFileInOrg(actor.context, fileId, resolved.executor);
 
   if (file === null || file.status !== 'ready') {
-    return { dataUrl: null, fileId: null };
+    return { dataUrl: null, fileId: null, state: 'unavailable' };
   }
 
   const bytes = await resolved.storage.get(file.path);
 
   if (bytes === null) {
-    return { dataUrl: null, fileId: null };
+    return { dataUrl: null, fileId: null, state: 'unavailable' };
   }
 
   return {
     dataUrl: `data:${file.mime};base64,${Buffer.from(bytes).toString('base64')}`,
     fileId: file.id,
+    state: 'ok',
   };
+}
+
+/**
+ * Договор с токеном подписи исполнителя без самой подписи не собирается
+ * (указание владельца, 26 сентября 2026).
+ *
+ * Прежде на месте токена оставалась пустота: документ выходил с пустым
+ * местом там, где должна стоять подпись, и узнать об этом было негде.
+ * На боевой так собрались три договора. Теперь отказ называет причину
+ * и того, кто её устраняет.
+ *
+ * Шаблон без токена не при чём: он про подпись исполнителя не знает,
+ * и требовать её ради документа, который её не печатает, незачем.
+ */
+function assertOwnerSignature(
+  bodyHtml: string,
+  owner: { dataUrl: string | null; state: OwnerSignatureState },
+): void {
+  if (!hasToken(bodyHtml, 'owner.signature') || owner.dataUrl !== null) {
+    return;
+  }
+
+  throw new ValidationError(
+    owner.state === 'notSet'
+      ? 'contract.ownerSignatureMissing'
+      : 'contract.ownerSignatureUnavailable',
+  );
 }
 
 async function storeServerFile(
@@ -363,12 +394,13 @@ export async function buildContract(
   const declared = await declaredTokens(actor.context, executor);
   const unknown = unknownTokens(template.bodyHtml, declared);
   if (unknown.length > 0) {
-    throw new ValidationError('contracts.unknownTokens', { tokens: unknown });
+    throw new ValidationError('contract.unknownTokens', { tokens: unknown });
   }
 
   const contractNumber = await ensureContractNumber(actor.context, residency, executor);
   const values = await contractValues(actor, residency, resolved, contractNumber);
   const owner = await ownerSignatureDataUrl(actor, residency, resolved);
+  assertOwnerSignature(template.bodyHtml, owner);
   // Договор до подписания: токен подписи жильца получает пустое значение.
   const html = renderContract(template.bodyHtml, values, null, owner.dataUrl, declared);
   const pdf = await resolved.pdf.render(html);
@@ -447,7 +479,7 @@ export async function signContract(
   }
 
   if (signature.mime !== 'image/png') {
-    throw new ValidationError('contracts.signatureMustBePng');
+    throw new ValidationError('contract.signatureMustBePng');
   }
 
   const template = await templateOfResidency(residency, executor);
@@ -466,6 +498,7 @@ export async function signContract(
    * (указание владельца, 22 сентября 2026).
    */
   const owner = await ownerSignatureDataUrl(actor, residency, resolved);
+  assertOwnerSignature(template.bodyHtml, owner);
   const html = renderContract(
     template.bodyHtml,
     values,
