@@ -1040,7 +1040,8 @@
       "edited": "Строки сохранены",
       "recalculated": "Счёт пересчитан",
       "cancelled": "Счёт отменён",
-      "paymentRecorded": "Оплата отмечена"
+      "paymentRecorded": "Оплата отмечена",
+      "paymentReversed": "Платёж сторнирован"
     },
     "errors": {
       "unauthorized": "Требуется вход",
@@ -1061,7 +1062,10 @@
       "noPeriod": "У счёта не указан месяц",
       "method": "Выберите способ оплаты",
       "alreadySent": "Счёт уже отмечен отправленным",
-      "paidAtFuture": "Дата платежа не может быть в будущем"
+      "paidAtFuture": "Дата платежа не может быть в будущем",
+      "reversalOfReversal": "Сторно нельзя сторнировать",
+      "alreadyReversed": "Этот платёж уже сторнирован",
+      "reasonRequired": "Укажите причину сторно"
     },
     "remote": {
       "title": "Удалёнка",
@@ -1085,7 +1089,12 @@
     "paidAt": "Дата платежа",
     "paidAtHint": "Пусто — сегодня",
     "paymentNote": "Назначение платежа",
-    "paymentNoteHint": "За что приняты деньги"
+    "paymentNoteHint": "За что приняты деньги",
+    "reversal": "Сторно",
+    "reversalReason": "Причина сторно",
+    "reversalMark": "сторно",
+    "reversedMark": "сторнирован",
+    "paymentReceipt": "Документ подтверждения"
   },
   "language": {
     "label": "Язык",

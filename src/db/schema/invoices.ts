@@ -3,15 +3,18 @@ import {
   bigint,
   check,
   date,
+  foreignKey,
   index,
   jsonb,
   pgEnum,
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 
+import { files } from './files';
 import { houses } from './houses';
 import { organizations } from './organizations';
 import { residencies } from './residencies';
@@ -155,9 +158,45 @@ export const payments = pgTable(
     paidAt: timestamp('paid_at', { withTimezone: true }).notNull().defaultNow(),
     recordedBy: uuid('recorded_by').references(() => users.id),
     note: text('note'),
+    /**
+     * Сторно: строка с отрицательной суммой, ссылающаяся на исправляемый
+     * платёж (указание владельца, 27 сентября 2026). Ошибочный платёж
+     * не удаляется — удаление скрыло бы и ошибку, и исправление, а деньги
+     * уже попали в налоговый отчёт.
+     *
+     * Отрицательная строка вместо отдельной таблицы: `оплачено` считается
+     * суммой платежей в десятке мест, и сторно обязано уменьшать её везде
+     * само, без второго правила рядом с каждым запросом.
+     */
+    reversesPaymentId: uuid('reverses_payment_id'),
+    /**
+     * Подтверждающий документ: квитанция, скриншот перевода, расписка
+     * (Приложение №3 п. 4.2 договора — «при наличии»). Необязателен.
+     */
+    receiptFileId: uuid('receipt_file_id').references(() => files.id),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index('payments_invoice_idx').on(table.invoiceId)],
+  (table) => [
+    index('payments_invoice_idx').on(table.invoiceId),
+    foreignKey({
+      columns: [table.reversesPaymentId],
+      foreignColumns: [table.id],
+      name: 'payments_reverses_fk',
+    }),
+    /* Один платёж сторнируется один раз: второе сторно обнулило бы дважды. */
+    uniqueIndex('payments_reverses_unique')
+      .on(table.reversesPaymentId)
+      .where(sql`${table.reversesPaymentId} is not null`),
+    /*
+     * Отрицательная сумма бывает только у сторно, положительная — только
+     * у платежа. Иначе «минус» уехал бы в обычную отметку оплаты, и никто
+     * не понял бы, откуда в счёте отрицательный приход.
+     */
+    check(
+      'payments_sign_matches_reversal',
+      sql`(${table.reversesPaymentId} is null and ${table.amount} > 0) or (${table.reversesPaymentId} is not null and ${table.amount} < 0)`,
+    ),
+  ],
 );
 
 export const depositTransactions = pgTable(

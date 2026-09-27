@@ -13,6 +13,7 @@ import {
   editInvoiceLines,
   recalculateInvoice,
   recordPayment,
+  reversePayment,
   type InvoiceLineInput,
 } from '@/services/invoices';
 
@@ -192,6 +193,7 @@ export async function recordInvoicePaymentAction(
 
   const note = text(formData, 'note');
   const paidAt = tryParseBusinessDate(text(formData, 'paidAt'));
+  const receiptFileId = text(formData, 'receiptFileId');
 
   try {
     await recordPayment(current, text(formData, 'invoiceId'), {
@@ -200,6 +202,7 @@ export async function recordInvoicePaymentAction(
       // Пустая дата — момент отметки: деньги обычно принимают тем же днём.
       ...(paidAt === null ? {} : { paidAt: startOfDayUtc(paidAt) }),
       ...(note === '' ? {} : { note }),
+      ...(receiptFileId === '' ? {} : { receiptFileId }),
     });
   } catch (error) {
     return failure(error);
@@ -208,4 +211,30 @@ export async function recordInvoicePaymentAction(
   refresh();
 
   return { done: 'invoices.done.paymentRecorded' };
+}
+
+/**
+ * Сторно платежа (P1-4, 27 сентября 2026): обратная проводка, а не удаление.
+ * Право отдельное и только у суперадмина — сервис это проверяет сам.
+ */
+export async function reverseInvoicePaymentAction(
+  _previous: InvoiceActionState,
+  formData: FormData,
+): Promise<InvoiceActionState> {
+  const current = await actor();
+  if (current === null) {
+    return { error: 'invoices.errors.unauthorized' };
+  }
+
+  try {
+    await reversePayment(current, text(formData, 'paymentId'), {
+      reason: text(formData, 'reason'),
+    });
+  } catch (error) {
+    return failure(error);
+  }
+
+  refresh();
+
+  return { done: 'invoices.done.paymentReversed' };
 }

@@ -106,6 +106,9 @@ export default async function InvoicesPage({
             method: payment.method,
             paidAt: payment.paidAt.toISOString(),
             note: payment.note,
+            receiptFileId: payment.receiptFileId,
+            isReversal: payment.reversesPaymentId !== null,
+            isReversed: view.payments.some((other) => other.reversesPaymentId === payment.id),
           })),
         };
       }),

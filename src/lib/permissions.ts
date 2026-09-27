@@ -47,6 +47,13 @@ export const ACTIONS = [
   'invoice.read',
   'invoice.issue',
   'payment.record',
+  /*
+   * Сторно платежа — только у суперадмина (находка P1-4, 27 сентября 2026).
+   * Отметку оплаты ставит админ, а исправление денег обратной проводкой —
+   * решение уровня сети: ошибочный платёж уже попал в налоговый отчёт.
+   * В `docs/08-DECISIONS.md` это записано строкой `[ОТКРЫТО]`.
+   */
+  'payment.reverse',
   'deposit.read',
   'damage.read',
   'damage.create',
@@ -168,6 +175,7 @@ export const PERMISSIONS: PermissionMatrix = {
     'invoice.read': 'org',
     'invoice.issue': 'org',
     'payment.record': 'org',
+    'payment.reverse': 'org',
     'deposit.read': 'org',
     'damage.read': 'org',
     'damage.create': 'org',
@@ -246,6 +254,7 @@ export const PERMISSIONS: PermissionMatrix = {
     'invoice.read': 'house',
     'invoice.issue': 'house',
     'payment.record': 'house',
+    'payment.reverse': 'none',
     'deposit.read': 'house',
     'damage.read': 'house',
     'damage.create': 'house',
@@ -368,6 +377,7 @@ export const PERMISSIONS: PermissionMatrix = {
     'invoice.read': 'self',
     'invoice.issue': 'none',
     'payment.record': 'none',
+    'payment.reverse': 'none',
     'deposit.read': 'self',
     // Свои списания жилец видит движением депозита (§8), а не списком ущербов.
     'damage.read': 'none',

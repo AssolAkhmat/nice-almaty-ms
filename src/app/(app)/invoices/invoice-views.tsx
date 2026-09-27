@@ -1,6 +1,7 @@
 'use client';
 
 import { FileLinks } from '@/components/files/file-links';
+import { ReceiptUpload } from '@/components/upload/receipt-upload';
 import { AppLink } from '@/components/ui/app-link';
 import { PersonName, type PersonNameView } from '@/components/ui/person-name';
 import { useFormatter, useTranslations } from 'next-intl';
@@ -18,6 +19,7 @@ import { parseInstant } from '@/lib/time';
 import {
   createInvoiceAction,
   recordInvoicePaymentAction,
+  reverseInvoicePaymentAction,
   type InvoiceActionState,
 } from './actions';
 
@@ -41,6 +43,12 @@ export interface PaymentView {
   method: string;
   paidAt: string;
   note: string | null;
+  /** Подтверждающий документ, если приложен (Приложение №3 п. 4.2). */
+  receiptFileId: string | null;
+  /** Это сторно: строка с отрицательной суммой (P1-4, 27 сентября 2026). */
+  isReversal: boolean;
+  /** Этот платёж уже сторнирован: второй раз нельзя. */
+  isReversed: boolean;
 }
 
 export interface InvoiceCardView {
@@ -114,7 +122,14 @@ export function InvoiceStatus({ overdue, status }: { overdue: boolean; status: s
 }
 
 /** Карточка счёта жильца: строки, статус, история платежей, флаг «Долг». */
-export function InvoiceCard({ invoice }: { invoice: InvoiceCardView }) {
+export function InvoiceCard({
+  invoice,
+  canReverse = false,
+}: {
+  invoice: InvoiceCardView;
+  /** Право сторнировать платёж — у суперадмина (P1-4). */
+  canReverse?: boolean;
+}) {
   const t = useTranslations();
   const format = useFormatter();
 
@@ -162,25 +177,87 @@ export function InvoiceCard({ invoice }: { invoice: InvoiceCardView }) {
         </div>
 
         {invoice.payments.length > 0 && (
-          <section className="flex flex-col gap-1">
+          <section className="flex flex-col gap-2">
             <h3 className="font-medium">{t('invoices.paymentHistory')}</h3>
             {invoice.payments.map((payment) => (
-              <div className="flex items-center justify-between gap-4" key={payment.id}>
-                <span className="text-text-muted">
-                  {format.dateTime(parseInstant(payment.paidAt), {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                  })}
-                  <span className="ml-2">{t(`invoices.method.${payment.method}`)}</span>
-                </span>
-                <Money amount={payment.amount} />
+              <div className="flex flex-col gap-1" key={payment.id}>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-text-muted min-w-0">
+                    {format.dateTime(parseInstant(payment.paidAt), {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                    })}
+                    <span className="ml-2">{t(`invoices.method.${payment.method}`)}</span>
+                    {payment.isReversal && (
+                      <span className="text-danger ml-2">{t('invoices.reversalMark')}</span>
+                    )}
+                    {payment.isReversed && (
+                      <span className="text-text-muted ml-2">{t('invoices.reversedMark')}</span>
+                    )}
+                  </span>
+                  <Money amount={payment.amount} className="shrink-0" />
+                </div>
+
+                {payment.receiptFileId !== null && (
+                  <FileLinks fileId={payment.receiptFileId} label={t('invoices.paymentReceipt')} />
+                )}
+
+                {payment.note !== null && payment.note !== '' && (
+                  <span className="text-text-muted text-[13px] break-words">{payment.note}</span>
+                )}
+
+                {canReverse && !payment.isReversal && !payment.isReversed && (
+                  <ReversalForm paymentId={payment.id} />
+                )}
               </div>
             ))}
           </section>
         )}
       </div>
     </Card>
+  );
+}
+
+/**
+ * Сторно платежа: причина обязательна и видна в журнале и в карточке.
+ *
+ * Кнопка стоит у каждого платежа, а не одна на счёт: сторнируется
+ * конкретная отметка, а их бывает несколько.
+ */
+function ReversalForm({ paymentId }: { paymentId: string }) {
+  const t = useTranslations();
+  const [state, action, isPending] = useActionState(reverseInvoicePaymentAction, INITIAL);
+
+  return (
+    <form action={action} className="flex flex-wrap items-end gap-2">
+      <input name="paymentId" type="hidden" value={paymentId} />
+
+      {state.error !== undefined && (
+        <p className="text-danger w-full text-[13px]" role="alert">
+          {t(state.error)}
+        </p>
+      )}
+
+      <Input
+        aria-label={t('invoices.reversalReason')}
+        className="max-w-64 flex-1"
+        data-testid={`reversal-reason-${paymentId}`}
+        name="reason"
+        placeholder={t('invoices.reversalReason')}
+        required
+      />
+
+      <Button
+        data-testid={`reversal-submit-${paymentId}`}
+        disabled={isPending}
+        size="sm"
+        type="submit"
+        variant="danger"
+      >
+        {t('invoices.reversal')}
+      </Button>
+    </form>
   );
 }
 
@@ -473,11 +550,14 @@ export function PaymentForm({
   invoiceId,
   remaining,
   today,
+  houseId,
 }: {
   invoiceId: string;
   remaining: number;
   /** Сегодня по Алматы: верхняя граница даты платежа. */
   today: string;
+  /** Дом счёта: к нему принадлежит файл подтверждения. Пусто — без вложения. */
+  houseId: string | null;
 }) {
   const t = useTranslations();
   const [state, action, isPending] = useActionState(recordInvoicePaymentAction, INITIAL);
@@ -525,6 +605,15 @@ export function PaymentForm({
           type="date"
         />
       </Field>
+
+      {houseId !== null && (
+        <ReceiptUpload
+          houseId={houseId}
+          id={`payment-receipt-${invoiceId}`}
+          name="receiptFileId"
+          purpose="payment-receipt"
+        />
+      )}
 
       <Field htmlFor={`payment-note-${invoiceId}`} label={t('invoices.paymentNote')}>
         <Input

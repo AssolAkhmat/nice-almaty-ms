@@ -449,6 +449,12 @@ export async function postUtilitySurplus(
 }
 
 export interface InvoicePaymentEntry {
+  /**
+   * Платёж, которым пришли деньги. Проводка ссылается на него, а не только
+   * на счёт: сторно обязано найти проводку именно этого платежа, а платежей
+   * по счёту бывает несколько (находка P1-4, 27 сентября 2026).
+   */
+  paymentId: string;
   houseId: string;
   invoiceId: string;
   method: Payment['method'];
@@ -501,8 +507,8 @@ export async function postInvoicePayment(
     actor,
     {
       description: 'Оплата счёта',
-      sourceType: 'invoice',
-      sourceId: input.invoiceId,
+      sourceType: 'payment',
+      sourceId: input.paymentId,
       ...(input.date === undefined ? {} : { date: input.date }),
       lines,
     },

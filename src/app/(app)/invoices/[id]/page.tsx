@@ -64,6 +64,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       method: payment.method,
       paidAt: payment.paidAt.toISOString(),
       note: payment.note,
+      receiptFileId: payment.receiptFileId,
+      isReversal: payment.reversesPaymentId !== null,
+      isReversed: view.payments.some((other) => other.reversesPaymentId === payment.id),
     })),
   };
 
@@ -88,7 +91,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         <h1>{card.residentName ?? t('title')}</h1>
       </div>
 
-      <InvoiceCard invoice={card} />
+      <InvoiceCard canReverse={can(context, 'payment.reverse', target)} invoice={card} />
 
       {canIssue && (
         <InvoiceEditor
@@ -107,6 +110,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           </CardHeader>
           <div className="p-4 pt-0">
             <PaymentForm
+              houseId={view.invoice.houseId}
               invoiceId={view.invoice.id}
               remaining={view.remaining}
               today={todayInAlmaty()}

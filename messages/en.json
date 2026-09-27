@@ -1040,7 +1040,8 @@
       "edited": "Lines saved",
       "recalculated": "Invoice recalculated",
       "cancelled": "Invoice cancelled",
-      "paymentRecorded": "Payment recorded"
+      "paymentRecorded": "Payment recorded",
+      "paymentReversed": "Payment reversed"
     },
     "errors": {
       "unauthorized": "Sign in required",
@@ -1061,7 +1062,10 @@
       "noPeriod": "The invoice has no month",
       "method": "Choose a payment method",
       "alreadySent": "The invoice is already marked as sent",
-      "paidAtFuture": "The payment date cannot be in the future"
+      "paidAtFuture": "The payment date cannot be in the future",
+      "reversalOfReversal": "A reversal cannot be reversed",
+      "alreadyReversed": "This payment is already reversed",
+      "reasonRequired": "State the reason for the reversal"
     },
     "remote": {
       "title": "Remote payments",
@@ -1085,7 +1089,12 @@
     "paidAt": "Payment date",
     "paidAtHint": "Empty means today",
     "paymentNote": "Payment purpose",
-    "paymentNoteHint": "What the money was taken for"
+    "paymentNoteHint": "What the money was taken for",
+    "reversal": "Reverse",
+    "reversalReason": "Reason for the reversal",
+    "reversalMark": "reversal",
+    "reversedMark": "reversed",
+    "paymentReceipt": "Confirming document"
   },
   "language": {
     "label": "Language",

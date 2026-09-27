@@ -1,0 +1,4 @@
+ALTER TABLE "payments" ADD COLUMN "reverses_payment_id" uuid;--> statement-breakpoint
+ALTER TABLE "payments" ADD CONSTRAINT "payments_reverses_fk" FOREIGN KEY ("reverses_payment_id") REFERENCES "public"."payments"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+CREATE UNIQUE INDEX "payments_reverses_unique" ON "payments" USING btree ("reverses_payment_id") WHERE "payments"."reverses_payment_id" is not null;--> statement-breakpoint
+ALTER TABLE "payments" ADD CONSTRAINT "payments_sign_matches_reversal" CHECK (("payments"."reverses_payment_id" is null and "payments"."amount" > 0) or ("payments"."reverses_payment_id" is not null and "payments"."amount" < 0));

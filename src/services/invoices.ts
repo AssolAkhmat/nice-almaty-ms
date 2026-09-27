@@ -1,6 +1,7 @@
 import { getDb, type Executor } from '@/db/client';
 import { parsePeriod } from '@/db/period';
 import {
+  findPayment,
   addInvoiceLines,
   createDepositTransaction,
   createInvoice as insertInvoice,
@@ -37,7 +38,10 @@ import {
   type BusinessDate,
 } from '@/lib/time';
 
+import { findLedgerEntryBySource } from '@/db/repositories/accounts';
+
 import { AUDIT_ACTIONS, recordAudit } from './audit';
+import { reverseEntry } from './ledger';
 import { settleDepositInvoice } from './deposits';
 import { postInvoicePayment } from './ledger';
 
@@ -108,6 +112,8 @@ export interface PaymentInput {
    */
   paidAt?: Date | undefined;
   note?: string | undefined;
+  /** Подтверждающий документ, необязательный (Приложение №3 п. 4.2). */
+  receiptFileId?: string | undefined;
 }
 
 export interface InvoiceRow {
@@ -240,7 +246,7 @@ function isOverdue(invoice: Invoice, paid: number, today: BusinessDate): boolean
 async function invoiceWithResidency(
   actor: UserActor,
   invoiceId: string,
-  action: 'invoice.read' | 'invoice.issue' | 'payment.record',
+  action: 'invoice.read' | 'invoice.issue' | 'payment.record' | 'payment.reverse',
   executor: Executor,
 ): Promise<{ invoice: Invoice; residency: Residency }> {
   const invoice = await requireInvoice(actor.context, invoiceId, executor);
@@ -558,7 +564,7 @@ export async function recordPayment(
   const lines = await listInvoiceLines(invoice.id, executor);
 
   return executor.transaction(async (tx) => {
-    await createPayment(
+    const payment = await createPayment(
       {
         invoiceId: invoice.id,
         amount: input.amount,
@@ -566,6 +572,7 @@ export async function recordPayment(
         paidAt: input.paidAt ?? instant,
         recordedBy: actor.context.userId,
         note: input.note ?? null,
+        receiptFileId: input.receiptFileId ?? null,
       },
       tx,
     );
@@ -613,6 +620,7 @@ export async function recordPayment(
       {
         houseId: invoice.houseId ?? residency.houseId,
         invoiceId: invoice.id,
+        paymentId: payment.id,
         method: input.method,
         allocation,
         date: todayInAlmaty(input.paidAt ?? instant),
@@ -786,5 +794,114 @@ export async function listInvoicesFor(
       remaining: remainingToPay(invoice.total, amount),
       overdue: isOverdue(invoice, amount, today),
     };
+  });
+}
+
+export interface ReversePaymentInput {
+  /** Почему сторнируется: причина видна в журнале и в карточке счёта. */
+  reason: string;
+}
+
+/**
+ * Сторно платежа (указание владельца, 27 сентября 2026; Приложение №3 п. 4.2
+ * договора говорит об отметке факта оплаты, а факт бывает отмечен ошибочно).
+ *
+ * Платёж не удаляется. Удаление скрыло бы и ошибку, и её исправление, а
+ * деньги уже попали в налоговый отчёт и в фонд дома. Вместо этого:
+ *
+ * - строка платежа с отрицательной суммой, ссылающаяся на исправляемую —
+ *   «оплачено» считается суммой платежей в десятке мест, и сторно уменьшает
+ *   её везде само;
+ * - обратная проводка в книге (`reverseEntry`), оригинал остаётся;
+ * - статус счёта пересчитывается и возвращается к прежнему;
+ * - запись в журнале — и о сторно, и о проводке.
+ *
+ * Право отдельное и только у суперадмина: отметку ставит админ, а исправление
+ * денег — решение уровня сети (строка `[ОТКРЫТО]` в решениях).
+ */
+export async function reversePayment(
+  actor: UserActor,
+  paymentId: string,
+  input: ReversePaymentInput,
+  deps: InvoiceDeps = {},
+): Promise<Invoice> {
+  const { executor, today, instant } = resolve(deps);
+
+  const payment = await findPayment(paymentId, executor);
+
+  if (payment === null) {
+    throw new NotFoundError('Платёж не найден');
+  }
+
+  const { invoice } = await invoiceWithResidency(
+    actor,
+    payment.invoiceId,
+    'payment.reverse',
+    executor,
+  );
+
+  if (payment.reversesPaymentId !== null) {
+    throw new ConflictError('invoices.errors.reversalOfReversal');
+  }
+
+  const payments = await listPayments(invoice.id, executor);
+
+  if (payments.some((row) => row.reversesPaymentId === payment.id)) {
+    throw new ConflictError('invoices.errors.alreadyReversed');
+  }
+
+  const reason = input.reason.trim();
+
+  if (reason === '') {
+    throw new ValidationError('invoices.errors.reasonRequired');
+  }
+
+  return executor.transaction(async (tx) => {
+    await createPayment(
+      {
+        invoiceId: invoice.id,
+        amount: -payment.amount,
+        method: payment.method,
+        paidAt: instant,
+        recordedBy: actor.context.userId,
+        note: reason,
+        reversesPaymentId: payment.id,
+      },
+      tx,
+    );
+
+    const paid = totalOf(await listPayments(invoice.id, tx));
+    const status = invoiceStatus(invoice.total, paid);
+
+    const updated = await updateInvoice(actor.context, invoice.id, { status }, tx);
+
+    if (updated === null) {
+      throw new NotFoundError('Счёт не найден');
+    }
+
+    /*
+     * Проводка платежа сторнируется своей обратной. Её может не быть
+     * у депозитного счёта: тот проводится отдельным путём, и сторнировать
+     * там нечего — движение депозита ведётся своей таблицей.
+     */
+    const entry = await findLedgerEntryBySource(actor.context, 'payment', payment.id, tx);
+
+    if (entry !== null) {
+      await reverseEntry(actor, entry.id, { executor: tx, today });
+    }
+
+    await recordAudit(
+      { context: actor.context, ip: actor.ip, requestId: actor.requestId },
+      {
+        action: AUDIT_ACTIONS.paymentReversed,
+        entityType: 'invoice',
+        entityId: invoice.id,
+        before: { status: invoice.status, paid: paid + payment.amount },
+        after: { status, paid, reason, paymentId: payment.id },
+      },
+      tx,
+    );
+
+    return updated;
   });
 }

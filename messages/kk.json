@@ -1040,7 +1040,8 @@
       "edited": "Жолдар сақталды",
       "recalculated": "Шот қайта есептелді",
       "cancelled": "Шот болдырылмады",
-      "paymentRecorded": "Төлем белгіленді"
+      "paymentRecorded": "Төлем белгіленді",
+      "paymentReversed": "Төлем сторноланды"
     },
     "errors": {
       "unauthorized": "Кіру қажет",
@@ -1061,7 +1062,10 @@
       "noPeriod": "Шотта ай көрсетілмеген",
       "method": "Төлеу тәсілін таңдаңыз",
       "alreadySent": "Шот жіберілген деп белгіленген",
-      "paidAtFuture": "Төлем күні болашақта болуы мүмкін емес"
+      "paidAtFuture": "Төлем күні болашақта болуы мүмкін емес",
+      "reversalOfReversal": "Сторноны сторнолауға болмайды",
+      "alreadyReversed": "Бұл төлем сторноланған",
+      "reasonRequired": "Сторно себебін көрсетіңіз"
     },
     "remote": {
       "title": "Қашықтан төлеу",
@@ -1085,7 +1089,12 @@
     "paidAt": "Төлем күні",
     "paidAtHint": "Бос — бүгін",
     "paymentNote": "Төлемнің мақсаты",
-    "paymentNoteHint": "Ақша не үшін қабылданды"
+    "paymentNoteHint": "Ақша не үшін қабылданды",
+    "reversal": "Сторно",
+    "reversalReason": "Сторно себебі",
+    "reversalMark": "сторно",
+    "reversedMark": "сторноланған",
+    "paymentReceipt": "Растайтын құжат"
   },
   "language": {
     "label": "Тіл",

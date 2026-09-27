@@ -18,6 +18,7 @@ import {
   readInvoice,
   recalculateInvoice,
   recordPayment,
+  reversePayment,
 } from './invoices';
 
 import type { AccessContext } from '@/db/access';
@@ -164,6 +165,8 @@ async function seed(tx: Transaction, suffix: string) {
     residentA: actor(context('resident', a.userId, null)),
     residentB: actor(context('resident', b.userId, null)),
     admin: actor(context('admin', adminUser?.id ?? '', houseAId)),
+    /* Сторно платежа — право суперадмина (P1-4, 27 сентября 2026). */
+    superadmin: actor(context('superadmin', adminUser?.id ?? '', null)),
   };
 }
 
@@ -344,6 +347,156 @@ describe('платежи (инвариант 6)', () => {
           { executor: tx, today: TODAY },
         ),
       ).rejects.toThrow(/paidAtFuture/);
+    });
+  });
+
+  /*
+   * Сторно (указание владельца, 27 сентября 2026): ошибочный платёж
+   * не удаляется, а сторнируется обратной проводкой. Удаление скрыло бы
+   * и ошибку, и исправление, а деньги уже в налоговом отчёте и в фонде дома.
+   */
+  it('сторно возвращает прежний статус и не ломает баланс', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9731');
+      const invoice = await monthly(tx, fixture);
+
+      await recordPayment(
+        fixture.superadmin,
+        invoice.id,
+        { amount: 102_000, method: 'kaspi' },
+        { executor: tx, today: TODAY },
+      );
+
+      const [payment] = await tx
+        .select()
+        .from(schema.payments)
+        .where(eq(schema.payments.invoiceId, invoice.id));
+
+      const after = await reversePayment(
+        fixture.superadmin,
+        payment?.id ?? '',
+        { reason: 'Приняли по ошибке: платил другой жилец' },
+        { executor: tx, today: TODAY },
+      );
+
+      expect(after.status).toBe('issued');
+
+      const view = await readInvoice(fixture.superadmin, invoice.id, { executor: tx });
+      expect(view.paid).toBe(0);
+      expect(view.remaining).toBe(102_000);
+
+      /* Книга сходится: дебет и кредит по каждому счёту гасят друг друга. */
+      const ledger = await ledgerOf(tx, fixture.orgId);
+      const byCode = new Map<string, number>();
+
+      for (const line of ledger) {
+        const sign = line.direction === 'debit' ? 1 : -1;
+        byCode.set(line.code, (byCode.get(line.code) ?? 0) + sign * line.amount);
+      }
+
+      expect([...byCode.values()].every((value) => value === 0)).toBe(true);
+    });
+  });
+
+  it('частичная оплата после сторно оставляет остаток долгом', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9732');
+      const invoice = await monthly(tx, fixture);
+
+      await recordPayment(
+        fixture.superadmin,
+        invoice.id,
+        { amount: 40_000, method: 'cash' },
+        { executor: tx, today: TODAY },
+      );
+      await recordPayment(
+        fixture.superadmin,
+        invoice.id,
+        { amount: 62_000, method: 'cash' },
+        { executor: tx, today: TODAY },
+      );
+
+      const payments = await tx
+        .select()
+        .from(schema.payments)
+        .where(eq(schema.payments.invoiceId, invoice.id))
+        .orderBy(schema.payments.createdAt);
+
+      const after = await reversePayment(
+        fixture.superadmin,
+        payments[1]?.id ?? '',
+        { reason: 'Вторая отметка — дубль' },
+        { executor: tx, today: TODAY },
+      );
+
+      expect(after.status).toBe('partially_paid');
+
+      const view = await readInvoice(fixture.superadmin, invoice.id, { executor: tx });
+      expect(view.paid).toBe(40_000);
+      expect(view.remaining).toBe(62_000);
+    });
+  });
+
+  it('второе сторно того же платежа не проходит', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9733');
+      const invoice = await monthly(tx, fixture);
+
+      await recordPayment(
+        fixture.superadmin,
+        invoice.id,
+        { amount: 102_000, method: 'kaspi' },
+        { executor: tx, today: TODAY },
+      );
+
+      const [payment] = await tx
+        .select()
+        .from(schema.payments)
+        .where(eq(schema.payments.invoiceId, invoice.id));
+
+      await reversePayment(
+        fixture.superadmin,
+        payment?.id ?? '',
+        { reason: 'Ошибка' },
+        { executor: tx, today: TODAY },
+      );
+
+      await expect(
+        reversePayment(
+          fixture.superadmin,
+          payment?.id ?? '',
+          { reason: 'Ещё раз' },
+          { executor: tx, today: TODAY },
+        ),
+      ).rejects.toThrow(/alreadyReversed/);
+    });
+  });
+
+  it('админ дома платёж не сторнирует: это решение сети', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9734');
+      const invoice = await monthly(tx, fixture);
+
+      await recordPayment(
+        fixture.admin,
+        invoice.id,
+        { amount: 102_000, method: 'cash' },
+        { executor: tx, today: TODAY },
+      );
+
+      const [payment] = await tx
+        .select()
+        .from(schema.payments)
+        .where(eq(schema.payments.invoiceId, invoice.id));
+
+      await expect(
+        reversePayment(
+          fixture.admin,
+          payment?.id ?? '',
+          { reason: 'Ошибка' },
+          { executor: tx, today: TODAY },
+        ),
+      ).rejects.toThrow();
     });
   });
 

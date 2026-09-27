@@ -41,6 +41,7 @@ export const AUDIT_ACTIONS = {
   invoiceCancelled: 'invoice.cancelled',
   invoiceSentRemotely: 'invoice.sent_remotely',
   paymentRecorded: 'payment.recorded',
+  paymentReversed: 'payment.reversed',
   depositCharged: 'deposit.charged',
   residencyCreated: 'residency.created',
   residencyActivated: 'residency.activated',

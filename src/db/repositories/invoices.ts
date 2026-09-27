@@ -328,3 +328,13 @@ export async function listDepositTransactions(
     .where(and(...conditions))
     .orderBy(asc(depositTransactions.createdAt), asc(depositTransactions.id));
 }
+
+/** Один платёж по идентификатору: нужен сторно (P1-4, 27 сентября 2026). */
+export async function findPayment(
+  paymentId: string,
+  executor: Executor = getDb(),
+): Promise<Payment | null> {
+  const [payment] = await executor.select().from(payments).where(eq(payments.id, paymentId));
+
+  return payment ?? null;
+}
