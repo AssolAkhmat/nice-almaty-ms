@@ -153,6 +153,32 @@ describe('счёт на депозит', () => {
     });
   });
 
+  /*
+   * Находка боевой эксплуатации P1-3 (27 сентября 2026). Депозит дома может
+   * быть нулевым — у админа он обычно ноль, — и счёт на ноль тенге закрыть
+   * было нечем: статус назначался строкой `issued`, минуя правило
+   * `invoiceStatus`. Жилец оставался должником навсегда.
+   */
+  it('нулевой депозит даёт сразу закрытый счёт', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '7011');
+      await tx
+        .update(schema.houses)
+        .set({ defaultDeposit: 0 })
+        .where(eq(schema.houses.id, fixture.houseA));
+
+      const invoice = await issueDepositInvoice(
+        fixture.admin,
+        fixture.residencyA,
+        {},
+        { executor: tx, today: TODAY },
+      );
+
+      expect(invoice.total).toBe(0);
+      expect(invoice.status).toBe('paid');
+    });
+  });
+
   it('индивидуальная сумма перекрывает настройку дома', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '7003');

@@ -10,7 +10,7 @@ import {
 } from '@/db/repositories/invoices';
 import { countDamageShares, listDamageReceipts } from '@/db/repositories/damages';
 import { requireResidency, updateResidency } from '@/db/repositories/residencies';
-import { depositBalance, remainingToPay } from '@/domain/invoice';
+import { depositBalance, invoiceStatus, remainingToPay } from '@/domain/invoice';
 import { assertCan } from '@/lib/authz';
 import { ConflictError, ValidationError } from '@/lib/errors';
 import { now, startOfDayUtc, todayInAlmaty, type BusinessDate } from '@/lib/time';
@@ -171,7 +171,12 @@ export async function issueDepositInvoice(
         userId: residency.userId,
         residencyId: residency.id,
         type: 'deposit',
-        status: 'issued',
+        /*
+         * Статус выводится из суммы, а не назначается руками (находка P1-3,
+         * 27 сентября 2026): депозит дома может быть нулевым — у админа он
+         * обычно ноль, — и счёт с `issued` на нулевой сумме закрыть нечем.
+         */
+        status: invoiceStatus(total, 0),
         total,
         issuedAt: now(),
         dueDate: today,

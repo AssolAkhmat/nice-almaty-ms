@@ -232,6 +232,13 @@
       "when": 1790330973834,
       "tag": "0032_chubby_the_spike",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1790492692773,
+      "tag": "0033_lying_red_wolf",
+      "breakpoints": true
     }
   ]
 }

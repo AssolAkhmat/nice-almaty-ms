@@ -45,6 +45,34 @@ async function inRollback(body: (tx: Transaction) => Promise<void>): Promise<voi
 
 const TODAY = parseBusinessDate('2026-09-15');
 
+function errorChain(error: unknown): string {
+  const parts: string[] = [];
+  let current: unknown = error;
+
+  while (current instanceof Error) {
+    parts.push(current.message);
+    current = current.cause;
+  }
+
+  return parts.join(' | ');
+}
+
+/** Текст отказа базы: запрет проверяется запросом мимо сервиса. */
+async function failureText(
+  tx: Transaction,
+  body: (inner: Transaction) => Promise<unknown>,
+): Promise<string> {
+  try {
+    await tx.transaction(async (inner) => {
+      await body(inner);
+    });
+
+    return '';
+  } catch (error) {
+    return errorChain(error);
+  }
+}
+
 async function seed(tx: Transaction, suffix: string) {
   const [org] = await tx
     .insert(schema.organizations)
@@ -251,6 +279,85 @@ describe('список жильцов дома', () => {
       // Итог 100 000, оплачено 40 000 — долг это остаток, а не итог счёта.
       expect(row?.debt).toBe(60_000);
       expect(row?.hasDebt).toBe(true);
+    });
+  });
+
+  /*
+   * Находка боевой эксплуатации P1-3 (27 сентября 2026): счёт на ноль тенге
+   * висел долгом. Признак долга ставился по количеству просроченных счетов,
+   * а не по деньгам, и закрыть такой счёт было нечем — платить нечего.
+   */
+  it('нулевой счёт должником не делает', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '1133');
+
+      await tx.insert(schema.invoices).values({
+        orgId: fixture.orgId,
+        residencyId: fixture.own.residencyId,
+        userId: fixture.own.userId,
+        houseId: fixture.houseA,
+        type: 'deposit',
+        /* Закрыт при создании: платить нечего (правило `invoiceStatus`). */
+        status: 'paid',
+        dueDate: '2026-08-01',
+        total: 0,
+      });
+
+      const [row] = await listHouseResidents(fixture.admin, {}, { executor: tx, today: TODAY });
+
+      expect(row?.debt).toBe(0);
+      expect(row?.hasDebt).toBe(false);
+    });
+  });
+
+  it('фильтр «с долгом» нулевой счёт не показывает', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '1134');
+
+      await tx.insert(schema.invoices).values({
+        orgId: fixture.orgId,
+        residencyId: fixture.own.residencyId,
+        userId: fixture.own.userId,
+        houseId: fixture.houseA,
+        type: 'deposit',
+        status: 'paid',
+        dueDate: '2026-08-01',
+        total: 0,
+      });
+
+      const rows = await listHouseResidents(
+        fixture.admin,
+        { withDebt: true },
+        { executor: tx, today: TODAY },
+      );
+
+      expect(rows).toEqual([]);
+    });
+  });
+
+  it('открытый счёт на ноль база не принимает', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '1135');
+
+      /*
+       * Запрет проверяется запросом мимо сервиса: вставок в `invoices`
+       * несколько, и следующая напишет статус руками так же незаметно,
+       * как это сделал депозит.
+       */
+      const failure = await failureText(tx, (inner) =>
+        inner.insert(schema.invoices).values({
+          orgId: fixture.orgId,
+          residencyId: fixture.own.residencyId,
+          userId: fixture.own.userId,
+          houseId: fixture.houseA,
+          type: 'deposit',
+          status: 'issued',
+          dueDate: '2026-08-01',
+          total: 0,
+        }),
+      );
+
+      expect(failure).toContain('invoices_zero_total_closed');
     });
   });
 

@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   bigint,
+  check,
   date,
   index,
   jsonb,
@@ -100,6 +101,19 @@ export const invoices = pgTable(
   (table) => [
     index('invoices_residency_idx').on(table.residencyId),
     index('invoices_house_status_idx').on(table.houseId, table.status),
+    /*
+     * Счёт на ноль тенге не бывает открытым (находка P1-3, 27 сентября 2026).
+     * Закрыть его нечем: платить нечего, а из долга он не уходит. На боевой
+     * такой счёт появился депозитом с нулевой суммой — статус там назначался
+     * строкой, минуя правило `invoiceStatus`.
+     *
+     * Правило стоит в базе, а не только в сервисе: вставок в `invoices`
+     * несколько, и следующая напишет статус руками так же незаметно.
+     */
+    check(
+      'invoices_zero_total_closed',
+      sql`${table.total} > 0 or ${table.status} in ('paid', 'cancelled')`,
+    ),
   ],
 );
 

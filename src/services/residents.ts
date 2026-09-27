@@ -121,8 +121,6 @@ async function buildRow(
       compareBusinessDates(parseBusinessDate(invoice.dueDate), today) < 0,
   );
 
-  const hasDebt = overdue.length > 0;
-
   /*
    * Сумма долга — остаток по просроченным счётам, а не их итог: часть могла
    * быть уже оплачена. Платежи считаются одним запросом на все счета.
@@ -136,6 +134,14 @@ async function buildRow(
     (sum, invoice) => sum + Math.max(0, invoice.total - (paid.get(invoice.id) ?? 0)),
     0,
   );
+
+  /*
+   * Долг — деньги, а не число счетов (находка P1-3, 27 сентября 2026).
+   * Раньше признак ставился по количеству просроченных счетов, и счёт
+   * на ноль тенге делал жильца должником навсегда: закрыть его нечем —
+   * платить нечего, а из признака он не уходил.
+   */
+  const hasDebt = debt > 0;
 
   const byType = new Map(documents.map((document) => [document.documentTypeId, document]));
 
