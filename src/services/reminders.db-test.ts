@@ -15,7 +15,7 @@ import {
   type BusinessDate,
 } from '@/lib/time';
 
-import { checkCurfew } from './curfew';
+import { checkCurfew, CURFEW_CHECK_DISABLED, CURFEW_CHECK_JOB } from './curfew';
 import { watchDepositRefunds, watchDocumentExpiry } from './expiry-reminders';
 import { remindSchedule, remindUtilities } from './monthly-reminders';
 import { remindRotations } from './rotation-reminders';
@@ -252,61 +252,56 @@ describe('напоминания о ротациях', () => {
 });
 
 describe('отбой', () => {
-  it('жилец без уведомления попадает в список админа', async () => {
+  /*
+   * Задание выключено 27 сентября 2026 (указание владельца): в ночь на 27-е
+   * оно разослало двенадцать человек как «не подали уведомление к отбою»,
+   * хотя никто ничего не заявлял и не нарушал.
+   *
+   * Прежние проверки здесь закрепляли именно то поведение, которое оказалось
+   * ложным: «жилец без уведомления попадает в список админа». Они не удалены
+   * молча — они заменены на проверки молчания, а правило разослать список
+   * заново придёт вместе с источником события «вернулся домой».
+   */
+  it('выключенное задание не рассылает ничего', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '6605');
 
-      await checkCurfew({ executor: tx, instant: MORNING });
+      const result = await checkCurfew({ executor: tx, instant: MORNING });
 
-      const [notification] = await notificationsOf(tx, fixture.adminId ?? '');
-      expect(notification?.type).toBe('curfew.check');
-      expect(notification?.payload).toMatchObject({ userIds: [fixture.dwellerId] });
-      // Санкций нет: это список, а не наказание (§9).
+      expect(result.skipped).toBe(true);
+      expect(result.notified).toBe(0);
+      expect(await notificationsOf(tx, fixture.adminId ?? '')).toEqual([]);
+      expect(await notificationsOf(tx, fixture.superId)).toEqual([]);
       expect(await notificationsOf(tx, fixture.dwellerId)).toEqual([]);
     });
   });
 
-  it('подавший уведомление в список не попадает, и список не уходит', async () => {
+  it('выключенное задание не занимает прогон дня', async () => {
     await inRollback(async (tx) => {
-      const fixture = await seed(tx, '6606');
-
-      await tx.insert(schema.absences).values({
-        orgId: fixture.orgId,
-        userId: fixture.dwellerId,
-        houseId: fixture.houseId,
-        type: 'short',
-        status: 'approved',
-        startDate: '2027-03-08',
-        reason: 'Задерживаюсь на работе',
-      });
+      await seed(tx, '6606');
 
       await checkCurfew({ executor: tx, instant: MORNING });
 
-      expect(await notificationsOf(tx, fixture.adminId ?? '')).toEqual([]);
+      /*
+       * Прогон не помечается выполненным: иначе в день включения правила
+       * задание сочло бы день уже отработанным и промолчало бы ещё сутки.
+       */
+      const runs = await tx
+        .select()
+        .from(schema.jobRuns)
+        .where(eq(schema.jobRuns.job, CURFEW_CHECK_JOB));
+
+      expect(runs).toEqual([]);
     });
   });
 
-  it('в доме без админа список уходит суперадмину', async () => {
-    await inRollback(async (tx) => {
-      const fixture = await seed(tx, '6607', { withAdmin: false });
-
-      await checkCurfew({ executor: tx, instant: MORNING });
-
-      const [notification] = await notificationsOf(tx, fixture.superId);
-      expect(notification?.type).toBe('curfew.check');
-    });
-  });
-
-  it('повторный прогон за день ничего не дублирует', async () => {
-    await inRollback(async (tx) => {
-      const fixture = await seed(tx, '6608');
-
-      await checkCurfew({ executor: tx, instant: MORNING });
-      const again = await checkCurfew({ executor: tx, instant: EVENING });
-
-      expect(again.skipped).toBe(true);
-      expect(await notificationsOf(tx, fixture.adminId ?? '')).toHaveLength(1);
-    });
+  it('снять флаг молча нельзя: он и есть выключатель', () => {
+    /*
+     * Проверка краснеет, стоит вернуть задание в строй, не тронув эту строку.
+     * Строка меняется вместе с правилом — и тогда же возвращаются проверки
+     * рассылки, уже по согласованному условию.
+     */
+    expect(CURFEW_CHECK_DISABLED).toBe(true);
   });
 });
 

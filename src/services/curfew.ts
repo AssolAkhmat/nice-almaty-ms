@@ -21,6 +21,27 @@ import type { UserActor } from './users';
  */
 export const CURFEW_CHECK_JOB = 'curfew-check';
 
+/**
+ * Задание выключено 27 сентября 2026 по указанию владельца.
+ *
+ * В ночь на 27-е оно разослало админам список из двенадцати жильцов как
+ * «не подали уведомление к отбою». Ни один из двенадцати ничего не заявлял
+ * и не нарушал: список строится как «весь состав дома минус те, по кому есть
+ * запись об отсутствии», то есть в него попадает каждый, кто просто был дома.
+ * Ложное уведомление хуже отсутствующего — канал уведомлений обесценивается
+ * целиком, поэтому задание молчит до согласованного правила.
+ *
+ * Выключено в самом сервисе, а не снятием обработчика и не правкой
+ * расписания: вызвать `checkCurfew` можно и мимо них — из планировщика,
+ * из `/api/v1/cron`, руками при разборе. Молчать оно должно везде.
+ *
+ * Снимать этот флаг можно только вместе с правилом: чем именно система
+ * узнаёт, что человек не вернулся. Негативная фикстура в
+ * `src/services/curfew.db-test.ts` краснеет, если флаг снят, а рассылка
+ * осталась прежней.
+ */
+export const CURFEW_CHECK_DISABLED = true;
+
 export interface CurfewDeps {
   executor?: Executor;
   instant?: Date;
@@ -76,6 +97,12 @@ export async function checkCurfew(deps: CurfewDeps = {}): Promise<CurfewResult> 
 
   const date = todayInAlmaty(instant);
   const log = logger.child({ job: CURFEW_CHECK_JOB, date });
+
+  if (CURFEW_CHECK_DISABLED) {
+    log.warn('задание выключено 27 сентября 2026: рассылка была ложной, ждёт правила');
+
+    return { date, houses: 0, notified: 0, skipped: true };
+  }
 
   const run = await claimJobRun(CURFEW_CHECK_JOB, date, executor);
 
