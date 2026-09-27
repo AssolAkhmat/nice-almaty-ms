@@ -24,6 +24,7 @@ export async function seedChartOfAccounts(
     { orgId, code: ACCOUNT_CODES.commonFund, name: 'Общий счёт', type: 'common_fund' },
     { orgId, code: ACCOUNT_CODES.cash, name: 'Касса', type: 'cash' },
     { orgId, code: ACCOUNT_CODES.kaspi, name: 'Kaspi', type: 'kaspi' },
+    { orgId, code: ACCOUNT_CODES.bank, name: 'Расчётный счёт', type: 'bank' },
     ...houses.map((house) => ({
       orgId,
       houseId: house.id,

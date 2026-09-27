@@ -270,9 +270,48 @@ async function requireHouseFund(
   return fund;
 }
 
-/** Куда физически легли деньги: касса или Kaspi (§10.1). */
+/**
+ * Куда пришли деньги: Kaspi, касса или расчётный счёт (§10.1). Перевод заведён
+ * 27 сентября 2026 (D32) и кладётся на свой счёт, а не сваливается в кассу:
+ * иначе сверка с банком перестала бы сходиться.
+ */
 function moneyCode(method: Payment['method']): string {
-  return method === 'kaspi' ? ACCOUNT_CODES.kaspi : ACCOUNT_CODES.cash;
+  if (method === 'kaspi') {
+    return ACCOUNT_CODES.kaspi;
+  }
+
+  return method === 'transfer' ? ACCOUNT_CODES.bank : ACCOUNT_CODES.cash;
+}
+
+/**
+ * Счёт, на который легли деньги.
+ *
+ * Касса и Kaspi приходят из сида. Расчётный счёт появился позже сети, и
+ * заводится он по требованию — тем же приёмом, что фонд дома выше: вставить
+ * его миграцией нельзя, PostgreSQL не разрешает использовать новое значение
+ * перечисления в той же транзакции, где оно добавлено (проверено прогоном,
+ * а не предположено). Повторный вызов ничего не создаёт.
+ */
+async function moneyAccount(
+  actor: UserActor,
+  method: Payment['method'],
+  executor: Executor,
+): Promise<Account> {
+  if (method !== 'transfer') {
+    return requireAccountByCode(actor, moneyCode(method), executor);
+  }
+
+  const existing = await findAccountByCode(actor.context, ACCOUNT_CODES.bank, executor);
+
+  if (existing !== null) {
+    return existing;
+  }
+
+  return createAccount(
+    actor.context,
+    { code: ACCOUNT_CODES.bank, name: 'Расчётный счёт', type: 'bank', isSystem: true },
+    executor,
+  );
 }
 
 export interface DepositPaymentEntry {
@@ -299,7 +338,7 @@ export async function postDepositPayment(
 ): Promise<LedgerEntry> {
   const { executor } = resolve(deps);
 
-  const money = await requireAccountByCode(actor, moneyCode(input.method), executor);
+  const money = await moneyAccount(actor, input.method, executor);
   const depositFund = await requireAccountByCode(actor, ACCOUNT_CODES.depositFund, executor);
 
   const lines: PostLine[] = [
@@ -432,7 +471,7 @@ export async function postInvoicePayment(
   const { executor } = resolve(deps);
 
   const total = input.allocation.utilities + input.allocation.deposit + input.allocation.house;
-  const money = await requireAccountByCode(actor, moneyCode(input.method), executor);
+  const money = await moneyAccount(actor, input.method, executor);
   const lines: PostLine[] = [{ accountId: money.id, direction: 'debit', amount: total }];
 
   if (input.allocation.utilities > 0) {
@@ -487,7 +526,7 @@ export async function postDepositRefund(
   const { executor } = resolve(deps);
 
   const depositFund = await requireAccountByCode(actor, ACCOUNT_CODES.depositFund, executor);
-  const money = await requireAccountByCode(actor, moneyCode(input.method), executor);
+  const money = await moneyAccount(actor, input.method, executor);
 
   return postSystemEntry(
     actor,

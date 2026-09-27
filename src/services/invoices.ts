@@ -32,6 +32,7 @@ import {
   compareBusinessDates,
   now,
   parseBusinessDate,
+  startOfNextDayUtc,
   todayInAlmaty,
   type BusinessDate,
 } from '@/lib/time';
@@ -535,6 +536,15 @@ export async function recordPayment(
    */
   if (invoice.type === 'deposit_refund') {
     throw new ConflictError('invoices.errors.refundNotPayable');
+  }
+
+  /*
+   * Дата платежа не из будущего (Приложение №3 п. 4.2: отметка подтверждает
+   * состоявшийся факт). Прошедшая дата разрешена: деньги могли прийти вчера,
+   * а отметить их дошли сегодня.
+   */
+  if (input.paidAt !== undefined && input.paidAt.getTime() > startOfNextDayUtc(today).getTime()) {
+    throw new ValidationError('invoices.errors.paidAtFuture');
   }
 
   const paidBefore = totalOf(await listPayments(invoice.id, executor));

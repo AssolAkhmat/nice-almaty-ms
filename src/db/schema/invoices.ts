@@ -56,7 +56,12 @@ export const invoiceLineKindEnum = pgEnum('invoice_line_kind', [
   'proration',
 ]);
 
-export const paymentMethodEnum = pgEnum('payment_method', ['kaspi', 'cash']);
+/**
+ * Способ оплаты. `transfer` — банковский перевод на счёт ИП (указание
+ * владельца, 27 сентября 2026, Приложение №3 п. 4.2): эквайринга на нём нет,
+ * а налогооблагаемым доходом он остаётся, в отличие от наличных (D32).
+ */
+export const paymentMethodEnum = pgEnum('payment_method', ['kaspi', 'cash', 'transfer']);
 
 export const depositTransactionTypeEnum = pgEnum('deposit_transaction_type', [
   'charge',

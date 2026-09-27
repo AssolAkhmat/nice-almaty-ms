@@ -19,10 +19,14 @@ export const ACQUIRING_RATE_BP = 95;
 const BASIS_POINTS = 10_000;
 
 export interface TaxInput {
-  /** Доход через Kaspi за период, целые тенге. */
-  kaspiIncome: number;
-  /** Оборот через Kaspi за период: с него берётся эквайринг. */
-  kaspiTurnover: number;
+  /**
+   * Налогооблагаемый доход за период, целые тенге: безналичный приход
+   * без депозитов. Перевод входит наравне с Kaspi (D32, 27 сентября 2026),
+   * наличные — нет, по модели §10.2.
+   */
+  taxableIncome: number;
+  /** Оборот эквайринга: только Kaspi — комиссию берёт он. */
+  acquiringTurnover: number;
   taxRateBp: number;
   acquiringRateBp: number;
 }
@@ -60,18 +64,18 @@ function applyRate(amount: number, rateBp: number): number {
 }
 
 export function taxReport(input: TaxInput): TaxReport {
-  assertAmount(input.kaspiIncome, 'Доход через Kaspi');
-  assertAmount(input.kaspiTurnover, 'Оборот через Kaspi');
+  assertAmount(input.taxableIncome, 'Налогооблагаемый доход');
+  assertAmount(input.acquiringTurnover, 'Оборот эквайринга');
   assertAmount(input.taxRateBp, 'Ставка налога');
   assertAmount(input.acquiringRateBp, 'Ставка эквайринга');
 
-  const tax = applyRate(input.kaspiIncome, input.taxRateBp);
-  const acquiring = applyRate(input.kaspiTurnover, input.acquiringRateBp);
+  const tax = applyRate(input.taxableIncome, input.taxRateBp);
+  const acquiring = applyRate(input.acquiringTurnover, input.acquiringRateBp);
 
   return {
     tax,
     acquiring,
     deduction: tax + acquiring,
-    net: input.kaspiIncome - tax - acquiring,
+    net: input.taxableIncome - tax - acquiring,
   };
 }

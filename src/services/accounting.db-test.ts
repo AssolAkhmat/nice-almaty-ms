@@ -314,8 +314,8 @@ describe('калькулятор налогов (§10.2)', () => {
         { executor: tx },
       );
 
-      expect(report.totals.kaspiIncome).toBe(RENT);
-      expect(report.totals.kaspiTurnover).toBe(RENT);
+      expect(report.totals.taxableIncome).toBe(RENT);
+      expect(report.totals.acquiringTurnover).toBe(RENT);
       // 90 000 × 3 % = 2700; × 0,95 % = 855.
       expect(report.report.tax).toBe(2_700);
       expect(report.report.acquiring).toBe(855);
@@ -366,8 +366,8 @@ describe('калькулятор налогов (§10.2)', () => {
         { executor: tx },
       );
 
-      expect(report.totals.kaspiTurnover).toBe(DEPOSIT);
-      expect(report.totals.kaspiIncome).toBe(0);
+      expect(report.totals.acquiringTurnover).toBe(DEPOSIT);
+      expect(report.totals.taxableIncome).toBe(0);
     });
   });
 
@@ -405,6 +405,45 @@ describe('калькулятор налогов (§10.2)', () => {
     });
   });
 
+  /*
+   * Перевод заведён 27 сентября 2026 (D32): налогооблагаемым доходом он
+   * остаётся, а эквайринга на нём нет — комиссию берёт Kaspi, а не банк.
+   * Наличные в базу не входят по модели §10.2, и это правило не менялось.
+   */
+  it('перевод входит в доход, но не в оборот эквайринга', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9124');
+
+      const invoice = await createInvoice(
+        fixture.superadmin,
+        {
+          residencyId: fixture.residencyId,
+          type: 'monthly',
+          periodMonth: FROM,
+          lines: [{ kind: 'rent', title: 'Проживание', amount: RENT }],
+        },
+        { executor: tx, today: TODAY },
+      );
+      await recordPayment(
+        fixture.superadmin,
+        invoice.id,
+        { amount: RENT, method: 'transfer' },
+        { executor: tx, today: TODAY, instant: INSTANT },
+      );
+
+      const report = await readTaxReport(
+        fixture.superadmin,
+        { from: FROM, to: TO },
+        { executor: tx },
+      );
+
+      expect(report.totals.taxableIncome).toBe(RENT);
+      expect(report.totals.acquiringTurnover).toBe(0);
+      expect(report.report.acquiring).toBe(0);
+      expect(report.report.tax).toBeGreaterThan(0);
+    });
+  });
+
   it('наличные в расчёт не попадают: эквайринга по ним нет', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '9123');
@@ -432,7 +471,7 @@ describe('калькулятор налогов (§10.2)', () => {
         { executor: tx },
       );
 
-      expect(report.totals.kaspiTurnover).toBe(0);
+      expect(report.totals.acquiringTurnover).toBe(0);
     });
   });
 });

@@ -2,6 +2,7 @@
 
 import { FileLinks } from '@/components/files/file-links';
 import { AppLink } from '@/components/ui/app-link';
+import { PersonName, type PersonNameView } from '@/components/ui/person-name';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useActionState, useState } from 'react';
 
@@ -59,7 +60,13 @@ export interface InvoiceCardView {
 
 export interface InvoiceRowView {
   id: string;
-  residentName: string;
+  /**
+   * Кто платит. Подпись, а не строка с именем: при незаполненном профиле
+   * здесь была пустая строка, ссылка на карточку счёта выходила без текста,
+   * и нажать на неё было нечем — единственная дорога к отметке оплаты
+   * (находка P1-4, 27 сентября 2026).
+   */
+  resident: PersonNameView;
   periodMonth: string | null;
   status: string;
   total: number;
@@ -243,7 +250,7 @@ export function HouseInvoicesTable({ rows }: { rows: readonly InvoiceRowView[] }
           header: t('invoices.resident'),
           cell: (row) => (
             <AppLink className="underline-offset-2 hover:underline" href={`/invoices/${row.id}`}>
-              {row.residentName}
+              <PersonName person={row.resident} />
             </AppLink>
           ),
         },
@@ -454,8 +461,24 @@ export function CreateInvoiceForm({ residencies }: { residencies: readonly Resid
   );
 }
 
-/** Быстрая отметка оплаты (модуль 2): сумма, способ, комментарий. */
-export function PaymentForm({ invoiceId, remaining }: { invoiceId: string; remaining: number }) {
+/**
+ * Отметка оплаты по Приложению №3 п. 4.2 договора: сумма, дата, способ,
+ * назначение (комментарий) и, при наличии, подтверждающий документ.
+ *
+ * Полей раньше было три из пяти: комментарий и вложение отсутствовали, а
+ * способов было два из трёх (находка P1-4, 27 сентября 2026). Больше остатка
+ * не принимается сервисом, будущая дата — тоже.
+ */
+export function PaymentForm({
+  invoiceId,
+  remaining,
+  today,
+}: {
+  invoiceId: string;
+  remaining: number;
+  /** Сегодня по Алматы: верхняя граница даты платежа. */
+  today: string;
+}) {
   const t = useTranslations();
   const [state, action, isPending] = useActionState(recordInvoicePaymentAction, INITIAL);
 
@@ -482,9 +505,10 @@ export function PaymentForm({ invoiceId, remaining }: { invoiceId: string; remai
       </Field>
 
       <Field htmlFor={`method-${invoiceId}`} label={t('invoices.method.label')}>
-        <Select id={`method-${invoiceId}`} name="method">
+        <Select data-testid="invoice-payment-method" id={`method-${invoiceId}`} name="method">
           <option value="kaspi">{t('invoices.method.kaspi')}</option>
           <option value="cash">{t('invoices.method.cash')}</option>
+          <option value="transfer">{t('invoices.method.transfer')}</option>
         </Select>
       </Field>
 
@@ -493,7 +517,22 @@ export function PaymentForm({ invoiceId, remaining }: { invoiceId: string; remai
         htmlFor={`paid-at-${invoiceId}`}
         label={t('invoices.paidAt')}
       >
-        <Input id={`paid-at-${invoiceId}`} name="paidAt" type="date" />
+        <Input
+          data-testid="invoice-payment-date"
+          id={`paid-at-${invoiceId}`}
+          max={today}
+          name="paidAt"
+          type="date"
+        />
+      </Field>
+
+      <Field htmlFor={`payment-note-${invoiceId}`} label={t('invoices.paymentNote')}>
+        <Input
+          data-testid="invoice-payment-note"
+          id={`payment-note-${invoiceId}`}
+          name="note"
+          placeholder={t('invoices.paymentNoteHint')}
+        />
       </Field>
 
       <Button disabled={isPending} type="submit">

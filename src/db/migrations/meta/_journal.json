@@ -239,6 +239,13 @@
       "when": 1790492692773,
       "tag": "0033_lying_red_wolf",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1790494389649,
+      "tag": "0034_rapid_tarantula",
+      "breakpoints": true
     }
   ]
 }

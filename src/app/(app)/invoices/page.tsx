@@ -15,7 +15,7 @@ import {
 } from '@/lib/time';
 import { listInvoicesFor, readInvoice } from '@/services/invoices';
 import { listUtilityReceiptsFor } from '@/services/utilities';
-import { readProfile } from '@/services/resident-profiles';
+import { personLabels } from '@/services/person-labels';
 import { houseHistoryNames } from '@/services/residents';
 
 import {
@@ -147,21 +147,25 @@ export default async function InvoicesPage({
     listResidencies(context, { houseId, status: 'active' }),
   ]);
 
-  /** Имена вместо идентификаторов: таблицу счетов читает человек. */
+  /*
+   * Подпись человека строит один сервис (`personLabels`): страница собирала
+   * имя сама и на незаполненном профиле кладла в строку пустую строку —
+   * ссылка на карточку счёта выходила без текста, и дороги к отметке оплаты
+   * не оставалось (находка P1-4, 27 сентября 2026).
+   */
+  const labels = await personLabels(
+    context,
+    rows.map((row) => row.invoice.userId),
+  );
+
   const nameOf = new Map<string, string>();
-  for (const residency of residencies) {
-    const profile = await readProfile(actor, residency.userId);
-    const name = [profile.lastName, profile.firstName]
-      .filter((part) => part !== null && part !== '')
-      .join(' ');
-    nameOf.set(residency.userId, name.trim() === '' ? '' : name);
+
+  for (const [userId, label] of labels) {
+    if (label.name !== null) {
+      nameOf.set(userId, label.name);
+    }
   }
 
-  /*
-   * Счёт мог быть выставлен тому, кто с тех пор переселился в другой дом:
-   * его карточка админу уже не видна, а счёт дома остался. Имя для такой
-   * строки берётся по занятости мест дома — и только имя (решение D27).
-   */
   const missing = rows.map((row) => row.invoice.userId).filter((userId) => !nameOf.has(userId));
 
   for (const [userId, name] of await houseHistoryNames(actor, houseId, missing)) {
@@ -172,7 +176,10 @@ export default async function InvoicesPage({
 
   const tableRows: InvoiceRowView[] = rows.map((row) => ({
     id: row.invoice.id,
-    residentName: nameOf.get(row.invoice.userId) ?? row.invoice.userId,
+    resident: {
+      name: nameOf.get(row.invoice.userId) ?? null,
+      phone: labels.get(row.invoice.userId)?.phone ?? '',
+    },
     periodMonth: row.invoice.periodMonth,
     status: row.invoice.status,
     total: row.invoice.total,

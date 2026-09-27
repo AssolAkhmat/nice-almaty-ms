@@ -295,6 +295,58 @@ describe('платежи (инвариант 6)', () => {
     });
   });
 
+  /*
+   * Находка P1-4 (27 сентября 2026). Приложение №3 п. 4.2 договора требует
+   * отметку с суммой, датой, назначением и способом платежа. Способов было
+   * два из трёх, назначение не сохранялось, будущая дата принималась.
+   */
+  it('перевод ложится на расчётный счёт и сохраняет назначение', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9721');
+      const invoice = await monthly(tx, fixture);
+
+      const paid = await recordPayment(
+        fixture.admin,
+        invoice.id,
+        { amount: 102_000, method: 'transfer', note: 'По договору № 12 от 20.09' },
+        { executor: tx, today: TODAY },
+      );
+
+      expect(paid.status).toBe('paid');
+
+      const view = await readInvoice(fixture.admin, invoice.id, { executor: tx });
+      expect(view.payments[0]?.method).toBe('transfer');
+      expect(view.payments[0]?.note).toBe('По договору № 12 от 20.09');
+
+      /* Деньги легли на свой счёт, а не в кассу: сверка с банком сойдётся. */
+      const ledger = await ledgerOf(tx, fixture.orgId);
+      const bank = ledger.filter((line) => line.code === 'bank');
+
+      expect(bank).not.toEqual([]);
+      expect(
+        bank
+          .filter((line) => line.direction === 'debit')
+          .reduce((sum, line) => sum + line.amount, 0),
+      ).toBe(102_000);
+    });
+  });
+
+  it('дата платежа из будущего не принимается', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9722');
+      const invoice = await monthly(tx, fixture);
+
+      await expect(
+        recordPayment(
+          fixture.admin,
+          invoice.id,
+          { amount: 1_000, method: 'cash', paidAt: new Date('2099-01-01T00:00:00Z') },
+          { executor: tx, today: TODAY },
+        ),
+      ).rejects.toThrow(/paidAtFuture/);
+    });
+  });
+
   it('переплата запрещена', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '9711');

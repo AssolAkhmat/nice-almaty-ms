@@ -31,6 +31,8 @@ export const accountTypeEnum = pgEnum('account_type', [
   'common_fund',
   'cash',
   'kaspi',
+  /* Расчётный счёт ИП: приход банковским переводом (27 сентября 2026). */
+  'bank',
   'external',
 ]);
 
@@ -45,6 +47,7 @@ export const ACCOUNT_CODES = {
   commonFund: 'common_fund',
   cash: 'cash',
   kaspi: 'kaspi',
+  bank: 'bank',
 } as const;
 
 export function houseFundCode(houseSlug: string): string {

@@ -374,11 +374,11 @@ export function TaxCalculator({ view }: { view: TaxView }) {
 
         <div className="flex flex-col gap-1 text-[13px]" data-testid="tax-result">
           <div className="flex justify-between gap-4">
-            <span>{t('accounting.kaspiIncome')}</span>
+            <span>{t('accounting.taxableIncome')}</span>
             <Money amount={view.income} />
           </div>
           <div className="flex justify-between gap-4">
-            <span>{t('accounting.kaspiTurnover')}</span>
+            <span>{t('accounting.acquiringTurnover')}</span>
             <Money amount={view.turnover} />
           </div>
           <div className="flex justify-between gap-4">
@@ -406,7 +406,7 @@ export function TaxCalculator({ view }: { view: TaxView }) {
               { key: 'house', header: t('accounting.house'), cell: (row) => row.houseName },
               {
                 key: 'income',
-                header: t('accounting.kaspiIncome'),
+                header: t('accounting.taxableIncome'),
                 numeric: true,
                 cell: (row) => <Money amount={row.income} />,
               },

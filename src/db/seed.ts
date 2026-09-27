@@ -249,6 +249,7 @@ const NETWORK_ACCOUNTS = [
   { code: ACCOUNT_CODES.commonFund, name: 'Общий счёт', type: 'common_fund' as const },
   { code: ACCOUNT_CODES.cash, name: 'Касса', type: 'cash' as const },
   { code: ACCOUNT_CODES.kaspi, name: 'Kaspi', type: 'kaspi' as const },
+  { code: ACCOUNT_CODES.bank, name: 'Расчётный счёт', type: 'bank' as const },
 ];
 
 async function ensureAccount(

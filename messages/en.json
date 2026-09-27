@@ -91,8 +91,6 @@
     "acquiringRate": "Acquiring, %",
     "percentHint": "Defaults are 3% and 0.95%",
     "recalculate": "Recalculate",
-    "kaspiIncome": "Income via Kaspi",
-    "kaspiTurnover": "Turnover via Kaspi",
     "taxAmount": "Tax",
     "acquiringAmount": "Acquiring fee",
     "deduction": "Total deduction",
@@ -126,7 +124,9 @@
       "expense": "Expense recorded",
       "reversed": "Entry reversed"
     },
-    "noAccountsLink": "Open the chart of accounts"
+    "noAccountsLink": "Open the chart of accounts",
+    "taxableIncome": "Taxable income",
+    "acquiringTurnover": "Acquiring turnover (Kaspi)"
   },
   "apiTokens": {
     "title": "API tokens",
@@ -301,7 +301,8 @@
       "common_fund": "Common fund",
       "deposit_fund": "Deposit fund",
       "utility_fund": "Utility fund",
-      "house_fund": "House fund"
+      "house_fund": "House fund",
+      "transfer": "Transfer"
     },
     "values": {
       "network": "Whole network"
@@ -1022,7 +1023,8 @@
     "method": {
       "label": "Payment method",
       "kaspi": "Kaspi",
-      "cash": "Cash"
+      "cash": "Cash",
+      "transfer": "Transfer"
     },
     "status": {
       "pending": "Pending",
@@ -1058,7 +1060,8 @@
       "notMonthly": "Only a monthly invoice can be recalculated",
       "noPeriod": "The invoice has no month",
       "method": "Choose a payment method",
-      "alreadySent": "The invoice is already marked as sent"
+      "alreadySent": "The invoice is already marked as sent",
+      "paidAtFuture": "The payment date cannot be in the future"
     },
     "remote": {
       "title": "Remote payments",
@@ -1080,7 +1083,9 @@
       }
     },
     "paidAt": "Payment date",
-    "paidAtHint": "Empty means today"
+    "paidAtHint": "Empty means today",
+    "paymentNote": "Payment purpose",
+    "paymentNoteHint": "What the money was taken for"
   },
   "language": {
     "label": "Language",

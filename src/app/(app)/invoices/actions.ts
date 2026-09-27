@@ -186,7 +186,7 @@ export async function recordInvoicePaymentAction(
   }
 
   const method = text(formData, 'method');
-  if (method !== 'kaspi' && method !== 'cash') {
+  if (method !== 'kaspi' && method !== 'cash' && method !== 'transfer') {
     return { error: 'invoices.errors.method' };
   }
 

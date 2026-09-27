@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { can } from '@/lib/authz';
 import { getCurrentSession } from '@/lib/session';
+import { todayInAlmaty } from '@/lib/time';
 import { readInvoice } from '@/services/invoices';
 import { readProfile } from '@/services/resident-profiles';
 
@@ -105,7 +106,11 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             <CardTitle>{t('recordPayment')}</CardTitle>
           </CardHeader>
           <div className="p-4 pt-0">
-            <PaymentForm invoiceId={view.invoice.id} remaining={view.remaining} />
+            <PaymentForm
+              invoiceId={view.invoice.id}
+              remaining={view.remaining}
+              today={todayInAlmaty()}
+            />
           </div>
         </Card>
       )}

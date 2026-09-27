@@ -91,8 +91,6 @@
     "acquiringRate": "Эквайринг, %",
     "percentHint": "Әдепкі: 3 % және 0,95 %",
     "recalculate": "Қайта есептеу",
-    "kaspiIncome": "Kaspi арқылы кіріс",
-    "kaspiTurnover": "Kaspi арқылы айналым",
     "taxAmount": "Салық",
     "acquiringAmount": "Эквайринг комиссиясы",
     "deduction": "Барлығы шегерімге",
@@ -126,7 +124,9 @@
       "expense": "Шығыс тіркелді",
       "reversed": "Өткізбе сторноланды"
     },
-    "noAccountsLink": "Шоттар жоспарын ашу"
+    "noAccountsLink": "Шоттар жоспарын ашу",
+    "taxableIncome": "Салық салынатын табыс",
+    "acquiringTurnover": "Эквайринг айналымы (Kaspi)"
   },
   "apiTokens": {
     "title": "API токендері",
@@ -301,7 +301,8 @@
       "common_fund": "Жалпы шот",
       "deposit_fund": "Депозит қоры",
       "utility_fund": "Коммуналдық қор",
-      "house_fund": "Үй қоры"
+      "house_fund": "Үй қоры",
+      "transfer": "Аударым"
     },
     "values": {
       "network": "Бүкіл желі"
@@ -1022,7 +1023,8 @@
     "method": {
       "label": "Төлеу тәсілі",
       "kaspi": "Kaspi",
-      "cash": "Қолма-қол"
+      "cash": "Қолма-қол",
+      "transfer": "Аударым"
     },
     "status": {
       "pending": "Күтуде",
@@ -1058,7 +1060,8 @@
       "notMonthly": "Тек айлық шот қайта есептеледі",
       "noPeriod": "Шотта ай көрсетілмеген",
       "method": "Төлеу тәсілін таңдаңыз",
-      "alreadySent": "Шот жіберілген деп белгіленген"
+      "alreadySent": "Шот жіберілген деп белгіленген",
+      "paidAtFuture": "Төлем күні болашақта болуы мүмкін емес"
     },
     "remote": {
       "title": "Қашықтан төлеу",
@@ -1080,7 +1083,9 @@
       }
     },
     "paidAt": "Төлем күні",
-    "paidAtHint": "Бос — бүгін"
+    "paidAtHint": "Бос — бүгін",
+    "paymentNote": "Төлемнің мақсаты",
+    "paymentNoteHint": "Ақша не үшін қабылданды"
   },
   "language": {
     "label": "Тіл",

@@ -91,8 +91,6 @@
     "acquiringRate": "Эквайринг, %",
     "percentHint": "По умолчанию 3 % и 0,95 %",
     "recalculate": "Пересчитать",
-    "kaspiIncome": "Доход через Kaspi",
-    "kaspiTurnover": "Оборот через Kaspi",
     "taxAmount": "Налог",
     "acquiringAmount": "Комиссия эквайринга",
     "deduction": "Итого к вычету",
@@ -126,7 +124,9 @@
       "expense": "Расход проведён",
       "reversed": "Проводка сторнирована"
     },
-    "noAccountsLink": "Открыть план счетов"
+    "noAccountsLink": "Открыть план счетов",
+    "taxableIncome": "Налогооблагаемый доход",
+    "acquiringTurnover": "Оборот эквайринга (Kaspi)"
   },
   "apiTokens": {
     "title": "Токены API",
@@ -301,7 +301,8 @@
       "common_fund": "Общий счёт",
       "deposit_fund": "Депозитный фонд",
       "utility_fund": "Коммунальный фонд",
-      "house_fund": "Фонд дома"
+      "house_fund": "Фонд дома",
+      "transfer": "Перевод"
     },
     "values": {
       "network": "Вся сеть"
@@ -1022,7 +1023,8 @@
     "method": {
       "label": "Способ оплаты",
       "kaspi": "Kaspi",
-      "cash": "Наличные"
+      "cash": "Наличные",
+      "transfer": "Перевод"
     },
     "status": {
       "pending": "В ожидании",
@@ -1058,7 +1060,8 @@
       "notMonthly": "Пересчитывается только месячный счёт",
       "noPeriod": "У счёта не указан месяц",
       "method": "Выберите способ оплаты",
-      "alreadySent": "Счёт уже отмечен отправленным"
+      "alreadySent": "Счёт уже отмечен отправленным",
+      "paidAtFuture": "Дата платежа не может быть в будущем"
     },
     "remote": {
       "title": "Удалёнка",
@@ -1080,7 +1083,9 @@
       }
     },
     "paidAt": "Дата платежа",
-    "paidAtHint": "Пусто — сегодня"
+    "paidAtHint": "Пусто — сегодня",
+    "paymentNote": "Назначение платежа",
+    "paymentNoteHint": "За что приняты деньги"
   },
   "language": {
     "label": "Язык",

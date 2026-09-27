@@ -19,8 +19,8 @@ describe('ставки по умолчанию', () => {
 describe('расчёт за период', () => {
   it('налог берётся с дохода, эквайринг — с оборота', () => {
     const report = taxReport({
-      kaspiIncome: 1_000_000,
-      kaspiTurnover: 1_200_000,
+      taxableIncome: 1_000_000,
+      acquiringTurnover: 1_200_000,
       taxRateBp: TAX_RATE_BP,
       acquiringRateBp: ACQUIRING_RATE_BP,
     });
@@ -33,8 +33,8 @@ describe('расчёт за период', () => {
 
   it('дробный результат округляется вверх: справка не занижает вычет', () => {
     const report = taxReport({
-      kaspiIncome: 33_333,
-      kaspiTurnover: 33_333,
+      taxableIncome: 33_333,
+      acquiringTurnover: 33_333,
       taxRateBp: 300,
       acquiringRateBp: 95,
     });
@@ -46,8 +46,8 @@ describe('расчёт за период', () => {
 
   it('пустой период даёт нули, а не деление на ноль', () => {
     const report = taxReport({
-      kaspiIncome: 0,
-      kaspiTurnover: 0,
+      taxableIncome: 0,
+      acquiringTurnover: 0,
       taxRateBp: 300,
       acquiringRateBp: 95,
     });
@@ -57,8 +57,8 @@ describe('расчёт за период', () => {
 
   it('нулевые ставки не берут ничего: их разрешено выставить', () => {
     const report = taxReport({
-      kaspiIncome: 500_000,
-      kaspiTurnover: 500_000,
+      taxableIncome: 500_000,
+      acquiringTurnover: 500_000,
       taxRateBp: 0,
       acquiringRateBp: 0,
     });
@@ -69,10 +69,10 @@ describe('расчёт за период', () => {
 
   it('отрицательная ставка и дробная сумма — ошибка ввода, а не «ноль»', () => {
     expect(() =>
-      taxReport({ kaspiIncome: 1, kaspiTurnover: 1, taxRateBp: -1, acquiringRateBp: 0 }),
+      taxReport({ taxableIncome: 1, acquiringTurnover: 1, taxRateBp: -1, acquiringRateBp: 0 }),
     ).toThrow(RangeError);
     expect(() =>
-      taxReport({ kaspiIncome: 1.5, kaspiTurnover: 1, taxRateBp: 300, acquiringRateBp: 95 }),
+      taxReport({ taxableIncome: 1.5, acquiringTurnover: 1, taxRateBp: 300, acquiringRateBp: 95 }),
     ).toThrow(RangeError);
   });
 });

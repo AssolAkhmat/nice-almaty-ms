@@ -7,7 +7,7 @@ import {
   requireAccount,
   type LedgerFilter,
 } from '@/db/repositories/accounts';
-import { kaspiTotals } from '@/db/repositories/invoices';
+import { taxTotals } from '@/db/repositories/invoices';
 import { listHouses } from '@/db/repositories/houses';
 import { ACCOUNT_CODES } from '@/db/schema';
 import { ACQUIRING_RATE_BP, TAX_RATE_BP, taxReport, type TaxReport } from '@/domain/tax';
@@ -75,8 +75,8 @@ export interface JournalRow {
 }
 
 export interface TaxTotals {
-  kaspiIncome: number;
-  kaspiTurnover: number;
+  taxableIncome: number;
+  acquiringTurnover: number;
 }
 
 export interface TaxByHouse {
@@ -247,7 +247,7 @@ export async function readTaxReport(
   const acquiringRateBp = rates.acquiringRateBp ?? ACQUIRING_RATE_BP;
 
   // Период включает последний день целиком: границы суток — по Алматы.
-  const totalsByHouse = await kaspiTotals(
+  const totalsByHouse = await taxTotals(
     actor.context,
     { from: startOfDayUtc(period.from), to: startOfNextDayUtc(period.to) },
     executor,
@@ -257,8 +257,8 @@ export async function readTaxReport(
   const nameOf = new Map(houses.map((house) => [house.id, house.name]));
 
   const totals: TaxTotals = {
-    kaspiIncome: totalsByHouse.reduce((sum, row) => sum + row.income, 0),
-    kaspiTurnover: totalsByHouse.reduce((sum, row) => sum + row.turnover, 0),
+    taxableIncome: totalsByHouse.reduce((sum, row) => sum + row.taxableIncome, 0),
+    acquiringTurnover: totalsByHouse.reduce((sum, row) => sum + row.acquiringTurnover, 0),
   };
 
   return {
@@ -271,11 +271,11 @@ export async function readTaxReport(
     byHouse: totalsByHouse.map((row) => ({
       houseId: row.houseId,
       houseName: nameOf.get(row.houseId) ?? '—',
-      income: row.income,
-      turnover: row.turnover,
+      income: row.taxableIncome,
+      turnover: row.acquiringTurnover,
       report: taxReport({
-        kaspiIncome: row.income,
-        kaspiTurnover: row.turnover,
+        taxableIncome: row.taxableIncome,
+        acquiringTurnover: row.acquiringTurnover,
         taxRateBp,
         acquiringRateBp,
       }),
