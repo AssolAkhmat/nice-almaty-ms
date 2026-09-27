@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/cn';
 import { isActiveHref, NAV_ITEMS } from '@/lib/navigation';
+import { visibleItems } from './visible-items';
 
 import { LogoutButton } from './logout-button';
 
@@ -16,11 +17,13 @@ import { LogoutButton } from './logout-button';
  * Мобильный (< 768): меню скрыто, работает нижняя навигация.
  */
 export interface SidebarProps {
+  /** Разделы, положенные этой роли (P0-2). Пусто — показываются все. */
+  sections?: readonly string[];
   /** Непрочитанные уведомления: число рядом с пунктом, а не сам список. */
   unread: number;
 }
 
-export function Sidebar({ unread }: SidebarProps) {
+export function Sidebar({ sections, unread }: SidebarProps) {
   const t = useTranslations('nav');
   const pathname = usePathname();
 
@@ -31,7 +34,7 @@ export function Sidebar({ unread }: SidebarProps) {
       data-testid="sidebar"
     >
       <ul className="flex flex-col gap-0.5 p-2">
-        {NAV_ITEMS.map((item) => {
+        {visibleItems(NAV_ITEMS, sections).map((item) => {
           const Icon = item.icon;
           const isActive = isActiveHref(item.href, pathname);
 

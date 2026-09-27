@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Field, Input, Select } from '@/components/ui/input';
 import { Money } from '@/components/ui/money';
 import { Button } from '@/components/ui/button';
+import { can } from '@/lib/authz';
 import { getCurrentSession } from '@/lib/session';
 import { listHouseResidents, type ResidentFilter } from '@/services/residents';
 
@@ -54,6 +55,15 @@ export default async function ResidentsPage({
   const t = await getTranslations('residents');
   const { context } = session;
   const actor: UserActor = { context };
+
+  /*
+   * Раздел про других, а не про себя: право спрашивается без своего
+   * идентификатора, иначе `user.read` с областью `self` открыл бы список
+   * жильцу (карта доступа, P0-2, 27 сентября 2026).
+   */
+  if (!can(context, 'user.read', { houseId: context.houseId ?? undefined })) {
+    redirect('/');
+  }
 
   const params = await searchParams;
   const single = (key: string): string => (typeof params[key] === 'string' ? params[key] : '');

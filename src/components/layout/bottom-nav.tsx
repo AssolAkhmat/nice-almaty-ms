@@ -11,17 +11,21 @@ import { Modal } from '@/components/ui/modal';
 import { cn } from '@/lib/cn';
 import { isActiveHref, NAV_ITEMS, PRIMARY_NAV_ITEMS } from '@/lib/navigation';
 
+import { visibleItems } from './visible-items';
+
 import { LogoutButton } from './logout-button';
 
 const ITEM_CLASSES =
   'flex h-14 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-[11px] transition-colors duration-150';
 
 export interface BottomNavProps {
+  /** Разделы, положенные этой роли (P0-2). Пусто — показываются все. */
+  sections?: readonly string[];
   unread: number;
 }
 
 /** Мобильная навигация: четыре пункта и «Ещё» с полным списком. */
-export function BottomNav({ unread }: BottomNavProps) {
+export function BottomNav({ sections, unread }: BottomNavProps) {
   const t = useTranslations('nav');
   const tCommon = useTranslations('common');
   const pathname = usePathname();
@@ -34,7 +38,7 @@ export function BottomNav({ unread }: BottomNavProps) {
         className="border-border bg-surface sticky bottom-0 z-20 flex border-t md:hidden"
         data-testid="bottom-nav"
       >
-        {PRIMARY_NAV_ITEMS.map((item) => {
+        {visibleItems(PRIMARY_NAV_ITEMS, sections).map((item) => {
           const Icon = item.icon;
           const isActive = isActiveHref(item.href, pathname);
 
@@ -66,7 +70,7 @@ export function BottomNav({ unread }: BottomNavProps) {
 
       <Modal onOpenChange={setMoreOpen} open={isMoreOpen} title={tCommon('menu')}>
         <ul className="flex flex-col gap-0.5">
-          {NAV_ITEMS.map((item) => {
+          {visibleItems(NAV_ITEMS, sections).map((item) => {
             const Icon = item.icon;
             const isActive = isActiveHref(item.href, pathname);
 

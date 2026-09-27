@@ -6,6 +6,7 @@ import { assertSchemaCurrent } from '@/db/schema-version';
 import { isPathAllowed } from '@/lib/residency-access';
 import { getCurrentSession } from '@/lib/session';
 import { PATHNAME_HEADER } from '@/middleware';
+import { visibleNavItems } from '@/lib/navigation';
 import { unreadCount } from '@/services/notifications';
 import { readAccessScope } from '@/services/onboarding';
 
@@ -60,5 +61,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
    */
   const unread = await unreadCount(session.context);
 
-  return <AppShell unread={unread}>{children}</AppShell>;
+  /*
+   * Разделы считаются здесь, а не в меню: право спрашивает единственная точка
+   * `can`, и в браузер уезжает уже готовый список (P0-2, 27 сентября 2026).
+   */
+  const sections = visibleNavItems(session.context).map((item) => item.href);
+
+  return (
+    <AppShell sections={sections} unread={unread}>
+      {children}
+    </AppShell>
+  );
 }

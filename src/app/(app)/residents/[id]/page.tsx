@@ -55,6 +55,14 @@ export default async function ResidentCardPage({ params }: { params: Promise<{ i
 
   const t = await getTranslations('residents');
   const { context } = session;
+
+  /*
+   * Карточка — раздел про другого человека: право спрашивается без своего
+   * идентификатора (карта доступа, P0-2, 27 сентября 2026).
+   */
+  if (!can(context, 'user.read', { houseId: context.houseId ?? undefined })) {
+    redirect('/');
+  }
   const actor: UserActor = { context };
 
   const { id } = await params;

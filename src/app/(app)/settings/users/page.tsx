@@ -28,6 +28,15 @@ export default async function UsersPage() {
   const t = await getTranslations('users');
   const { context } = session;
 
+  /*
+   * Раздел про других, а не про себя: право спрашивается без своего
+   * идентификатора, иначе `user.read` с областью `self` открыл бы список
+   * жильцу (карта доступа, P0-2, 27 сентября 2026).
+   */
+  if (!can(context, 'user.read', { houseId: context.houseId ?? undefined })) {
+    redirect('/');
+  }
+
   const [accounts, houses, residencies] = await Promise.all([
     listAccounts({ context }),
     listHouses(context, {}),

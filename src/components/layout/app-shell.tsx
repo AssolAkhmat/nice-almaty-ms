@@ -27,23 +27,30 @@ function Header() {
  */
 export function AppShell({
   children,
+  sections,
   unread = 0,
 }: {
   children: React.ReactNode;
   /** Непрочитанные уведомления адресата: считает защищённая зона. */
+  /**
+   * Разделы, которые видит эта роль (P0-2): считаются на сервере правами,
+   * а не рисуются все и прячутся стилями. Пусто — меню как было, чтобы
+   * компонент оставался пригодным для страниц без сессии.
+   */
+  sections?: readonly string[];
   unread?: number;
 }) {
   return (
     <div className="flex min-h-dvh flex-col">
       <Header />
       <div className="flex flex-1">
-        <Sidebar unread={unread} />
+        <Sidebar sections={sections} unread={unread} />
         <main className="min-w-0 flex-1 px-3 py-4 md:px-6 md:py-6">
           <BackLink />
           {children}
         </main>
       </div>
-      <BottomNav unread={unread} />
+      <BottomNav sections={sections} unread={unread} />
     </div>
   );
 }

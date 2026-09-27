@@ -18,6 +18,10 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
+import { accessOf } from './access-map';
+import { can } from './authz';
+
+import type { AccessContext } from '@/db/access';
 import type { Route } from 'next';
 
 export interface NavItem {
@@ -52,6 +56,29 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'inventory', href: '/inventory', icon: Package },
   { key: 'settings', href: '/settings', icon: Settings },
 ];
+
+/**
+ * Разделы, которые видит эта роль (находка P0-2, 27 сентября 2026).
+ *
+ * До этого список был один на всех, и админ дома видел в меню бухгалтерию —
+ * роут отказывал, а пункт показывался. Право берётся из `src/lib/access-map.ts`,
+ * проверяет его единственная точка `can`: в компонентах проверок роли нет
+ * и быть не должно (CLAUDE.md §3).
+ */
+export function visibleNavItems(context: AccessContext): readonly NavItem[] {
+  return NAV_ITEMS.filter((item) => {
+    const access = accessOf(item.href);
+
+    if (access === undefined || access.action === null) {
+      return true;
+    }
+
+    return can(context, access.action, {
+      ...(context.houseId === null ? {} : { houseId: context.houseId }),
+      ...(access.target === 'self' ? { userId: context.userId } : {}),
+    });
+  });
+}
 
 export const PRIMARY_NAV_ITEMS = NAV_ITEMS.filter((item) => item.primary === true);
 

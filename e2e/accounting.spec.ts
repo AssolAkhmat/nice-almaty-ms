@@ -47,4 +47,26 @@ test.describe('экран бухгалтерии', () => {
     await expect(main).toContainText('Раздел для суперадмина');
     await expect(main).not.toContainText('Оборотная ведомость');
   });
+
+  /*
+   * Находка боевой эксплуатации P0-2 (27 сентября 2026): админ дома видел
+   * раздел бухгалтерии в меню. Роут отказывал, но пункт показывался всем —
+   * список разделов не спрашивал прав вовсе. Скрытая ссылка на закрытый роут
+   * исправлением не считается, поэтому проверяется и меню, и роут.
+   */
+  test('ссылки на бухгалтерию нет в меню админа дома', async ({ page }) => {
+    await login(page, E2E_ACCOUNTS.adminHouse1);
+    await page.goto('/');
+
+    await expect(page.locator('a[href="/accounting"]')).toHaveCount(0);
+    /* Раздел, который админу положен, в меню остаётся. */
+    await expect(page.locator('a[href="/inventory"]').first()).toBeAttached();
+  });
+
+  test('у суперадмина ссылка на бухгалтерию в меню есть', async ({ page }) => {
+    await login(page, E2E_ACCOUNTS.superadmin);
+    await page.goto('/');
+
+    await expect(page.locator('a[href="/accounting"]').first()).toBeAttached();
+  });
 });
