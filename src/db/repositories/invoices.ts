@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, lt, ne, sql } from 'drizzle-orm';
 
 import { NotFoundError } from '@/lib/errors';
 import { now, type BusinessDate } from '@/lib/time';
@@ -337,4 +337,31 @@ export async function findPayment(
   const [payment] = await executor.select().from(payments).where(eq(payments.id, paymentId));
 
   return payment ?? null;
+}
+
+/**
+ * Сколько по проживанию выставлено счетов, кроме депозитных.
+ *
+ * Нужно исправлению ошибки ввода места (P1-5, 27 сентября 2026): пока
+ * по месту ничего не начислено, назначение можно аннулировать целиком;
+ * как только начислено — только переселение с сохранением истории.
+ * Депозит не считается: он выставляется при заселении всегда и о месте
+ * ничего не говорит.
+ */
+export async function countChargeInvoices(
+  residencyId: string,
+  executor: Executor = getDb(),
+): Promise<number> {
+  const [row] = await executor
+    .select({ count: sql<number>`count(*)::int` })
+    .from(invoices)
+    .where(
+      and(
+        eq(invoices.residencyId, residencyId),
+        inArray(invoices.type, ['monthly', 'extra']),
+        ne(invoices.status, 'cancelled'),
+      ),
+    );
+
+  return row?.count ?? 0;
 }

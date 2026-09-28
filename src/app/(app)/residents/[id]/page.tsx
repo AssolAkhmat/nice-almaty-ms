@@ -17,6 +17,7 @@ import { listDocumentCards } from '@/services/documents';
 import { listInvoicesFor } from '@/services/invoices';
 import { readResidentRating } from '@/services/rating-views';
 import { groupsNamingUser } from '@/services/relocations';
+import { readBedMoveContext } from '@/services/bed-moves';
 import { readDeclaredFields } from '@/services/profile-fields';
 import { readProfile } from '@/services/resident-profiles';
 import { readResidentCard } from '@/services/residents';
@@ -32,6 +33,7 @@ import {
 } from './card-sections';
 import { DocumentsSection } from './documents-section';
 import { ProfileSection } from './profile-section';
+import { BedMovePanel, type HouseBedView } from './bed-move-panel';
 import { RelocationPanel, type FreeBedView } from './relocation-panel';
 import { RoleForm } from './role-form';
 import { TerminationPanel } from './termination-panel';
@@ -99,6 +101,34 @@ export default async function ResidentCardPage({ params }: { params: Promise<{ i
 
   const freeBeds: FreeBedView[] = [];
   let namedGroups: { id: string; name: string }[] = [];
+
+  /*
+   * Переселение внутри дома (P1-5): своё действие со своими последствиями,
+   * поэтому и свои свободные места — только этого дома.
+   */
+  const canMove =
+    (card.residency.status === 'active' || card.residency.status === 'terminating') &&
+    can(context, 'bed.assign', { houseId: card.residency.houseId, userId: card.row.userId });
+
+  const houseBeds: HouseBedView[] = [];
+
+  if (canMove) {
+    for (const area of await houseLayout(actor, card.residency.houseId)) {
+      for (const bed of area.beds) {
+        if (bed.occupiedBy !== null) {
+          continue;
+        }
+
+        houseBeds.push({
+          bedId: bed.bedId,
+          label: `${area.area.name}, ${bed.label}`,
+          defaultPrice: bed.defaultPrice,
+        });
+      }
+    }
+  }
+
+  const moveContext = canMove ? await readBedMoveContext(actor, card.residency.id) : null;
 
   if (canRelocate) {
     for (const house of houses) {
@@ -298,6 +328,17 @@ export default async function ResidentCardPage({ params }: { params: Promise<{ i
       {rating !== null && <RatingSection view={rating} />}
 
       {history !== null && <HistorySection entries={history} />}
+
+      {canMove && moveContext !== null && (
+        <BedMovePanel
+          beds={houseBeds}
+          currentPrice={moveContext.currentPrice}
+          hasPostedCharges={moveContext.hasPostedCharges}
+          priceAppliesFrom={moveContext.priceAppliesFrom}
+          residencyId={card.residency.id}
+          today={todayInAlmaty()}
+        />
+      )}
 
       {canRelocate && (
         <RelocationPanel

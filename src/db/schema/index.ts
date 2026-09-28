@@ -24,6 +24,7 @@ export * from './resident-profiles';
 export * from './rotations';
 export * from './sessions';
 export * from './settings';
+export * from './temporary-placements';
 export * from './temporary-residents';
 export * from './users';
 export * from './utilities';

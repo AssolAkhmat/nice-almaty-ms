@@ -402,3 +402,16 @@ export async function saveUtilityAllocations(
     .values(allocations.map((allocation) => ({ ...allocation, periodId })))
     .returning();
 }
+
+/** Сколько долей коммуналки записано на человека (P1-5, 27 сентября 2026). */
+export async function countAllocationsOfUser(
+  userId: string,
+  executor: Executor = getDb(),
+): Promise<number> {
+  const [row] = await executor
+    .select({ count: sql<number>`count(*)::int` })
+    .from(utilityAllocations)
+    .where(eq(utilityAllocations.userId, userId));
+
+  return row?.count ?? 0;
+}

@@ -1482,7 +1482,30 @@
     "keysNotIssued": "Keys not issued",
     "historyTitle": "History",
     "historyEmpty": "No entries",
-    "historyEmptyHint": "Changes for this resident will appear here"
+    "historyEmptyHint": "Changes for this resident will appear here",
+    "moveTitle": "Move within the house",
+    "moveHint": "The former bed stays in history: utility person-days, the rotation schedule and past damage attribution rest on it",
+    "movePriceNow": "Price now",
+    "movePriceFrom": "New price appears in the invoice from",
+    "moveCharges": "Posted charges",
+    "moveChargesYes": "present — correcting the entry is unavailable",
+    "moveChargesNo": "none",
+    "moveNoBeds": "No free beds in the house",
+    "moveKind": "What this is",
+    "moveKindHint": "The scenarios differ in consequences, so a person chooses",
+    "moveKindPermanent": "Permanent move",
+    "moveKindTemporary": "Temporary placement (repair, incident)",
+    "moveKindCorrection": "Correction of a data-entry error",
+    "moveBed": "Bed",
+    "moveFrom": "From which date",
+    "moveFromHint": "For a correction the date is taken from the previous assignment",
+    "moveTo": "Until which date",
+    "moveToHint": "Temporary placement only; empty — until a separate decision",
+    "moveReason": "Reason",
+    "moveConsent": "The resident agrees to the new price (contract cl. 6.2). Needed only when the price changes",
+    "moveConsentDate": "Date of agreement",
+    "moveSubmit": "Move",
+    "moveDone": "The move is recorded"
   },
   "rotationCalendar": {
     "assign": "Assign",
@@ -2159,6 +2182,17 @@
       "conflict": "Data changed, try again",
       "rate_limited": "Too often",
       "internal": "Something went wrong"
+    }
+  },
+  "bedMoves": {
+    "errors": {
+      "archived": "The residency is archived",
+      "beforeMoveIn": "The date precedes the move-in",
+      "chargesPosted": "Charges are already posted: a data-entry correction is impossible, use a permanent move",
+      "consentRequired": "The price changes: the resident’s agreement must be marked",
+      "emptyPeriod": "The end date must be later than the start",
+      "otherHouse": "That bed belongs to another house: moving between houses is a separate action",
+      "reasonRequired": "State the reason"
     }
   }
 }

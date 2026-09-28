@@ -45,6 +45,7 @@ export const MIGRATIONS = [
   '0034_rapid_tarantula.sql',
   '0035_zippy_trauma.sql',
   '0036_solid_romulus.sql',
+  '0037_wonderful_wildside.sql',
 ] as const;
 
 export const EXPECTED_MIGRATIONS = MIGRATIONS.length;

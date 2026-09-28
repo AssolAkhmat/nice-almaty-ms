@@ -260,6 +260,13 @@
       "when": 1790497574184,
       "tag": "0036_solid_romulus",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1790623741573,
+      "tag": "0037_wonderful_wildside",
+      "breakpoints": true
     }
   ]
 }

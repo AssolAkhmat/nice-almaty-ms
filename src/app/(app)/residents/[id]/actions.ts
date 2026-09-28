@@ -12,6 +12,7 @@ import {
   settleRefund,
   terminateResidency,
 } from '@/services/terminations';
+import { correctAssignment, moveBedPermanently, placeTemporarily } from '@/services/bed-moves';
 import { relocateResidency } from '@/services/relocations';
 import { changeAccountRole } from '@/services/users';
 
@@ -240,4 +241,67 @@ export async function relocateAction(
   revalidatePath('/rotations', 'layout');
 
   return { done: 'relocations.done' };
+}
+
+/**
+ * Переселение внутри дома в трёх сценариях (P1-5, 27 сентября 2026).
+ *
+ * Сценарий выбирает человек, а не угадывает код: последствия у них разные —
+ * аннулирование ошибочной записи, временное размещение без денег и настоящий
+ * переезд с закрытием назначения датой.
+ */
+export async function moveBedAction(
+  _previous: RelocationActionState,
+  formData: FormData,
+): Promise<RelocationActionState> {
+  const current = await actor();
+  if (current === null) {
+    return { error: 'relocations.errors.unauthorized' };
+  }
+
+  const residencyId = text(formData, 'residencyId');
+  const bedId = text(formData, 'bedId');
+  const kind = text(formData, 'kind');
+  const reason = text(formData, 'reason');
+  const from = tryParseBusinessDate(text(formData, 'from'));
+  const to = tryParseBusinessDate(text(formData, 'to'));
+  const consentAgreedOn = tryParseBusinessDate(text(formData, 'consentAgreedOn'));
+  const consentGiven = formData.get('consent') !== null;
+
+  try {
+    if (kind === 'correction') {
+      await correctAssignment(current, { residencyId, bedId, reason });
+    } else if (kind === 'temporary') {
+      await placeTemporarily(current, {
+        residencyId,
+        bedId,
+        reason,
+        ...(from === null ? {} : { from }),
+        ...(to === null ? {} : { to }),
+      });
+    } else {
+      await moveBedPermanently(current, {
+        residencyId,
+        bedId,
+        reason,
+        ...(from === null ? {} : { from }),
+        /*
+         * Отметка о согласии передаётся только когда она поставлена: сервис
+         * сам решит, нужна ли она (цена могла не измениться).
+         */
+        ...(consentGiven && consentAgreedOn !== null
+          ? { consent: { agreedOn: consentAgreedOn } }
+          : {}),
+      });
+    }
+  } catch (error) {
+    return { error: actionErrorKey(error, 'relocations.errors.unknown') };
+  }
+
+  revalidatePath('/residents', 'layout');
+  revalidatePath('/beds');
+  revalidatePath('/rotations', 'layout');
+  revalidatePath('/utilities');
+
+  return { done: 'residents.moveDone' };
 }

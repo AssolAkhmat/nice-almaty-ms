@@ -177,3 +177,16 @@ export async function listDamageShares(
     .where(eq(damageShares.damageId, damageId))
     .orderBy(asc(damageShares.createdAt), asc(damageShares.id));
 }
+
+/** Сколько долей ущерба записано на человека (P1-5, 27 сентября 2026). */
+export async function countDamageSharesOfUser(
+  userId: string,
+  executor: Executor = getDb(),
+): Promise<number> {
+  const [row] = await executor
+    .select({ count: sql<number>`count(*)::int` })
+    .from(damageShares)
+    .where(eq(damageShares.userId, userId));
+
+  return row?.count ?? 0;
+}
