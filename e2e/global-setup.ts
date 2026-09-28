@@ -56,6 +56,14 @@ export const E2E_ACCOUNTS = {
   adminHouse12: adminPhone(12),
   adminHouse13: adminPhone(13),
   adminHouse14: adminPhone(14),
+  /*
+   * Дома сквозной приёмки «рабочий день админа» — по одному на ширину:
+   * она заводит коммунальный период за текущий месяц, а период у дома
+   * один на месяц.
+   */
+  adminHouse15: adminPhone(15),
+  adminHouse16: adminPhone(16),
+  adminHouse17: adminPhone(17),
 } as const;
 
 /**
@@ -446,7 +454,7 @@ async function removeLeftoverAreas(db: ReturnType<typeof drizzle>): Promise<void
  * до строки. Убирается всё, что прогон в этих домах заводит: периоды
  * с их строками и снимками распределения и ущербы с долями.
  */
-export const ACCEPTANCE_HOUSES = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14] as const;
+export const ACCEPTANCE_HOUSES = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17] as const;
 
 /**
  * Задания фазы 6 и разосланные ими уведомления.
@@ -701,8 +709,8 @@ export default async function globalSetup(): Promise<void> {
       executor: db as unknown as Executor,
       passwordFor: () => E2E_PASSWORD,
       withContent: false,
-      // Дома с третьего по четырнадцатый отданы приёмкам, по одному на ширину.
-      houses: 14,
+      // Дома с третьего по семнадцатый отданы приёмкам, по одному на ширину.
+      houses: 17,
     });
 
     /*
