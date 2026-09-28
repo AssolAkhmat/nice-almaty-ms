@@ -2,7 +2,7 @@ import { AppLink } from '@/components/ui/app-link';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { redirect } from 'next/navigation';
 
-import { listDocumentTypes, requireDocumentType } from '@/db/repositories/documents';
+import { listDocumentTypes } from '@/db/repositories/documents';
 import { listHouses } from '@/db/repositories/houses';
 import { listResidencies } from '@/db/repositories/residencies';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,7 @@ import { Field, Input, Select } from '@/components/ui/input';
 import { can } from '@/lib/authz';
 import { getCurrentSession } from '@/lib/session';
 import { listDocumentCards, listReviewDocuments } from '@/services/documents';
-import { readProfile } from '@/services/resident-profiles';
+import { optionLabel, personLabels } from '@/services/person-labels';
 
 import { DocumentCards, type DocumentCardView } from './document-cards';
 import { ReviewQueue, type ReviewItemView } from './review-queue';
@@ -75,6 +75,7 @@ async function reviewView(
   context: AccessContext,
   locale: string,
   filter: ReviewFilter,
+  types: readonly DocumentType[],
 ): Promise<ReviewItemView[]> {
   const documents = await listReviewDocuments(actor, {
     ...(filter.status === undefined ? {} : { status: filter.status }),
@@ -83,26 +84,36 @@ async function reviewView(
     ...(filter.documentTypeId === undefined ? {} : { documentTypeId: filter.documentTypeId }),
   });
 
-  const items = await Promise.all(
-    documents.map(async (document) => {
-      const type = await requireDocumentType(context, document.documentTypeId);
-      const profile = await readProfile(actor, document.userId);
-      const name = [profile.lastName, profile.firstName].filter((part) => part !== null).join(' ');
-
-      return {
-        id: document.id,
-        typeName: localizedName(type, locale),
-        // Профиль может быть ещё пустым: в списке тогда нужен хоть какой-то ориентир.
-        residentName: name.trim() === '' ? '' : name,
-        fileId: document.fileId,
-        status: document.status,
-        issueDate: document.issueDate,
-        validUntil: document.validUntil,
-        rejectReason: document.rejectReason,
-        createdAt: document.createdAt.toISOString(),
-      };
-    }),
+  /*
+   * Типы и подписи читаются по одному разу на весь список, а не по разу
+   * на строку: на сотне документов прежний способ делал двести запросов.
+   * Типы уже прочитаны ради фильтра — здесь они переиспользуются.
+   *
+   * Подпись строит общий `personLabels`: без имени в строке стоит телефон,
+   * а не пустое место, и чтение списка больше не создаёт профиль побочно
+   * (прежний `readProfile` заводил пустой профиль на каждого).
+   */
+  const typeOf = new Map(types.map((type) => [type.id, type]));
+  const labels = await personLabels(
+    context,
+    documents.map((document) => document.userId),
   );
+
+  const items = documents.map((document) => {
+    const type = typeOf.get(document.documentTypeId);
+
+    return {
+      id: document.id,
+      typeName: type === undefined ? '' : localizedName(type, locale),
+      residentName: optionLabel(labels.get(document.userId), ''),
+      fileId: document.fileId,
+      status: document.status,
+      issueDate: document.issueDate,
+      validUntil: document.validUntil,
+      rejectReason: document.rejectReason,
+      createdAt: document.createdAt.toISOString(),
+    };
+  });
 
   /*
    * Поиск по жильцу идёт по собранным строкам, а не запросом: имя лежит
@@ -198,13 +209,13 @@ export default async function DocumentsPage({
 
   const resident = isReviewer ? null : await residentView(actor, context, locale);
   const queue = mayReview
-    ? await reviewView(actor, context, locale, {
-        status,
-        residencyId,
-        houseId,
-        documentTypeId,
-        query: search,
-      })
+    ? await reviewView(
+        actor,
+        context,
+        locale,
+        { status, residencyId, houseId, documentTypeId, query: search },
+        types,
+      )
     : [];
 
   /** Фильтры переносятся ссылками статуса: иначе смена статуса сбрасывала бы их. */
