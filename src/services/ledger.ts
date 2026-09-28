@@ -448,6 +448,41 @@ export async function postUtilitySurplus(
   );
 }
 
+/**
+ * Доля дома в коммуналке (P2-7, указание владельца 27 сентября 2026):
+ * Фонд дома → Коммунальный фонд.
+ *
+ * Зеркало излишка округления. Общие помещения и пустые места потребляют,
+ * и эту часть платит Исполнитель: фонд дома отдаёт, коммунальный принимает
+ * ровно как при оплате коммуналки жильцом (§10.1, строка «Оплата коммуналки
+ * жильцом» с той разницей, что источник — не касса, а фонд дома).
+ */
+export async function postUtilityHouseShare(
+  actor: UserActor,
+  input: DepositFundEntry,
+  deps: LedgerDeps = {},
+): Promise<LedgerEntry> {
+  const { executor } = resolve(deps);
+
+  const utilityFund = await requireAccountByCode(actor, ACCOUNT_CODES.utilityFund, executor);
+  const houseFund = await requireHouseFund(actor, input.houseId, executor);
+
+  return postSystemEntry(
+    actor,
+    {
+      description: 'Доля дома в коммуналке',
+      sourceType: 'utilities',
+      sourceId: input.sourceId,
+      ...(input.date === undefined ? {} : { date: input.date }),
+      lines: [
+        { accountId: houseFund.id, direction: 'debit', amount: input.amount },
+        { accountId: utilityFund.id, direction: 'credit', amount: input.amount },
+      ],
+    },
+    deps,
+  );
+}
+
 export interface InvoicePaymentEntry {
   /**
    * Платёж, которым пришли деньги. Проводка ссылается на него, а не только

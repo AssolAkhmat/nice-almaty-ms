@@ -120,6 +120,8 @@ export default async function InvoicesPage({
                           days: share.days,
                           totalDays: share.totalDays,
                           total: share.total,
+                          houseDays: share.houseDays,
+                          houseAmount: share.houseAmount,
                         },
                       }),
                 }

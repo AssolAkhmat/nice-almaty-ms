@@ -15,6 +15,7 @@ import {
   previewDayCorrection,
   removePeriodLine,
   reopenUtilityPeriod,
+  setHouseDays,
 } from '@/services/utilities';
 import { houseHistoryNames } from '@/services/residents';
 
@@ -237,4 +238,33 @@ export async function correctDaysAction(
   refresh();
 
   return { done: 'utilities.done.daysCorrected' };
+}
+
+/**
+ * Доля дома в человеко-днях (P2-7). Ноль убирает долю целиком, поэтому
+ * причина обязательна только при ненулевом значении.
+ */
+export async function setHouseDaysAction(
+  _previous: UtilityActionState,
+  formData: FormData,
+): Promise<UtilityActionState> {
+  const current = await actor();
+  if (current === null) {
+    return { error: 'utilities.errors.unauthorized' };
+  }
+
+  const raw = text(formData, 'houseDays');
+
+  try {
+    await setHouseDays(current, text(formData, 'periodId'), {
+      days: raw === '' ? 0 : Number(raw),
+      comment: text(formData, 'comment'),
+    });
+  } catch (error) {
+    return failure(error);
+  }
+
+  refresh();
+
+  return { done: 'utilities.done.houseDaysSet' };
 }

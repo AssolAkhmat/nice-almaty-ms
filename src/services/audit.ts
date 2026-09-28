@@ -67,6 +67,7 @@ export const AUDIT_ACTIONS = {
   damageCreated: 'damage.created',
   damageReversed: 'damage.reversed',
   utilityDaysCorrected: 'utility_days.corrected',
+  utilityHouseDaysSet: 'utility_house_days.set',
   utilityPeriodClosed: 'utility_period.closed',
   utilityPeriodReopened: 'utility_period.reopened',
   expenseRecorded: 'expense.recorded',

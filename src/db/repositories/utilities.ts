@@ -501,6 +501,9 @@ export interface ResidentUtilityShare {
   totalDays: number;
   /** Итог периода по дому: сумма всех строк коммуналки. */
   total: number;
+  /** Человеко-дни дома: их платит Исполнитель (P2-7). */
+  houseDays: number;
+  houseAmount: number;
 }
 
 export async function findResidentShare(
@@ -521,6 +524,8 @@ export async function findResidentShare(
       month: utilityPeriods.month,
       days: utilityAllocations.days,
       amount: utilityAllocations.amount,
+      houseDays: utilityPeriods.houseDays,
+      houseAmount: utilityPeriods.houseAmount,
     })
     .from(utilityAllocations)
     .innerJoin(utilityPeriods, eq(utilityPeriods.id, utilityAllocations.periodId))
@@ -551,7 +556,8 @@ export async function findResidentShare(
 
   return {
     ...share,
-    totalDays: sums?.totalDays ?? 0,
+    /* Знаменатель — сутки жильцов плюс сутки дома: дом делит наравне. */
+    totalDays: (sums?.totalDays ?? 0) + share.houseDays,
     total: Number(lines?.total ?? 0),
   };
 }

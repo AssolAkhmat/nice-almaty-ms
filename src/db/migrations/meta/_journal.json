@@ -274,6 +274,13 @@
       "when": 1790625911819,
       "tag": "0038_low_richard_fisk",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1790626831101,
+      "tag": "0039_pink_black_panther",
+      "breakpoints": true
     }
   ]
 }

@@ -1097,7 +1097,8 @@
     "reversedMark": "сторнирован",
     "paymentReceipt": "Документ подтверждения",
     "utilityBreakdown": "Посчитано по {days} суткам из {totalDays} человеко-суток дома",
-    "utilityPeriodTotal": "Коммуналка дома за месяц"
+    "utilityPeriodTotal": "Коммуналка дома за месяц",
+    "utilityHouseShare": "Доля дома: {days} человеко-суток, оплачивает Исполнитель"
   },
   "language": {
     "label": "Язык",
@@ -2078,7 +2079,8 @@
       "lineRemoved": "Строка убрана",
       "closed": "Период закрыт",
       "reopened": "Период переоткрыт",
-      "daysCorrected": "Сутки скорректированы"
+      "daysCorrected": "Сутки скорректированы",
+      "houseDaysSet": "Доля дома сохранена"
     },
     "errors": {
       "unauthorized": "Требуется вход",
@@ -2094,7 +2096,8 @@
       "notUpdated": "Период не обновлён",
       "daysInvalid": "Число суток — целое от нуля до числа дней в месяце",
       "commentRequired": "Назовите причину корректировки",
-      "increaseNotConfirmed": "Увеличение выше расчётного требует подтверждения в форме"
+      "increaseNotConfirmed": "Увеличение выше расчётного требует подтверждения в форме",
+      "houseDaysInvalid": "Доля дома — целое неотрицательное число человеко-дней"
     },
     "history": "История по дому",
     "month": "Месяц",
@@ -2115,7 +2118,14 @@
     "correctionPreview": "Пересчитать",
     "correctionSave": "Сохранить",
     "correctionPreviewTitle": "Пересчёт до сохранения",
-    "correctionWas": "было {days}"
+    "correctionWas": "было {days}",
+    "houseShare": "Доля дома",
+    "houseShareHint": "Общие помещения и пустые места потребляют независимо от заселённости. Человеко-дни дома входят в знаменатель наравне с жильцами, а сумма относится на счёт дома: доля каждого жильца от этого только уменьшается.",
+    "houseShareDays": "Человеко-дни дома",
+    "houseShareComment": "Причина",
+    "houseShareSave": "Сохранить долю дома",
+    "houseShareAmount": "Сумма доли дома",
+    "houseSharePaidBy": "оплачивает Исполнитель"
   },
   "validation": {
     "password": {

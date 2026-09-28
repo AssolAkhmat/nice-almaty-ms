@@ -40,7 +40,14 @@ export interface InvoiceLineView {
    * периода (Приложение №3 п. 4.4). Без этих трёх чисел строка счёта
    * непроверяема: сумма есть, а откуда она — нет.
    */
-  breakdown?: { days: number; totalDays: number; total: number };
+  breakdown?: {
+    days: number;
+    totalDays: number;
+    total: number;
+    /** Доля дома: её платит Исполнитель, а не жильцы (P2-7). */
+    houseDays: number;
+    houseAmount: number;
+  };
 }
 
 export interface PaymentView {
@@ -179,6 +186,16 @@ export function InvoiceCard({
                     {t('invoices.utilityPeriodTotal')}
                     <Money amount={line.breakdown.total} />
                   </span>
+                </span>
+              )}
+
+              {line.breakdown !== undefined && line.breakdown.houseDays > 0 && (
+                <span
+                  className="text-text-muted flex flex-wrap items-center justify-between gap-x-4"
+                  data-testid="utility-house-share"
+                >
+                  <span>{t('invoices.utilityHouseShare', { days: line.breakdown.houseDays })}</span>
+                  <Money amount={line.breakdown.houseAmount} />
                 </span>
               )}
 

@@ -1097,7 +1097,8 @@
     "reversedMark": "reversed",
     "paymentReceipt": "Confirming document",
     "utilityBreakdown": "Calculated over {days} days out of the house total of {totalDays} person-days",
-    "utilityPeriodTotal": "House utilities for the month"
+    "utilityPeriodTotal": "House utilities for the month",
+    "utilityHouseShare": "House share: {days} person-days, paid by the provider"
   },
   "language": {
     "label": "Language",
@@ -2078,7 +2079,8 @@
       "lineRemoved": "Line removed",
       "closed": "Period closed",
       "reopened": "Period reopened",
-      "daysCorrected": "Days corrected"
+      "daysCorrected": "Days corrected",
+      "houseDaysSet": "House share saved"
     },
     "errors": {
       "unauthorized": "Sign in required",
@@ -2094,7 +2096,8 @@
       "notUpdated": "The period was not updated",
       "daysInvalid": "Days must be a whole number between zero and the length of the month",
       "commentRequired": "State the reason for the correction",
-      "increaseNotConfirmed": "Increasing above the calculated value requires confirmation in the form"
+      "increaseNotConfirmed": "Increasing above the calculated value requires confirmation in the form",
+      "houseDaysInvalid": "The house share must be a whole, non-negative number of person-days"
     },
     "history": "House history",
     "month": "Month",
@@ -2115,7 +2118,14 @@
     "correctionPreview": "Recalculate",
     "correctionSave": "Save",
     "correctionPreviewTitle": "Recalculation before saving",
-    "correctionWas": "was {days}"
+    "correctionWas": "was {days}",
+    "houseShare": "House share",
+    "houseShareHint": "Common areas and empty beds consume regardless of occupancy. The house person-days join the denominator on equal terms with residents, and the amount is posted to the house account: each resident\\u2019s share can only go down.",
+    "houseShareDays": "House person-days",
+    "houseShareComment": "Reason",
+    "houseShareSave": "Save house share",
+    "houseShareAmount": "House share amount",
+    "houseSharePaidBy": "paid by the provider"
   },
   "validation": {
     "password": {

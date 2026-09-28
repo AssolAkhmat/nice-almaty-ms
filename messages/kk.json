@@ -1097,7 +1097,8 @@
     "reversedMark": "сторноланған",
     "paymentReceipt": "Растайтын құжат",
     "utilityBreakdown": "Үйдің {totalDays} адам-тәулігінен {days} тәулік бойынша есептелген",
-    "utilityPeriodTotal": "Үйдің айлық коммуналдық төлемі"
+    "utilityPeriodTotal": "Үйдің айлық коммуналдық төлемі",
+    "utilityHouseShare": "Үй үлесі: {days} адам-тәулік, Орындаушы төлейді"
   },
   "language": {
     "label": "Тіл",
@@ -2078,7 +2079,8 @@
       "lineRemoved": "Жол алынды",
       "closed": "Кезең жабылды",
       "reopened": "Кезең қайта ашылды",
-      "daysCorrected": "Тәуліктер түзетілді"
+      "daysCorrected": "Тәуліктер түзетілді",
+      "houseDaysSet": "Үй үлесі сақталды"
     },
     "errors": {
       "unauthorized": "Кіру қажет",
@@ -2094,7 +2096,8 @@
       "notUpdated": "Кезең жаңартылмады",
       "daysInvalid": "Тәулік саны — нөлден айдағы күн санына дейінгі бүтін сан",
       "commentRequired": "Түзету себебін жазыңыз",
-      "increaseNotConfirmed": "Есептелгеннен арттыру формада растауды талап етеді"
+      "increaseNotConfirmed": "Есептелгеннен арттыру формада растауды талап етеді",
+      "houseDaysInvalid": "Үй үлесі — бүтін теріс емес адам-күн саны"
     },
     "history": "Үй бойынша тарих",
     "month": "Ай",
@@ -2115,7 +2118,14 @@
     "correctionPreview": "Қайта санау",
     "correctionSave": "Сақтау",
     "correctionPreviewTitle": "Сақтау алдындағы қайта санау",
-    "correctionWas": "{days} болған"
+    "correctionWas": "{days} болған",
+    "houseShare": "Үй үлесі",
+    "houseShareHint": "Ортақ бөлмелер мен бос орындар қоныстануға қарамастан тұтынады. Үйдің адам-күндері тұрғындармен тең бөлгішке кіреді, сома үй шотына жазылады: әрбір тұрғынның үлесі бұдан тек азаяды.",
+    "houseShareDays": "Үйдің адам-күндері",
+    "houseShareComment": "Себебі",
+    "houseShareSave": "Үй үлесін сақтау",
+    "houseShareAmount": "Үй үлесінің сомасы",
+    "houseSharePaidBy": "Орындаушы төлейді"
   },
   "validation": {
     "password": {

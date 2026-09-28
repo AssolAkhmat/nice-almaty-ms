@@ -20,6 +20,7 @@ import {
   correctDaysAction,
   removeLineAction,
   reopenPeriodAction,
+  setHouseDaysAction,
   type UtilityActionState,
 } from './actions';
 
@@ -56,6 +57,10 @@ export interface PeriodScreenProps {
   houseId: string;
   month: string;
   closed: boolean;
+  /** Доля дома в человеко-днях: её вводит админ, система не считает (P2-7). */
+  houseDays: number;
+  houseDaysComment: string | null;
+  houseAmount: number;
   lines: readonly PeriodLineView[];
   total: number;
   rows: readonly AllocationRowView[];
@@ -273,6 +278,74 @@ function DaysForm({ periodId, rows }: { periodId: string; rows: readonly Allocat
   );
 }
 
+/**
+ * Доля дома в человеко-днях (P2-7, указание владельца 27 сентября 2026).
+ *
+ * Поле необязательное, по умолчанию ноль. Причина обязательна, пока значение
+ * ненулевое: ненулевая доля дома молча уменьшает счета жильцов, и за этим
+ * должен стоять кто-то поимённо.
+ */
+function HouseShareForm({
+  comment,
+  days,
+  periodId,
+}: {
+  comment: string | null;
+  days: number;
+  periodId: string;
+}) {
+  const t = useTranslations();
+  const [state, action, isPending] = useActionState(setHouseDaysAction, INITIAL);
+
+  return (
+    <form action={action} className="flex flex-col gap-3" data-testid="house-share-form">
+      <input name="periodId" type="hidden" value={periodId} />
+
+      <h3 className="font-medium">{t('utilities.houseShare')}</h3>
+      <p className="text-text-muted text-[13px]">{t('utilities.houseShareHint')}</p>
+
+      {state.error !== undefined && (
+        <p className="text-danger text-[13px]" data-testid="house-share-error" role="alert">
+          {t(state.error)}
+        </p>
+      )}
+
+      {state.done !== undefined && (
+        <p className="text-[13px]" data-testid="house-share-done">
+          {t(state.done)}
+        </p>
+      )}
+
+      <div className="grid items-end gap-3 md:grid-cols-[1fr_3fr_auto]">
+        <Field htmlFor="house-days" label={t('utilities.houseShareDays')}>
+          <Input
+            data-testid="house-days"
+            defaultValue={days}
+            id="house-days"
+            inputMode="numeric"
+            name="houseDays"
+            step={1}
+            type="number"
+          />
+        </Field>
+
+        <Field htmlFor="house-days-comment" label={t('utilities.houseShareComment')}>
+          <Input
+            data-testid="house-days-comment"
+            defaultValue={comment ?? ''}
+            id="house-days-comment"
+            name="comment"
+          />
+        </Field>
+
+        <Button data-testid="house-share-save" disabled={isPending} size="sm" type="submit">
+          {t('utilities.houseShareSave')}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 /** История по дому: месяц, сумма, средняя доля, число жильцов и дней. */
 function History({ rows }: { rows: readonly HistoryRowView[] }) {
   const t = useTranslations();
@@ -331,6 +404,9 @@ export function PeriodScreen({
   canReopen,
   closed,
   history,
+  houseAmount,
+  houseDays,
+  houseDaysComment,
   houseId,
   lines,
   periodId,
@@ -441,6 +517,15 @@ export function PeriodScreen({
           />
 
           <div className="flex flex-col gap-1 text-[13px]">
+            {houseDays > 0 && (
+              <div className="flex justify-between gap-4" data-testid="house-share-row">
+                <span>
+                  {t('utilities.houseShareAmount')} — {houseDays} ({t('utilities.houseSharePaidBy')}
+                  )
+                </span>
+                <Money amount={houseAmount} />
+              </div>
+            )}
             <div className="flex justify-between gap-4">
               <span>{t('utilities.surplus')}</span>
               <Money amount={surplus} />
@@ -460,6 +545,12 @@ export function PeriodScreen({
                 {t(state.error)}
               </p>
             ),
+          )}
+
+          {canManage && !closed && (
+            <div className="border-border border-t pt-3">
+              <HouseShareForm comment={houseDaysComment} days={houseDays} periodId={periodId} />
+            </div>
           )}
 
           {canManage && !closed && rows.length > 0 && (

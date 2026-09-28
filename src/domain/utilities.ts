@@ -50,6 +50,8 @@ export interface UtilityDistribution {
   surplus: number;
   /** Сумма, которую не на кого делить: в доме за месяц не жил никто. */
   undistributed: number;
+  /** Доля дома: человеко-дни Исполнителя и его сумма (P2-7). */
+  house: { days: number; amount: number };
 }
 
 function lastDayOfMonth(month: BusinessDate): BusinessDate {
@@ -302,22 +304,46 @@ export function daysLivedInHouseInMonth(input: HouseDaysInput): number {
  * Распределение суммы периода между жильцами пропорционально дням (§4.2).
  * Тот, кто не прожил в месяце ни дня, в распределении не участвует —
  * иначе он получил бы долю за чужой месяц.
+ *
+ * `houseDays` — доля дома в человеко-днях (P2-7, указание владельца
+ * 27 сентября 2026). Общие помещения греются независимо от заселённости,
+ * пустые места тоже потребляют, и эту часть платит Исполнитель. Дом входит
+ * в знаменатель ровно так же, как жилец: одни человеко-сутки дома равны
+ * одним человеко-суткам жильца, заехавшего на день.
+ *
+ * Направление от этого строго одно. Знаменатель растёт, доля каждого
+ * жильца — `ceil(total * days / totalDays)` — от роста знаменателя может
+ * только уменьшиться или остаться прежней. Увеличить чью-то долю доля дома
+ * не способна ни при каком значении, и это свойство проверяется перебором,
+ * а не рассуждением.
  */
 export function distributeUtilities(
   total: number,
   participants: readonly UtilityParticipant[],
+  houseDays = 0,
 ): UtilityDistribution {
+  if (!Number.isSafeInteger(houseDays) || houseDays < 0) {
+    throw new RangeError(
+      `Доля дома — целое неотрицательное число человеко-дней, получено: ${String(houseDays)}`,
+    );
+  }
+
   const paying = participants.filter((participant) => participant.days > 0);
 
   if (paying.length === 0) {
-    // Делить не на кого: сумма остаётся дому целиком, а не делится на ноль.
-    return { allocations: [], surplus: 0, undistributed: total };
+    /*
+     * Делить не на кого. Если у дома заявлены сутки — вся сумма его:
+     * месяц, в котором никто не жил, целиком оплачивает Исполнитель,
+     * и это осмысленный итог, а не потерянная сумма. Если суток нет —
+     * сумма остаётся неразнесённой, и закрытие периода об этом скажет.
+     */
+    return houseDays > 0
+      ? { allocations: [], surplus: 0, undistributed: 0, house: { days: houseDays, amount: total } }
+      : { allocations: [], surplus: 0, undistributed: total, house: { days: 0, amount: 0 } };
   }
 
-  const { shares, surplus } = splitCeil(
-    total,
-    paying.map((participant) => participant.days),
-  );
+  const weights = paying.map((participant) => participant.days);
+  const { shares, surplus } = splitCeil(total, houseDays > 0 ? [...weights, houseDays] : weights);
 
   return {
     allocations: paying.map((participant, index) => ({
@@ -327,5 +353,6 @@ export function distributeUtilities(
     })),
     surplus,
     undistributed: 0,
+    house: { days: houseDays, amount: houseDays > 0 ? (shares[weights.length] ?? 0) : 0 },
   };
 }

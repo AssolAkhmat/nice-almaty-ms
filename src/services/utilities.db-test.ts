@@ -27,6 +27,7 @@ import {
   readUtilityShareFor,
   removePeriodLine,
   reopenUtilityPeriod,
+  setHouseDays,
 } from './utilities';
 
 import type { AccessContext } from '@/db/access';
@@ -1076,6 +1077,245 @@ describe('корректировка человеко-дней', () => {
           { executor: tx },
         ),
       ).rejects.toBeInstanceOf(NotFoundError);
+    });
+  });
+});
+
+/**
+ * Доля дома в коммуналке (P2-7, указание владельца 27 сентября 2026).
+ *
+ * Фикстура та же: сутки 10 / 20 / 30, итог 30 000. Арифметика доказана
+ * числами в ядре, здесь — что доля дома доезжает до проводки, до снимка
+ * и до раскладки жильца, а в счета не попадает.
+ */
+describe('доля дома', () => {
+  const REASON = 'Отопление общих помещений и два пустых места';
+
+  it('по умолчанию ноль: расчёт совпадает с прежним', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9990');
+      const period = await periodWith(tx, fixture, 30_000);
+
+      expect(period.houseDays).toBe(0);
+
+      const view = await readUtilityPeriod(fixture.admin, period.id, { executor: tx });
+
+      expect(view.preview.allocations.map((row) => row.amount)).toEqual([5_000, 10_000, 15_000]);
+      expect(view.preview.house).toEqual({ days: 0, amount: 0 });
+    });
+  });
+
+  it('человеко-дни дома уменьшают долю каждого жильца', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9991');
+      const period = await periodWith(tx, fixture, 30_000);
+
+      await setHouseDays(fixture.admin, period.id, { days: 12, comment: REASON }, { executor: tx });
+
+      const view = await readUtilityPeriod(fixture.admin, period.id, { executor: tx });
+      const amounts = view.preview.allocations.map((row) => row.amount);
+
+      expect(amounts[0]).toBeLessThan(5_000);
+      expect(amounts[1]).toBeLessThan(10_000);
+      expect(amounts[2]).toBeLessThan(15_000);
+
+      /* Деньги периода сходятся: доля дома и излишек лежат на счёте дома. */
+      const residents = amounts.reduce((sum, amount) => sum + amount, 0);
+
+      expect(residents + view.preview.house.amount - view.preview.surplus).toBe(30_000);
+    });
+  });
+
+  it('без причины ненулевая доля дома не сохраняется', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9992');
+      const period = await periodWith(tx, fixture, 30_000);
+
+      await expect(
+        setHouseDays(fixture.admin, period.id, { days: 12, comment: '  ' }, { executor: tx }),
+      ).rejects.toBeInstanceOf(ValidationError);
+    });
+  });
+
+  it('отрицательная доля дома отклоняется', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9993');
+      const period = await periodWith(tx, fixture, 30_000);
+
+      await expect(
+        setHouseDays(fixture.admin, period.id, { days: -1, comment: REASON }, { executor: tx }),
+      ).rejects.toBeInstanceOf(ValidationError);
+    });
+  });
+
+  it('база не принимает ненулевую долю дома без причины', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9994');
+      const period = await periodWith(tx, fixture, 30_000);
+
+      const message = await failureText(() =>
+        tx
+          .update(schema.utilityPeriods)
+          .set({ houseDays: 12, houseDaysComment: null })
+          .where(eq(schema.utilityPeriods.id, period.id)),
+      );
+
+      expect(message).toContain('utility_periods_house_days_comment');
+    });
+  });
+
+  it('сумма доли дома уходит на счёт дома, а не в счета жильцов', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9995');
+      const period = await periodWith(tx, fixture, 30_000);
+
+      await setHouseDays(fixture.admin, period.id, { days: 12, comment: REASON }, { executor: tx });
+
+      /* Счета ноября выставлены заранее — доли лягут в них строками. */
+      await generateMonthlyInvoices({
+        executor: tx,
+        instant: parseInstant('2026-10-31T19:30:00Z'),
+      });
+
+      const closed = await closeUtilityPeriod(fixture.admin, period.id, {
+        executor: tx,
+        today: IN_NOVEMBER,
+        instant: INSTANT,
+      });
+
+      /* Снимок несёт сумму доли дома: пересчитывать её потом нечем. */
+      expect(closed.period.houseAmount).toBe(5_000);
+
+      const lines = await ledgerOf(tx, fixture.orgId);
+      const houseShare = lines.filter((line) => line.amount === 5_000);
+
+      expect(houseShare).toEqual(
+        expect.arrayContaining([
+          { code: `house_fund:${fixture.houseSlugA}`, direction: 'debit', amount: 5_000 },
+          { code: 'utility_fund', direction: 'credit', amount: 5_000 },
+        ]),
+      );
+
+      /* В счетах жильцов доли дома нет: сумма строк — только их доли. */
+      const invoiceLines = await tx
+        .select({ amount: schema.invoiceLines.amount, kind: schema.invoiceLines.kind })
+        .from(schema.invoiceLines);
+
+      const utilities = invoiceLines.filter((line) => line.kind === 'utilities');
+
+      expect(utilities.reduce((sum, line) => sum + line.amount, 0)).toBe(
+        closed.allocations.reduce((sum, row) => sum + row.amount, 0),
+      );
+      expect(utilities.some((line) => line.amount === 5_000)).toBe(false);
+    });
+  });
+
+  it('жильцу видно долю дома отдельной строкой раскладки', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9996');
+      const period = await periodWith(tx, fixture, 30_000);
+
+      await setHouseDays(fixture.admin, period.id, { days: 12, comment: REASON }, { executor: tx });
+
+      await closeUtilityPeriod(fixture.admin, period.id, {
+        executor: tx,
+        today: IN_NOVEMBER,
+        instant: INSTANT,
+      });
+
+      const share = await readUtilityShareFor(
+        fixture.admin,
+        { userId: fixture.residents[0]?.userId ?? '', month: OCTOBER },
+        { executor: tx },
+      );
+
+      /* Знаменатель включает сутки дома: 10 + 20 + 30 + 12. */
+      expect(share).toMatchObject({ days: 10, totalDays: 72, houseDays: 12, houseAmount: 5_000 });
+    });
+  });
+
+  it('переоткрытие отменяет проводки периода, повторное закрытие не удваивает', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9997');
+      const period = await periodWith(tx, fixture, 30_000);
+
+      await setHouseDays(fixture.admin, period.id, { days: 12, comment: REASON }, { executor: tx });
+
+      await closeUtilityPeriod(fixture.admin, period.id, {
+        executor: tx,
+        today: IN_NOVEMBER,
+        instant: INSTANT,
+      });
+
+      await reopenUtilityPeriod(fixture.superadmin, period.id, { executor: tx });
+
+      await closeUtilityPeriod(fixture.admin, period.id, {
+        executor: tx,
+        today: IN_NOVEMBER,
+        instant: INSTANT,
+      });
+
+      /*
+       * После сторно и повторного закрытия проводок ровно по одной: доля
+       * дома и излишек округления. Без отмены их было бы по две — до доли
+       * дома тем же путём удваивался излишек, и увидеть это было нечем.
+       */
+      const entries = await tx
+        .select({
+          id: schema.ledgerEntries.id,
+          description: schema.ledgerEntries.description,
+          reversed: schema.ledgerEntries.reversedByEntryId,
+        })
+        .from(schema.ledgerEntries)
+        .where(eq(schema.ledgerEntries.sourceId, period.id));
+
+      const active = entries.filter(
+        (entry) => entry.reversed === null && !entry.description.startsWith('Сторно'),
+      );
+
+      expect(active.map((entry) => entry.description).sort()).toEqual([
+        'Доля дома в коммуналке',
+        'Излишек округления коммуналки',
+      ]);
+    });
+  });
+
+  it('месяц без жильцов с долей дома закрывается: платит дом', async () => {
+    await inRollback(async (tx) => {
+      /* Заезды в ноябре: в октябре в доме не жил никто. */
+      const fixture = await seed(tx, '9998', ['2026-11-02', '2026-11-03', '2026-11-04']);
+      const period = await periodWith(tx, fixture, 30_000);
+
+      await setHouseDays(
+        fixture.admin,
+        period.id,
+        { days: 30, comment: 'Дом стоял пустым, отопление шло' },
+        { executor: tx },
+      );
+
+      const closed = await closeUtilityPeriod(fixture.admin, period.id, {
+        executor: tx,
+        today: IN_NOVEMBER,
+        instant: INSTANT,
+      });
+
+      expect(closed.allocations).toEqual([]);
+      expect(closed.period.houseAmount).toBe(30_000);
+    });
+  });
+
+  it('месяц без жильцов и без доли дома закрыть нельзя', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9999', ['2026-11-02', '2026-11-03', '2026-11-04']);
+      const period = await periodWith(tx, fixture, 30_000);
+
+      await expect(
+        closeUtilityPeriod(fixture.admin, period.id, {
+          executor: tx,
+          today: IN_NOVEMBER,
+          instant: INSTANT,
+        }),
+      ).rejects.toBeInstanceOf(ConflictError);
     });
   });
 });

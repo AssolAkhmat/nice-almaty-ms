@@ -1,4 +1,5 @@
 import { getDb, type Executor } from '@/db/client';
+import { listLedgerEntriesBySource } from '@/db/repositories/accounts';
 import { listInvoices } from '@/db/repositories/invoices';
 import { listApprovedAbsences } from '@/db/repositories/rating';
 import { listMonthStaysInHouse, listResidencies } from '@/db/repositories/residencies';
@@ -42,7 +43,7 @@ import {
 
 import { AUDIT_ACTIONS, recordAudit, withAudit } from './audit';
 import { appendInvoiceLine, createInvoice } from './invoices';
-import { postUtilitySurplus } from './ledger';
+import { postUtilityHouseShare, postUtilitySurplus, reverseEntry } from './ledger';
 
 import type { ResidentUtilityShare } from '@/db/repositories/utilities';
 import type {
@@ -297,8 +298,74 @@ async function computePeriod(
     distribution: distributeUtilities(
       total,
       participants.map((entry) => ({ userId: entry.userId, days: entry.days })),
+      period.houseDays,
     ),
   };
+}
+
+/**
+ * Доля дома в человеко-днях (P2-7, указание владельца 27 сентября 2026).
+ *
+ * Число вводит администратор: система его не вычисляет и вычислить не может —
+ * сколько человеко-суток «прожили» общие помещения, знает только тот, кто
+ * видел дом. Комментарий обязателен, ноль — значение по умолчанию.
+ *
+ * Отрицательного значения не бывает: доля дома только уменьшает долю жильца,
+ * увеличить её она не способна ни при каком значении. Это свойство самой
+ * формулы (знаменатель растёт), и оно проверено перебором в тестах ядра.
+ */
+export async function setHouseDays(
+  actor: UserActor,
+  periodId: string,
+  input: { days: number; comment: string },
+  deps: UtilityDeps = {},
+): Promise<UtilityPeriod> {
+  const { executor } = resolve(deps);
+
+  const period = await periodFor(actor, periodId, 'utility.manage', executor);
+  assertDraft(period);
+
+  if (!Number.isSafeInteger(input.days) || input.days < 0) {
+    throw new ValidationError('utilities.errors.houseDaysInvalid');
+  }
+
+  /* Ноль снимает долю дома целиком — тогда и объяснять нечего. */
+  const comment = input.comment.trim();
+
+  if (input.days > 0 && comment === '') {
+    throw new ValidationError('utilities.errors.commentRequired');
+  }
+
+  return withAudit(
+    { context: actor.context, ip: actor.ip, requestId: actor.requestId },
+    async (tx) => {
+      const updated = await updateUtilityPeriod(
+        actor.context,
+        period.id,
+        {
+          houseDays: input.days,
+          houseDaysComment: input.days === 0 ? null : comment,
+        },
+        tx,
+      );
+
+      if (updated === null) {
+        throw new ConflictError('utilities.errors.notUpdated');
+      }
+
+      return {
+        result: updated,
+        audit: {
+          action: AUDIT_ACTIONS.utilityHouseDaysSet,
+          entityType: 'utility_period',
+          entityId: period.id,
+          before: { houseDays: period.houseDays, houseDaysComment: period.houseDaysComment },
+          after: { houseDays: updated.houseDays, houseDaysComment: updated.houseDaysComment },
+        },
+      };
+    },
+    executor,
+  );
 }
 
 /** Период дома за месяц; заводится пустым, если его ещё нет (модуль 6). */
@@ -642,7 +709,7 @@ export async function closeUtilityPeriod(
    * Делить не на кого — по-прежнему отказ, но только когда делить есть что:
    * сумма, которую не на кого разложить, потерялась бы молча.
    */
-  if (total > 0 && distribution.allocations.length === 0) {
+  if (total > 0 && distribution.allocations.length === 0 && distribution.house.days === 0) {
     throw new ConflictError('utilities.errors.noParticipants');
   }
 
@@ -663,7 +730,13 @@ export async function closeUtilityPeriod(
     const closed = await updateUtilityPeriod(
       actor.context,
       period.id,
-      { status: 'closed', closedAt: instant, closedBy: actor.context.userId },
+      {
+        status: 'closed',
+        closedAt: instant,
+        closedBy: actor.context.userId,
+        /* Доля дома фиксируется снимком наравне с долями жильцов. */
+        houseAmount: distribution.house.amount,
+      },
       tx,
     );
 
@@ -680,6 +753,25 @@ export async function closeUtilityPeriod(
       await postUtilitySurplus(
         actor,
         { houseId: period.houseId, sourceId: period.id, amount: distribution.surplus, date: today },
+        { executor: tx, today },
+      );
+    }
+
+    /*
+     * Доля дома — расход Исполнителя, а не долг жильца: она идёт проводкой
+     * на счёт дома (§10.1) и ни в один счёт не попадает. Проводка при
+     * закрытии, как и излишек: с этого момента коммунальный фонд должен
+     * поставщику итог периода, а часть его причитается от дома.
+     */
+    if (distribution.house.amount > 0) {
+      await postUtilityHouseShare(
+        actor,
+        {
+          houseId: period.houseId,
+          sourceId: period.id,
+          amount: distribution.house.amount,
+          date: today,
+        },
         { executor: tx, today },
       );
     }
@@ -743,6 +835,8 @@ export async function closeUtilityPeriod(
           total,
           participants: distribution.allocations.length,
           surplus: distribution.surplus,
+          houseDays: distribution.house.days,
+          houseAmount: distribution.house.amount,
           invoiced,
         },
       },
@@ -758,6 +852,11 @@ export async function closeUtilityPeriod(
  * Снимок стирается: он относился к прежним строкам. Строки, уже попавшие
  * в счета, отсюда не убираются — счёт правится своим экраном, и это
  * осознанная ручная работа ([ОТКРЫТО] P3-24).
+ *
+ * Проводки периода — излишек округления и доля дома — отменяются сторно.
+ * Без этого повторное закрытие клало их вторым разом: до появления доли дома
+ * так удваивался излишек, и заметить это было нечем. Корректировки суток
+ * остаются: они относятся к людям и суткам, а не к строкам расходов.
  */
 export async function reopenUtilityPeriod(
   actor: UserActor,
@@ -775,10 +874,16 @@ export async function reopenUtilityPeriod(
   return executor.transaction(async (tx) => {
     await saveUtilityAllocations(period.id, [], tx);
 
+    const entries = await listLedgerEntriesBySource(actor.context, 'utilities', period.id, tx);
+
+    for (const entry of entries) {
+      await reverseEntry(actor, entry.id, { executor: tx });
+    }
+
     const reopened = await updateUtilityPeriod(
       actor.context,
       period.id,
-      { status: 'draft', closedAt: null, closedBy: null },
+      { status: 'draft', closedAt: null, closedBy: null, houseAmount: 0 },
       tx,
     );
 

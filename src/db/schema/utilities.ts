@@ -42,12 +42,36 @@ export const utilityPeriods = pgTable(
     /** Первое число месяца, за который собирается коммуналка. */
     month: date('month').notNull(),
     status: utilityPeriodStatusEnum('status').notNull().default('draft'),
+    /**
+     * Доля дома в человеко-днях (P2-7, указание владельца 27 сентября 2026).
+     * Общие помещения греются независимо от заселённости, пустые места тоже
+     * потребляют. Число вводит администратор — система его не вычисляет.
+     */
+    houseDays: integer('house_days').notNull().default(0),
+    houseDaysComment: text('house_days_comment'),
+    /** Сумма доли дома на момент закрытия: снимок наравне с долями жильцов. */
+    houseAmount: bigint('house_amount', { mode: 'number' }).notNull().default(0),
     closedAt: timestamp('closed_at', { withTimezone: true }),
     closedBy: uuid('closed_by').references(() => users.id),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [uniqueIndex('utility_periods_house_month_unique').on(table.houseId, table.month)],
+  (table) => [
+    uniqueIndex('utility_periods_house_month_unique').on(table.houseId, table.month),
+    check(
+      'utility_periods_house_days_non_negative',
+      sql`${table.houseDays} >= 0 and ${table.houseAmount} >= 0`,
+    ),
+    /*
+     * Ненулевая доля дома без объяснения — это молча уменьшенные счета
+     * жильцов. Запрет стоит в базе: сумма, за которую некому ответить,
+     * хуже отсутствующей.
+     */
+    check(
+      'utility_periods_house_days_comment',
+      sql`${table.houseDays} = 0 or btrim(coalesce(${table.houseDaysComment}, '')) <> ''`,
+    ),
+  ],
 );
 
 export const utilityLines = pgTable(

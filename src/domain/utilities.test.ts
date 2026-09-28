@@ -428,3 +428,84 @@ describe('корректировка человеко-дней (P2-6)', () => {
     expect(checkDayCorrection({ ...BASE, days: -5, comment: '' })).toBe('daysInvalid');
   });
 });
+
+describe('доля дома в человеко-днях (P2-7)', () => {
+  const THREE = [
+    { userId: 'a', days: 10 },
+    { userId: 'b', days: 20 },
+    { userId: 'c', days: 30 },
+  ];
+
+  it('при нуле расчёт совпадает с прежним: пример 4.1 не двинулся', () => {
+    const result = distributeUtilities(30_000, THREE, 0);
+
+    expect(result.allocations.map((row) => row.amount)).toEqual([5_000, 10_000, 15_000]);
+    expect(result.surplus).toBe(0);
+    expect(result.house).toEqual({ days: 0, amount: 0 });
+  });
+
+  it('человеко-дни дома входят в знаменатель наравне с жильцами', () => {
+    /* 10 + 20 + 30 + 1 = 61: те же числа, что в примере 4.2. */
+    const result = distributeUtilities(30_000, THREE, 1);
+
+    expect(result.allocations.map((row) => row.amount)).toEqual([4_919, 9_837, 14_755]);
+    expect(result.house).toEqual({ days: 1, amount: 492 });
+  });
+
+  it('деньги периода сходятся до тенге', () => {
+    const result = distributeUtilities(30_000, THREE, 7);
+    const residents = result.allocations.reduce((sum, row) => sum + row.amount, 0);
+
+    /*
+     * Доля дома и излишек округления лежат на одном счёте — дома, — поэтому
+     * сумма долей жильцов плюс доля дома минус излишек равна итогу периода
+     * ровно, без остатка. Ни одного тенге не появилось и не исчезло.
+     */
+    expect(residents + result.house.amount - result.surplus).toBe(30_000);
+  });
+
+  it('доля каждого жильца строго меньше, чем при нуле', () => {
+    const base = distributeUtilities(30_000, THREE, 0);
+    const withHouse = distributeUtilities(30_000, THREE, 12);
+
+    for (const [index, row] of withHouse.allocations.entries()) {
+      expect(row.amount).toBeLessThan(base.allocations[index]?.amount ?? 0);
+    }
+  });
+
+  /*
+   * Доказательство направления перебором, а не словами: ни при каком значении
+   * доли дома чья-либо доля не становится больше, чем при нуле. Проверка
+   * краснеет, если знаменатель однажды начнут считать иначе.
+   */
+  it('ни при каком значении доля жильца не растёт', () => {
+    const base = distributeUtilities(30_000, THREE, 0);
+
+    for (let houseDays = 0; houseDays <= 120; houseDays += 1) {
+      const result = distributeUtilities(30_000, THREE, houseDays);
+
+      for (const [index, row] of result.allocations.entries()) {
+        expect(row.amount).toBeLessThanOrEqual(base.allocations[index]?.amount ?? 0);
+      }
+    }
+  });
+
+  it('отрицательная доля дома отклоняется', () => {
+    expect(() => distributeUtilities(30_000, THREE, -1)).toThrow(RangeError);
+    expect(() => distributeUtilities(30_000, THREE, 1.5)).toThrow(RangeError);
+  });
+
+  it('месяц без жильцов с заявленными сутками дома оплачивает дом целиком', () => {
+    const result = distributeUtilities(30_000, [], 30);
+
+    expect(result.house).toEqual({ days: 30, amount: 30_000 });
+    expect(result.undistributed).toBe(0);
+  });
+
+  it('месяц без жильцов и без суток дома оставляет сумму неразнесённой', () => {
+    const result = distributeUtilities(30_000, [], 0);
+
+    expect(result.undistributed).toBe(30_000);
+    expect(result.house).toEqual({ days: 0, amount: 0 });
+  });
+});

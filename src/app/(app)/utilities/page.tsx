@@ -253,6 +253,9 @@ export default async function UtilitiesPage({
         canReopen={can(context, 'utility.reopen', { houseId })}
         closed={closed}
         history={history}
+        houseAmount={closed ? view.period.houseAmount : view.preview.house.amount}
+        houseDays={view.period.houseDays}
+        houseDaysComment={view.period.houseDaysComment}
         houseId={houseId}
         lines={view.lines.map((line) => ({
           id: line.id,

@@ -287,6 +287,31 @@ export async function findLedgerEntryBySource(
   return entry ?? null;
 }
 
+/**
+ * Все действующие проводки операции. Отличается от `findLedgerEntryBySource`
+ * тем, что отдаёт их все: у коммунального периода при закрытии проводок две —
+ * излишек округления и доля дома, — и отменять надо обе (P2-7).
+ */
+export async function listLedgerEntriesBySource(
+  context: AccessContext,
+  sourceType: string,
+  sourceId: string,
+  executor: Executor = getDb(),
+): Promise<LedgerEntry[]> {
+  return executor
+    .select()
+    .from(ledgerEntries)
+    .where(
+      and(
+        eq(ledgerEntries.orgId, context.orgId),
+        eq(ledgerEntries.sourceType, sourceType),
+        eq(ledgerEntries.sourceId, sourceId),
+        isNull(ledgerEntries.reversedByEntryId),
+      ),
+    )
+    .orderBy(asc(ledgerEntries.createdAt), asc(ledgerEntries.id));
+}
+
 export async function listLedgerLines(
   entryId: string,
   executor: Executor = getDb(),
