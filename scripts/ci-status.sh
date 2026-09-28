@@ -37,11 +37,40 @@ else
   echo "на боевой: ДРУГОЙ — ${deployed}"
 fi
 
-body="$(curl -fsS "https://api.github.com/repos/${REPO}/commits/${commit}/check-runs" \
-  -H 'Accept: application/vnd.github+json' 2>/dev/null || true)"
+#
+# Причина недоступности называется, а не сваливается в «лимит или сеть».
+# Незапушенный коммит GitHub отдаёт как 422, и прежнее сообщение уводило
+# искать сетевой сбой там, где надо было сделать `git push`.
+#
+status="$(curl -sS -o /tmp/ci-status-body.json -w '%{http_code}' \
+  "https://api.github.com/repos/${REPO}/commits/${commit}/check-runs" \
+  -H 'Accept: application/vnd.github+json' 2>/dev/null || echo 000)"
+
+body="$(cat /tmp/ci-status-body.json 2>/dev/null || true)"
+rm -f /tmp/ci-status-body.json
+
+case "${status}" in
+  200) ;;
+  422 | 404)
+    echo "прогон:    коммита нет на GitHub — не запушен"
+    exit 0
+    ;;
+  403 | 429)
+    echo "прогон:    лимит запросов GitHub исчерпан"
+    exit 0
+    ;;
+  000)
+    echo "прогон:    сеть недоступна"
+    exit 0
+    ;;
+  *)
+    echo "прогон:    GitHub ответил ${status}"
+    exit 0
+    ;;
+esac
 
 if [ -z "${body}" ]; then
-  echo "прогон:    состояние недоступно (лимит запросов или сеть)"
+  echo "прогон:    GitHub ответил пустым телом"
   exit 0
 fi
 
