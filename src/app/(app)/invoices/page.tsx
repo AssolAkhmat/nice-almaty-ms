@@ -15,7 +15,7 @@ import {
 } from '@/lib/time';
 import { listInvoicesFor, readInvoice } from '@/services/invoices';
 import { listUtilityReceiptsFor, readUtilityShareFor } from '@/services/utilities';
-import { personLabels } from '@/services/person-labels';
+import { optionLabel, personLabels } from '@/services/person-labels';
 import { houseHistoryNames } from '@/services/residents';
 
 import {
@@ -183,10 +183,23 @@ export default async function InvoicesPage({
    * ссылка на карточку счёта выходила без текста, и дороги к отметке оплаты
    * не оставалось (находка P1-4, 27 сентября 2026).
    */
-  const labels = await personLabels(
-    context,
-    rows.map((row) => row.invoice.userId),
-  );
+  /*
+   * Подписи нужны и владельцам счетов месяца, и всем действующим жильцам дома:
+   * из вторых собирается список формы ручного счёта.
+   *
+   * Сначала здесь брались только владельцы счетов, и жилец без счёта за этот
+   * месяц попадал в список формы **пустой строкой**: выбрать его было нельзя
+   * ни человеку, ни приёмке. Прогон приёмок это назвал, а `pnpm verify` — нет:
+   * пустая строка в `<option>` типы не ломает (разбор 28 сентября 2026).
+   */
+  const userIds = [
+    ...new Set([
+      ...rows.map((row) => row.invoice.userId),
+      ...residencies.map((residency) => residency.userId),
+    ]),
+  ];
+
+  const labels = await personLabels(context, userIds);
 
   const nameOf = new Map<string, string>();
 
@@ -196,7 +209,7 @@ export default async function InvoicesPage({
     }
   }
 
-  const missing = rows.map((row) => row.invoice.userId).filter((userId) => !nameOf.has(userId));
+  const missing = userIds.filter((userId) => !nameOf.has(userId));
 
   for (const [userId, name] of await houseHistoryNames(actor, houseId, missing)) {
     if (name.trim() !== '') {
@@ -226,9 +239,13 @@ export default async function InvoicesPage({
     debt: counted.reduce((sum, row) => sum + row.remaining, 0),
   };
 
+  /*
+   * Без имени в списке стоит телефон, а не пустая строка: профиль может быть
+   * ещё не заполнен, а счёт такому жильцу выставляют — например, на депозит.
+   */
   const options: ResidencyOption[] = residencies.map((residency) => ({
     id: residency.id,
-    name: nameOf.get(residency.userId) ?? '',
+    name: optionLabel(labels.get(residency.userId), residency.id),
   }));
 
   return (

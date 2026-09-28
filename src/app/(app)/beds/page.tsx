@@ -11,7 +11,7 @@ import { can } from '@/lib/authz';
 import { getCurrentSession } from '@/lib/session';
 import { todayInAlmaty } from '@/lib/time';
 import { houseLayout, myPlacement } from '@/services/beds';
-import { personLabels } from '@/services/person-labels';
+import { optionLabel, personLabels } from '@/services/person-labels';
 import { listTemporary } from '@/services/temporary-residents';
 
 import { HouseLayout, type RoomView, type UnplacedResident } from './house-layout';
@@ -98,8 +98,13 @@ export default async function BedsPage({
     residencies.map((residency) => residency.userId),
   );
 
+  /*
+   * Подпись собирает `optionLabel`: пустой она не бывает ни при каком
+   * состоянии данных, а список незаселённых — это список выбора, в котором
+   * пустую строку не выбрать (разбор 28 сентября 2026).
+   */
   const nameOf = new Map(
-    [...labels.values()].map((label) => [label.userId, label.name ?? label.phone]),
+    [...labels.values()].map((label) => [label.userId, optionLabel(label, label.userId)]),
   );
 
   const rooms: RoomView[] = layout.map((area) => ({
@@ -129,7 +134,7 @@ export default async function BedsPage({
     .filter((residency) => !placedResidencies.has(residency.id))
     .map((residency) => ({
       residencyId: residency.id,
-      name: nameOf.get(residency.userId) ?? '',
+      name: optionLabel(labels.get(residency.userId), residency.id),
     }));
 
   /*

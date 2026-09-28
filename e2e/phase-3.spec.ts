@@ -51,6 +51,17 @@ async function issueInvoice(
 ): Promise<void> {
   await page.goto('/invoices');
 
+  /*
+   * Сначала — есть ли жилец в списке. Отказ обязан называть причину: пустая
+   * подпись в списке выглядела как таймаут «не могу выбрать вариант» через
+   * четыре минуты, и три прогона подряд это читалось как зависшая машина
+   * (разбор 28 сентября 2026).
+   */
+  await expect(
+    page.getByTestId('invoice-residency').locator('option', { hasText: resident }),
+    'жильца нет в списке формы счёта — подпись собралась пустой?',
+  ).toHaveCount(1, { timeout: 15_000 });
+
   await page.getByTestId('invoice-residency').selectOption({ label: resident });
 
   await page.getByTestId('line-title').fill('Проживание');

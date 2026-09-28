@@ -146,6 +146,13 @@ test.describe('сквозная приёмка: рабочий день адми
     /* 5. Счёт: проживание одной строкой на следующий месяц. */
     const nextMonth = monthStart(1);
     await page.goto('/invoices');
+
+    /* Отказ называет причину, а не выглядит таймаутом выбора (см. фазу 3). */
+    await expect(
+      page.getByTestId('invoice-residency').locator('option', { hasText: fullName }),
+      'жильца нет в списке формы счёта — подпись собралась пустой?',
+    ).toHaveCount(1, { timeout: 15_000 });
+
     await page.getByTestId('invoice-residency').selectOption({ label: fullName });
     await page.getByTestId('line-title').fill('Проживание');
     await page.getByTestId('line-amount').fill(String(RENT));
