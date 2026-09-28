@@ -14,6 +14,7 @@ import {
   type NewDocumentType,
 } from '../schema';
 import { residencyVisibility } from './residencies';
+import { assertHouseVisible } from '../access';
 
 import type { AccessContext } from '../access';
 
@@ -146,9 +147,20 @@ export async function createDocument(
   return document;
 }
 
+/**
+ * Документы по фильтру. Дом в самой таблице не хранится — он достижим
+ * только через проживание, поэтому фильтр по дому идёт подзапросом
+ * по `residencies` (находка P2-9, 27 сентября 2026: у суперадмина очередь
+ * проверки была общей на всю сеть и разобрать её было нечем).
+ */
 export async function listDocuments(
   context: AccessContext,
-  filter: { residencyId?: string; status?: DocumentRecord['status'] } = {},
+  filter: {
+    residencyId?: string;
+    status?: DocumentRecord['status'];
+    houseId?: string;
+    documentTypeId?: string;
+  } = {},
   executor: Executor = getDb(),
 ): Promise<DocumentRecord[]> {
   const conditions = [documentScope(context, executor)];
@@ -158,6 +170,22 @@ export async function listDocuments(
   }
   if (filter.status !== undefined) {
     conditions.push(eq(documents.status, filter.status));
+  }
+  if (filter.houseId !== undefined) {
+    assertHouseVisible(context, filter.houseId);
+
+    conditions.push(
+      inArray(
+        documents.residencyId,
+        executor
+          .select({ id: residencies.id })
+          .from(residencies)
+          .where(and(residencyVisibility(context), eq(residencies.houseId, filter.houseId))),
+      ),
+    );
+  }
+  if (filter.documentTypeId !== undefined) {
+    conditions.push(eq(documents.documentTypeId, filter.documentTypeId));
   }
 
   return executor

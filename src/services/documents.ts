@@ -266,7 +266,13 @@ export async function reviewDocument(
  */
 export async function listReviewDocuments(
   actor: UserActor,
-  filter: { status?: DocumentRecord['status']; residencyId?: string } = {},
+  filter: {
+    status?: DocumentRecord['status'];
+    residencyId?: string;
+    /** Дом очереди: у суперадмина она иначе общая на всю сеть (P2-9). */
+    houseId?: string;
+    documentTypeId?: string;
+  } = {},
   deps: DocumentDeps = {},
 ): Promise<DocumentRecord[]> {
   const { executor } = resolve(deps);
@@ -290,14 +296,23 @@ export async function listReviewDocuments(
     );
   }
 
+  /*
+   * Дом в фильтре — область запроса, а не подсказка: право спрашивается
+   * по нему, иначе админ одного дома читал бы очередь другого, передав
+   * идентификатор в адресе (P2-9).
+   */
   assertCan(actor.context, 'document.read', {
-    houseId: actor.context.houseId,
+    houseId: filter.houseId ?? actor.context.houseId,
     userId: actor.context.userId,
   });
 
   return listDocuments(
     actor.context,
-    filter.status === undefined ? {} : { status: filter.status },
+    {
+      ...(filter.status === undefined ? {} : { status: filter.status }),
+      ...(filter.houseId === undefined ? {} : { houseId: filter.houseId }),
+      ...(filter.documentTypeId === undefined ? {} : { documentTypeId: filter.documentTypeId }),
+    },
     executor,
   );
 }

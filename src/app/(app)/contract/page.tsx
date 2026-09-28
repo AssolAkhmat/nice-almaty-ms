@@ -1,6 +1,8 @@
 import { getTranslations } from 'next-intl/server';
 import { redirect } from 'next/navigation';
 
+import { AppLink } from '@/components/ui/app-link';
+import { listHouses } from '@/db/repositories/houses';
 import { listResidencies } from '@/db/repositories/residencies';
 import { EmptyState } from '@/components/ui/empty-state';
 import { can } from '@/lib/authz';
@@ -19,17 +21,31 @@ export const dynamic = 'force-dynamic';
  * не ставит никто. Админ собирает договор и отдельно отмечает выдачу
  * ключей — это разные события, и в списке они видны раздельно.
  */
-export default async function ContractPage() {
+export default async function ContractPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ house?: string }>;
+}) {
   const session = await getCurrentSession();
   if (session === null) {
     redirect('/login');
   }
 
   const t = await getTranslations('contract');
+  const tc = await getTranslations('common');
   const { context } = session;
 
   const isAdmin = context.role === 'admin' || context.role === 'superadmin';
-  const residencies = await listResidencies(context, {});
+
+  /*
+   * Фильтр по дому (находка P2-9, 27 сентября 2026): у суперадмина список
+   * договоров был общим на всю сеть, одним полотном без разбора по домам.
+   */
+  const houses = context.role === 'superadmin' ? await listHouses(context) : [];
+  const { house: requestedHouse } = await searchParams;
+  const houseId = houses.some((house) => house.id === requestedHouse) ? requestedHouse : undefined;
+
+  const residencies = await listResidencies(context, houseId === undefined ? {} : { houseId });
 
   if (!isAdmin) {
     const [residency] = residencies;
@@ -86,6 +102,30 @@ export default async function ContractPage() {
         <h1>{t('title')}</h1>
         <p className="text-text-muted text-[13px]">{t('adminSubtitle')}</p>
       </div>
+
+      {houses.length > 1 && (
+        <nav className="flex flex-wrap gap-2 text-[13px]" data-testid="contract-houses">
+          <AppLink
+            className={
+              houseId === undefined ? 'text-text font-medium' : 'text-text-muted hover:text-text'
+            }
+            href="/contract"
+          >
+            {tc('allHouses')}
+          </AppLink>
+          {houses.map((house) => (
+            <AppLink
+              className={
+                house.id === houseId ? 'text-text font-medium' : 'text-text-muted hover:text-text'
+              }
+              href={{ pathname: '/contract', query: { house: house.id } }}
+              key={house.id}
+            >
+              {house.name}
+            </AppLink>
+          ))}
+        </nav>
+      )}
 
       <ContractList
         canRead={can(context, 'contract.read', { houseId: context.houseId })}

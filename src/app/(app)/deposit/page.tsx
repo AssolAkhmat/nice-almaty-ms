@@ -1,6 +1,8 @@
 import { getTranslations } from 'next-intl/server';
 import { redirect } from 'next/navigation';
 
+import { AppLink } from '@/components/ui/app-link';
+import { listHouses } from '@/db/repositories/houses';
 import { listResidencies } from '@/db/repositories/residencies';
 import { EmptyState } from '@/components/ui/empty-state';
 import { getCurrentSession } from '@/lib/session';
@@ -66,18 +68,29 @@ async function viewFor(
   };
 }
 
-export default async function DepositPage() {
+export default async function DepositPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ house?: string }>;
+}) {
   const session = await getCurrentSession();
   if (session === null) {
     redirect('/login');
   }
 
   const t = await getTranslations('deposit');
+  const tc = await getTranslations('common');
   const { context } = session;
   const actor: UserActor = { context };
 
   const canManage = context.role === 'admin' || context.role === 'superadmin';
-  const residencies = await listResidencies(context, {});
+
+  /* Фильтр по дому (P2-9): у суперадмина список был общим на всю сеть. */
+  const houses = context.role === 'superadmin' ? await listHouses(context) : [];
+  const { house: requestedHouse } = await searchParams;
+  const houseId = houses.some((house) => house.id === requestedHouse) ? requestedHouse : undefined;
+
+  const residencies = await listResidencies(context, houseId === undefined ? {} : { houseId });
 
   /*
    * Подписи читаются одним запросом на весь список: N запросов на N жильцов
@@ -104,6 +117,30 @@ export default async function DepositPage() {
           {canManage ? t('adminSubtitle') : t('subtitle')}
         </p>
       </div>
+
+      {canManage && houses.length > 1 && (
+        <nav className="flex flex-wrap gap-2 text-[13px]" data-testid="deposit-houses">
+          <AppLink
+            className={
+              houseId === undefined ? 'text-text font-medium' : 'text-text-muted hover:text-text'
+            }
+            href="/deposit"
+          >
+            {tc('allHouses')}
+          </AppLink>
+          {houses.map((house) => (
+            <AppLink
+              className={
+                house.id === houseId ? 'text-text font-medium' : 'text-text-muted hover:text-text'
+              }
+              href={{ pathname: '/deposit', query: { house: house.id } }}
+              key={house.id}
+            >
+              {house.name}
+            </AppLink>
+          ))}
+        </nav>
+      )}
 
       {canManage ? (
         <DepositList views={views} />

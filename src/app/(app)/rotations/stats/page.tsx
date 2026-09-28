@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
+import { listHouses } from '@/db/repositories/houses';
 import { listResidencies } from '@/db/repositories/residencies';
 import { can } from '@/lib/authz';
 import { getCurrentSession } from '@/lib/session';
@@ -47,9 +48,18 @@ export default async function RotationStatsPage({
   const from = tryParseBusinessDate(params.from ?? '') ?? startOfMonth(addMonths(today, -2));
   const to = tryParseBusinessDate(params.to ?? '') ?? today;
 
+  /*
+   * Переключатель дома (находка P2-9, 27 сентября 2026): параметр `house`
+   * экран читал и раньше, но менять дом можно было только правкой адреса
+   * руками — на самом экране ссылок не было.
+   */
+  const houses = context.role === 'superadmin' ? await listHouses(context) : [];
+
   const houseId =
     context.role === 'superadmin'
-      ? (params.house ?? (await listResidencies(context, {}))[0]?.houseId ?? null)
+      ? ((houses.some((house) => house.id === params.house) ? params.house : null) ??
+        (await listResidencies(context, {}))[0]?.houseId ??
+        null)
       : context.houseId;
 
   if (houseId === null) {
@@ -76,6 +86,22 @@ export default async function RotationStatsPage({
         <AppLink className="text-accent text-[13px] underline" href="/rotations">
           {t('toCalendar')}
         </AppLink>
+
+        {houses.length > 1 && (
+          <nav className="flex flex-wrap gap-2 text-[13px]" data-testid="stats-houses">
+            {houses.map((house) => (
+              <AppLink
+                className={
+                  house.id === houseId ? 'text-text font-medium' : 'text-text-muted hover:text-text'
+                }
+                href={{ pathname: '/rotations/stats', query: { house: house.id, from, to } }}
+                key={house.id}
+              >
+                {house.name}
+              </AppLink>
+            ))}
+          </nav>
+        )}
       </div>
 
       <StatsView

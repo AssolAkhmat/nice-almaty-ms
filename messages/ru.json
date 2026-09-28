@@ -362,7 +362,8 @@
     "menu": "Меню",
     "moduleNotReady": "Раздел ещё не реализован",
     "moduleNotReadyHint": "Он появится в своей фазе по плану работ.",
-    "remove": "Убрать"
+    "remove": "Убрать",
+    "allHouses": "Все дома"
   },
   "contract": {
     "title": "Договор",
@@ -648,7 +649,13 @@
     "accessOff": "Доступ к документам выключен",
     "accessOffHint": "Сеть не включила админам доступ к документам жильцов. Включает суперадмин в настройках сети.",
     "noDocumentTypes": "Типов документов пока нет",
-    "reviewOf": "Проверить справки: {count}"
+    "reviewOf": "Проверить справки: {count}",
+    "filterHouse": "Дом",
+    "filterAllHouses": "Все дома",
+    "filterType": "Тип документа",
+    "filterAllTypes": "Все типы",
+    "filterResident": "Жилец",
+    "filterApply": "Применить"
   },
   "files": {
     "open": "Открыть",

@@ -181,6 +181,8 @@ async function seed(tx: Transaction, suffix: string) {
   return {
     orgId,
     typeId,
+    houseA: houseA?.id ?? '',
+    houseB: houseB?.id ?? '',
     residentA: actor(context('resident', a.userId, null)),
     residentB: actor(context('resident', b.userId, null)),
     adminA: actor(context('admin', adminUser?.id ?? '', houseA?.id ?? null, withDocuments)),
@@ -643,6 +645,134 @@ describe('очередь проверки', () => {
  * владельца, 23 сентября 2026). Негативные фикстуры обязательны: без них
  * «админ не видит документ» осталось бы словами.
  */
+/**
+ * Фильтры очереди проверки (P2-9, указание владельца 27 сентября 2026).
+ *
+ * У суперадмина очередь была общей на всю сеть: ни дома, ни типа справки,
+ * ни поиска по человеку. Все тесты ниже падали бы до появления фильтров —
+ * параметров, по которым они спрашивают, в сервисе не существовало.
+ */
+describe('фильтры очереди', () => {
+  async function twoHouses(tx: Transaction, suffix: string) {
+    const fixture = await seed(tx, suffix);
+
+    const ownFile = await fixture.readyFile(fixture.residencyA, fixture.userA, 'own');
+    const foreignFile = await fixture.readyFile(fixture.residencyB, fixture.userB, 'foreign');
+
+    await submitDocument(
+      fixture.residentA,
+      {
+        residencyId: fixture.residencyA,
+        documentTypeId: fixture.typeId('dispensary'),
+        fileId: ownFile,
+        issueDate: null,
+      },
+      { executor: tx, today: TODAY },
+    );
+    await submitDocument(
+      fixture.residentB,
+      {
+        residencyId: fixture.residencyB,
+        documentTypeId: fixture.typeId('dispensary'),
+        fileId: foreignFile,
+        issueDate: null,
+      },
+      { executor: tx, today: TODAY },
+    );
+
+    return fixture;
+  }
+
+  it('без фильтра суперадмин видит сеть, с фильтром — один дом', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await twoHouses(tx, '5090');
+
+      const all = await listReviewDocuments(
+        fixture.superadmin,
+        { status: 'uploaded' },
+        { executor: tx, today: TODAY },
+      );
+
+      expect(all).toHaveLength(2);
+
+      const onlyA = await listReviewDocuments(
+        fixture.superadmin,
+        { status: 'uploaded', houseId: fixture.houseA },
+        { executor: tx, today: TODAY },
+      );
+
+      expect(onlyA.map((document) => document.residencyId)).toEqual([fixture.residencyA]);
+
+      const onlyB = await listReviewDocuments(
+        fixture.superadmin,
+        { status: 'uploaded', houseId: fixture.houseB },
+        { executor: tx, today: TODAY },
+      );
+
+      expect(onlyB.map((document) => document.residencyId)).toEqual([fixture.residencyB]);
+    });
+  });
+
+  /*
+   * Фильтр — это область запроса, а не подсказка экрана: подставив чужой дом
+   * в адрес, админ обязан получить отказ, а не пустой список. Пустой список
+   * говорил бы «там ничего нет», и это ложь о чужом доме.
+   */
+  it('админ дома не может отфильтровать по чужому дому', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await twoHouses(tx, '5091');
+
+      await expect(
+        listReviewDocuments(
+          fixture.adminA,
+          { status: 'uploaded', houseId: fixture.houseB },
+          { executor: tx, today: TODAY },
+        ),
+      ).rejects.toBeInstanceOf(NotFoundError);
+    });
+  });
+
+  it('фильтр по типу документа отдаёт только этот тип', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await twoHouses(tx, '5092');
+
+      const dispensary = await listReviewDocuments(
+        fixture.superadmin,
+        { status: 'uploaded', documentTypeId: fixture.typeId('dispensary') },
+        { executor: tx, today: TODAY },
+      );
+
+      expect(dispensary).toHaveLength(2);
+
+      const other = await listReviewDocuments(
+        fixture.superadmin,
+        { status: 'uploaded', documentTypeId: fixture.typeId('fluorography') },
+        { executor: tx, today: TODAY },
+      );
+
+      expect(other).toEqual([]);
+    });
+  });
+
+  it('дом и тип действуют вместе', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await twoHouses(tx, '5093');
+
+      const rows = await listReviewDocuments(
+        fixture.superadmin,
+        {
+          status: 'uploaded',
+          houseId: fixture.houseB,
+          documentTypeId: fixture.typeId('dispensary'),
+        },
+        { executor: tx, today: TODAY },
+      );
+
+      expect(rows.map((document) => document.residencyId)).toEqual([fixture.residencyB]);
+    });
+  });
+});
+
 describe('полномочие выключено', () => {
   it('список документов жильца админу не отдаётся', async () => {
     await inRollback(async (tx) => {

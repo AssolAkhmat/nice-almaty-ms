@@ -362,7 +362,8 @@
     "menu": "Menu",
     "moduleNotReady": "This section is not built yet",
     "moduleNotReadyHint": "It arrives in its own phase of the roadmap.",
-    "remove": "Remove"
+    "remove": "Remove",
+    "allHouses": "All houses"
   },
   "contract": {
     "title": "Contract",
@@ -648,7 +649,13 @@
     "accessOff": "Document access is disabled",
     "accessOffHint": "The network has not enabled admin access to resident documents. A superadmin enables it in network settings.",
     "noDocumentTypes": "No document types yet",
-    "reviewOf": "Review documents: {count}"
+    "reviewOf": "Review documents: {count}",
+    "filterHouse": "House",
+    "filterAllHouses": "All houses",
+    "filterType": "Document type",
+    "filterAllTypes": "All types",
+    "filterResident": "Resident",
+    "filterApply": "Apply"
   },
   "files": {
     "open": "Open",
