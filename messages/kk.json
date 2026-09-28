@@ -215,7 +215,8 @@
       "user": "Есептік жазба",
       "utility_period": "Коммуналдық кезең",
       "profile_field_def": "профильдің қосымша өрісі",
-      "profile_field_value": "қосымша өрістің мәні"
+      "profile_field_value": "қосымша өрістің мәні",
+      "utility_day_adjustment": "Тәуліктерді түзету"
     }
   },
   "auth": {
@@ -1094,7 +1095,9 @@
     "reversalReason": "Сторно себебі",
     "reversalMark": "сторно",
     "reversedMark": "сторноланған",
-    "paymentReceipt": "Растайтын құжат"
+    "paymentReceipt": "Растайтын құжат",
+    "utilityBreakdown": "Үйдің {totalDays} адам-тәулігінен {days} тәулік бойынша есептелген",
+    "utilityPeriodTotal": "Үйдің айлық коммуналдық төлемі"
   },
   "language": {
     "label": "Тіл",
@@ -2074,7 +2077,8 @@
       "lineAdded": "Жол қосылды",
       "lineRemoved": "Жол алынды",
       "closed": "Кезең жабылды",
-      "reopened": "Кезең қайта ашылды"
+      "reopened": "Кезең қайта ашылды",
+      "daysCorrected": "Тәуліктер түзетілді"
     },
     "errors": {
       "unauthorized": "Кіру қажет",
@@ -2087,7 +2091,10 @@
       "closed": "Кезең жабық: жолдар өзгертілмейді",
       "notClosed": "Кезең әлдеқашан ашық",
       "noParticipants": "Бұл айда үйде ешкім тұрмаған",
-      "notUpdated": "Кезең жаңартылмады"
+      "notUpdated": "Кезең жаңартылмады",
+      "daysInvalid": "Тәулік саны — нөлден айдағы күн санына дейінгі бүтін сан",
+      "commentRequired": "Түзету себебін жазыңыз",
+      "increaseNotConfirmed": "Есептелгеннен арттыру формада растауды талап етеді"
     },
     "history": "Үй бойынша тарих",
     "month": "Ай",
@@ -2095,7 +2102,20 @@
     "residents": "Тұрғын",
     "averageShare": "Орташа үлес",
     "noHistory": "Жабылған кезеңдер жоқ",
-    "noHistoryHint": "Мұнда кезеңі жабылған айлар шығады"
+    "noHistoryHint": "Мұнда кезеңі жабылған айлар шығады",
+    "systemDays": "Есептелген",
+    "correctionColumn": "Түзету",
+    "daysTotal": "Қорытқы, тәулік",
+    "correctionTitle": "Адам-күндерді қолмен түзету",
+    "correctionHint": "Формула тәуліктерді қоныстану күні мен бекітілген кетулер бойынша санайды. Тұрғын ресімдемей кеткен болса, нақты тәулік санын қойып, себебін жазыңыз.",
+    "correctionDays": "Тәулік",
+    "correctionComment": "Себебі",
+    "correctionConfirm": "Растаймын: тәулік есептелгеннен көп",
+    "correctionWarning": "Шарт формуласы (4.5-т.) есептелгеннен көбін бермейді. Арттыру растауды талап етеді, екі мән де журналда қалады.",
+    "correctionPreview": "Қайта санау",
+    "correctionSave": "Сақтау",
+    "correctionPreviewTitle": "Сақтау алдындағы қайта санау",
+    "correctionWas": "{days} болған"
   },
   "validation": {
     "password": {

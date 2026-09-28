@@ -4,6 +4,7 @@ import { parseBusinessDate } from '@/lib/time';
 
 import {
   absentDaysInMonth,
+  checkDayCorrection,
   daysLivedInHouseInMonth,
   daysLivedInMonth,
   defaultUtilityMonth,
@@ -361,5 +362,69 @@ describe('месяц по умолчанию (P2-8)', () => {
     ]);
 
     expect(options).toEqual(['2027-01-01', '2026-12-01', '2026-11-01']);
+  });
+});
+
+describe('корректировка человеко-дней (P2-6)', () => {
+  const BASE = {
+    month: SEPTEMBER,
+    systemDays: 30,
+    comment: 'Каникулы: жильцы разъехались, отсутствие не оформляли',
+    confirmIncrease: false,
+  };
+
+  it('уменьшение относительно расчётного проходит свободно', () => {
+    expect(checkDayCorrection({ ...BASE, days: 12 })).toBeNull();
+  });
+
+  it('уменьшение до нуля — тоже уменьшение', () => {
+    expect(checkDayCorrection({ ...BASE, days: 0 })).toBeNull();
+  });
+
+  it('без комментария отказ', () => {
+    expect(checkDayCorrection({ ...BASE, days: 12, comment: '   ' })).toBe('commentRequired');
+  });
+
+  it('увеличение без подтверждения отказ', () => {
+    expect(checkDayCorrection({ ...BASE, systemDays: 12, days: 20 })).toBe('increaseNotConfirmed');
+  });
+
+  it('увеличение с подтверждением проходит', () => {
+    expect(
+      checkDayCorrection({ ...BASE, systemDays: 12, days: 20, confirmIncrease: true }),
+    ).toBeNull();
+  });
+
+  it('равное расчётному не считается увеличением', () => {
+    expect(checkDayCorrection({ ...BASE, days: 30 })).toBeNull();
+  });
+
+  /* Потолок — календарь: тридцать первое сентября не наступает. */
+  it('больше суток, чем в месяце, отказ даже с подтверждением', () => {
+    expect(checkDayCorrection({ ...BASE, days: 31, confirmIncrease: true })).toBe('daysInvalid');
+  });
+
+  it('в октябре тридцать один день допустим', () => {
+    expect(
+      checkDayCorrection({
+        ...BASE,
+        month: parseBusinessDate('2026-10-01'),
+        days: 31,
+        confirmIncrease: true,
+      }),
+    ).toBeNull();
+  });
+
+  it('отрицательное и дробное число суток отказ', () => {
+    expect(checkDayCorrection({ ...BASE, days: -1 })).toBe('daysInvalid');
+    expect(checkDayCorrection({ ...BASE, days: 12.5 })).toBe('daysInvalid');
+  });
+
+  /*
+   * Негодное число суток называется числом суток, а не отсутствием
+   * комментария: сообщение об отказе обязано назвать причину.
+   */
+  it('негодное число суток важнее пустого комментария', () => {
+    expect(checkDayCorrection({ ...BASE, days: -5, comment: '' })).toBe('daysInvalid');
   });
 });

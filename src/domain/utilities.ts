@@ -176,6 +176,57 @@ export function monthOptions(
   return [...months].sort().reverse();
 }
 
+/**
+ * Ручная корректировка человеко-дней (находка P2-6, 27 сентября 2026).
+ *
+ * Формула §4.2 знает только даты заселения и одобренные отъезды. В январе
+ * жильцы разъезжаются на каникулы, не оформляя отсутствие, а отопление
+ * горит — расчёт по календарю оказывается справедливым только на бумаге.
+ * Поэтому число суток админ вправе поставить своё.
+ *
+ * Направления неравноправны, и это главное в правиле:
+ *
+ * - **меньше расчётного** — свободно: начисление выходит меньше договорного,
+ *   а меньше договорного можно всегда (п. 4.5 Договора);
+ * - **больше расчётного** — только с отдельным подтверждением: формула
+ *   договора столько суток не даёт, и одним движением поля это не делается.
+ *
+ * Потолок — число суток в месяце: тридцать первое сентября не наступает
+ * ни при какой корректировке.
+ */
+export type DayCorrectionProblem = 'daysInvalid' | 'commentRequired' | 'increaseNotConfirmed';
+
+export interface DayCorrectionInput {
+  month: BusinessDate;
+  /** Что посчитала система. */
+  systemDays: number;
+  /** Что ставит администратор. */
+  days: number;
+  comment: string;
+  /** Явно подтверждённое увеличение выше расчётного. */
+  confirmIncrease: boolean;
+}
+
+export function checkDayCorrection(input: DayCorrectionInput): DayCorrectionProblem | null {
+  if (
+    !Number.isSafeInteger(input.days) ||
+    input.days < 0 ||
+    input.days > daysInBusinessMonth(input.month)
+  ) {
+    return 'daysInvalid';
+  }
+
+  if (input.comment.trim() === '') {
+    return 'commentRequired';
+  }
+
+  if (input.days > input.systemDays && !input.confirmIncrease) {
+    return 'increaseNotConfirmed';
+  }
+
+  return null;
+}
+
 /** Отрезок занятости места внутри месяца: полуоткрытый, как в базе. */
 export interface StayRange {
   from: BusinessDate;

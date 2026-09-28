@@ -179,13 +179,40 @@ export default async function UtilitiesPage({
   ]);
 
   const closed = view.period.status === 'closed';
+
+  /*
+   * У закрытого периода строки — снимок, у открытого — участники расчёта,
+   * а не одни получатели долей: скорректированный до нуля суток жилец доли
+   * не получает, но остаться на экране обязан. Иначе правку «ноль суток»
+   * нельзя ни увидеть, ни отменить — строка просто исчезает (P2-6).
+   */
+  const previewAmounts = new Map(
+    view.preview.allocations.map((allocation) => [allocation.userId, allocation.amount]),
+  );
+
   const source = closed
     ? view.allocations.map((allocation) => ({
         userId: allocation.userId,
         days: allocation.days,
         amount: allocation.amount,
       }))
-    : view.preview.allocations;
+    : view.participants.map((participant) => ({
+        userId: participant.userId,
+        days: participant.days,
+        amount: previewAmounts.get(participant.userId) ?? 0,
+      }));
+
+  /*
+   * Расчётное число суток берётся у сохранённой корректировки, а не
+   * пересчитывается: после закрытия периода даты проживания правятся дальше,
+   * и «что считала система» поехало бы вместе с ними (P2-6). Где правки
+   * не было, расчётное и итоговое — одно и то же число.
+   */
+  const adjustmentOf = new Map(
+    view.participants
+      .filter((participant) => participant.adjustment !== null)
+      .map((participant) => [participant.userId, participant.adjustment]),
+  );
 
   /*
    * Имена вместо идентификаторов: распределение читает человек.
@@ -203,13 +230,16 @@ export default async function UtilitiesPage({
 
   const rows: AllocationRowView[] = source.map((row) => {
     const name = names.get(row.userId) ?? '';
+    const adjustment = adjustmentOf.get(row.userId) ?? null;
 
     return {
       userId: row.userId,
       /* Без имени — пусто, а не uuid: идентификатор человеку не нужен. */
       name: name.trim() === '' ? '' : name,
+      systemDays: adjustment?.systemDays ?? row.days,
       days: row.days,
       amount: row.amount,
+      comment: adjustment?.comment ?? null,
     };
   });
 

@@ -215,7 +215,8 @@
       "user": "Account",
       "utility_period": "Utility period",
       "profile_field_def": "additional profile field",
-      "profile_field_value": "additional field value"
+      "profile_field_value": "additional field value",
+      "utility_day_adjustment": "Person-day correction"
     }
   },
   "auth": {
@@ -1094,7 +1095,9 @@
     "reversalReason": "Reason for the reversal",
     "reversalMark": "reversal",
     "reversedMark": "reversed",
-    "paymentReceipt": "Confirming document"
+    "paymentReceipt": "Confirming document",
+    "utilityBreakdown": "Calculated over {days} days out of the house total of {totalDays} person-days",
+    "utilityPeriodTotal": "House utilities for the month"
   },
   "language": {
     "label": "Language",
@@ -2074,7 +2077,8 @@
       "lineAdded": "Line added",
       "lineRemoved": "Line removed",
       "closed": "Period closed",
-      "reopened": "Period reopened"
+      "reopened": "Period reopened",
+      "daysCorrected": "Days corrected"
     },
     "errors": {
       "unauthorized": "Sign in required",
@@ -2087,7 +2091,10 @@
       "closed": "The period is closed: lines cannot be edited",
       "notClosed": "The period is already open",
       "noParticipants": "Nobody lived in the house that month",
-      "notUpdated": "The period was not updated"
+      "notUpdated": "The period was not updated",
+      "daysInvalid": "Days must be a whole number between zero and the length of the month",
+      "commentRequired": "State the reason for the correction",
+      "increaseNotConfirmed": "Increasing above the calculated value requires confirmation in the form"
     },
     "history": "House history",
     "month": "Month",
@@ -2095,7 +2102,20 @@
     "residents": "Residents",
     "averageShare": "Average share",
     "noHistory": "No closed periods",
-    "noHistoryHint": "Months with a closed period will appear here"
+    "noHistoryHint": "Months with a closed period will appear here",
+    "systemDays": "Calculated",
+    "correctionColumn": "Correction",
+    "daysTotal": "Days used",
+    "correctionTitle": "Manual person-day correction",
+    "correctionHint": "The formula counts days from move-in dates and approved absences. If a resident left without filing an absence, enter the actual number of days and state the reason.",
+    "correctionDays": "Days",
+    "correctionComment": "Reason",
+    "correctionConfirm": "I confirm: more days than calculated",
+    "correctionWarning": "The contract formula (cl. 4.5) does not yield more than the calculated value. An increase requires confirmation, and both values stay in the log.",
+    "correctionPreview": "Recalculate",
+    "correctionSave": "Save",
+    "correctionPreviewTitle": "Recalculation before saving",
+    "correctionWas": "was {days}"
   },
   "validation": {
     "password": {

@@ -9,12 +9,14 @@ import {
   houses,
   residencies,
   utilityAllocations,
+  utilityDayAdjustments,
   utilityLines,
   utilityPeriods,
   type NewUtilityAllocation,
   type NewUtilityLine,
   type NewUtilityPeriod,
   type UtilityAllocation,
+  type UtilityDayAdjustment,
   type UtilityLine,
   type UtilityPeriod,
 } from '../schema';
@@ -414,4 +416,142 @@ export async function countAllocationsOfUser(
     .where(eq(utilityAllocations.userId, userId));
 
   return row?.count ?? 0;
+}
+
+/** Ручные корректировки суток периода (P2-6, 27 сентября 2026). */
+export async function listDayAdjustments(
+  periodId: string,
+  executor: Executor = getDb(),
+): Promise<UtilityDayAdjustment[]> {
+  return executor
+    .select()
+    .from(utilityDayAdjustments)
+    .where(eq(utilityDayAdjustments.periodId, periodId))
+    .orderBy(asc(utilityDayAdjustments.createdAt), asc(utilityDayAdjustments.id));
+}
+
+export async function findDayAdjustment(
+  periodId: string,
+  userId: string,
+  executor: Executor = getDb(),
+): Promise<UtilityDayAdjustment | null> {
+  const [row] = await executor
+    .select()
+    .from(utilityDayAdjustments)
+    .where(
+      and(eq(utilityDayAdjustments.periodId, periodId), eq(utilityDayAdjustments.userId, userId)),
+    )
+    .limit(1);
+
+  return row ?? null;
+}
+
+/**
+ * Корректировка одна на жильца в периоде: повторная правка заменяет прежнюю,
+ * а не кладётся рядом. История правок живёт в `audit_log` — там она полная,
+ * с обоими значениями и автором каждой.
+ */
+export async function saveDayAdjustment(
+  input: {
+    periodId: string;
+    userId: string;
+    systemDays: number;
+    days: number;
+    comment: string;
+    createdBy: string;
+  },
+  executor: Executor = getDb(),
+): Promise<UtilityDayAdjustment> {
+  const [row] = await executor
+    .insert(utilityDayAdjustments)
+    .values(input)
+    .onConflictDoUpdate({
+      target: [utilityDayAdjustments.periodId, utilityDayAdjustments.userId],
+      set: {
+        systemDays: input.systemDays,
+        days: input.days,
+        comment: input.comment,
+        createdBy: input.createdBy,
+        updatedAt: now(),
+      },
+    })
+    .returning();
+
+  if (row === undefined) {
+    throw new NotFoundError('Корректировка суток не сохранена');
+  }
+
+  return row;
+}
+
+/**
+ * Раскладка доли жильца за месяц: сутки, знаменатель и итог периода
+ * (Приложение №3 п. 4.4 — жильцу видно, по какому числу суток посчитано).
+ *
+ * Только закрытый период: у открытого доли ещё меняются, и показывать их
+ * жильцу как расчёт значило бы обещать сумму, которая завтра другая.
+ */
+export interface ResidentUtilityShare {
+  periodId: string;
+  month: string;
+  /** Сутки, по которым посчитана доля: уже с учётом корректировки. */
+  days: number;
+  amount: number;
+  /** Знаменатель распределения: сумма человеко-суток периода. */
+  totalDays: number;
+  /** Итог периода по дому: сумма всех строк коммуналки. */
+  total: number;
+}
+
+export async function findResidentShare(
+  context: AccessContext,
+  userId: string,
+  month: BusinessDate,
+  executor: Executor = getDb(),
+): Promise<ResidentUtilityShare | null> {
+  /* Область — дома самого жильца: в контексте жильца домов нет (D11). */
+  const houses = executor
+    .select({ id: residencies.houseId })
+    .from(residencies)
+    .where(and(eq(residencies.orgId, context.orgId), eq(residencies.userId, userId)));
+
+  const [share] = await executor
+    .select({
+      periodId: utilityPeriods.id,
+      month: utilityPeriods.month,
+      days: utilityAllocations.days,
+      amount: utilityAllocations.amount,
+    })
+    .from(utilityAllocations)
+    .innerJoin(utilityPeriods, eq(utilityPeriods.id, utilityAllocations.periodId))
+    .where(
+      and(
+        eq(utilityPeriods.orgId, context.orgId),
+        eq(utilityPeriods.month, month),
+        eq(utilityPeriods.status, 'closed'),
+        inArray(utilityPeriods.houseId, houses),
+        eq(utilityAllocations.userId, userId),
+      ),
+    )
+    .limit(1);
+
+  if (share === undefined) {
+    return null;
+  }
+
+  const [sums] = await executor
+    .select({ totalDays: sql<number>`coalesce(sum(${utilityAllocations.days}), 0)::int` })
+    .from(utilityAllocations)
+    .where(eq(utilityAllocations.periodId, share.periodId));
+
+  const [lines] = await executor
+    .select({ total: sql<number>`coalesce(sum(${utilityLines.amount}), 0)::bigint` })
+    .from(utilityLines)
+    .where(eq(utilityLines.periodId, share.periodId));
+
+  return {
+    ...share,
+    totalDays: sums?.totalDays ?? 0,
+    total: Number(lines?.total ?? 0),
+  };
 }

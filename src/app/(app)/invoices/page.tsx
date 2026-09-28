@@ -14,7 +14,7 @@ import {
   tryParseBusinessDate,
 } from '@/lib/time';
 import { listInvoicesFor, readInvoice } from '@/services/invoices';
-import { listUtilityReceiptsFor } from '@/services/utilities';
+import { listUtilityReceiptsFor, readUtilityShareFor } from '@/services/utilities';
 import { personLabels } from '@/services/person-labels';
 import { houseHistoryNames } from '@/services/residents';
 
@@ -74,13 +74,25 @@ export default async function InvoicesPage({
          * (указание владельца, 25 сентября 2026). Коммуналка идёт за
          * предыдущий месяц (§3), и чеки берутся у закрытого периода дома.
          */
-        const receipts =
+        const utilityMonth =
           view.invoice.periodMonth === null
+            ? null
+            : addMonths(parseBusinessDate(view.invoice.periodMonth), -1);
+
+        const receipts =
+          utilityMonth === null
             ? []
-            : await listUtilityReceiptsFor(actor, {
-                userId: context.userId,
-                month: addMonths(parseBusinessDate(view.invoice.periodMonth), -1),
-              });
+            : await listUtilityReceiptsFor(actor, { userId: context.userId, month: utilityMonth });
+
+        /*
+         * Раскладка доли: сутки, по которым посчитано, и знаменатель дома
+         * (Приложение №3 п. 4.4). До этого в счёте была одна сумма, и жилец
+         * не мог проверить по ней ничего (находка P2-6, 27 сентября 2026).
+         */
+        const share =
+          utilityMonth === null
+            ? null
+            : await readUtilityShareFor(actor, { userId: context.userId, month: utilityMonth });
 
         return {
           id: view.invoice.id,
@@ -98,7 +110,20 @@ export default async function InvoicesPage({
             kind: line.kind,
             title: line.title,
             amount: line.amount,
-            ...(line.kind === 'utilities' ? { receipts } : {}),
+            ...(line.kind === 'utilities'
+              ? {
+                  receipts,
+                  ...(share === null
+                    ? {}
+                    : {
+                        breakdown: {
+                          days: share.days,
+                          totalDays: share.totalDays,
+                          total: share.total,
+                        },
+                      }),
+                }
+              : {}),
           })),
           payments: view.payments.map((payment) => ({
             id: payment.id,

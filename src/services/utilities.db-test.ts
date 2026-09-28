@@ -6,7 +6,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import * as schema from '@/db/schema';
 import { seedChartOfAccounts } from '@/db/testing/chart-of-accounts';
 import { testDatabaseUrl } from '@/db/testing/database-url';
-import { ConflictError, ForbiddenError, NotFoundError } from '@/lib/errors';
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 
 import { grantFileView } from './files';
 import { parseBusinessDate, parseInstant } from '@/lib/time';
@@ -16,12 +16,15 @@ import { generateMonthlyInvoices } from './monthly-invoices';
 import {
   addPeriodLine,
   closeUtilityPeriod,
+  correctUtilityDays,
   listUtilityReceiptsFor,
   findPeriodOfMonth,
   listPeriodsOfHouse,
   openUtilityPeriod,
+  previewDayCorrection,
   readUtilityHistory,
   readUtilityPeriod,
+  readUtilityShareFor,
   removePeriodLine,
   reopenUtilityPeriod,
 } from './utilities';
@@ -46,6 +49,29 @@ afterAll(async () => {
 });
 
 class Rollback extends Error {}
+
+/** Текст отказа вместе с причиной: имя ограничения базы лежит в `cause`. */
+function errorChain(error: unknown): string {
+  const parts: string[] = [];
+  let current: unknown = error;
+
+  while (current instanceof Error) {
+    parts.push(current.message);
+    current = current.cause;
+  }
+
+  return parts.join(' | ');
+}
+
+async function failureText(body: () => Promise<unknown>): Promise<string> {
+  try {
+    await body();
+  } catch (error) {
+    return errorChain(error);
+  }
+
+  throw new Error('Ожидался отказ, но действие прошло');
+}
 
 async function inRollback(body: (tx: Transaction) => Promise<void>): Promise<void> {
   try {
@@ -738,6 +764,317 @@ describe('чек коммуналки у жильца', () => {
 
       await expect(
         grantFileView(fixture.foreignResident, fileId, 'inline', { executor: tx }),
+      ).rejects.toBeInstanceOf(NotFoundError);
+    });
+  });
+});
+
+/**
+ * Ручная корректировка человеко-дней (P2-6, указание владельца
+ * 27 сентября 2026).
+ *
+ * Фикстура та же, что у примера §4.1: сутки 10 / 20 / 30 при итоге 30 000.
+ * Каждый тест здесь падал бы до появления корректировки — потому что
+ * поставить своё число суток было нечем.
+ */
+describe('корректировка человеко-дней', () => {
+  const REASON = 'Каникулы: уехал, отсутствие не оформлял';
+
+  it('уменьшение проходит и меняет деньги по скорректированным суткам', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9970');
+      const period = await periodWith(tx, fixture, 30_000);
+
+      /* Третий жилец прожил 30 суток из 60; ставим 10 — знаменатель станет 40. */
+      await correctUtilityDays(
+        fixture.admin,
+        {
+          periodId: period.id,
+          userId: fixture.residents[2]?.userId ?? '',
+          days: 10,
+          comment: REASON,
+          confirmIncrease: false,
+        },
+        { executor: tx },
+      );
+
+      const view = await readUtilityPeriod(fixture.admin, period.id, { executor: tx });
+
+      expect(view.preview.allocations.map((row) => row.days)).toEqual([10, 10, 20]);
+      expect(view.preview.allocations.map((row) => row.amount)).toEqual([7_500, 7_500, 15_000]);
+      expect(view.preview.surplus).toBe(0);
+    });
+  });
+
+  it('исходное расчётное значение читается после правки', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9971');
+      const period = await periodWith(tx, fixture, 30_000);
+      const userId = fixture.residents[2]?.userId ?? '';
+
+      await correctUtilityDays(
+        fixture.admin,
+        { periodId: period.id, userId, days: 10, comment: REASON, confirmIncrease: false },
+        { executor: tx },
+      );
+
+      const view = await readUtilityPeriod(fixture.admin, period.id, { executor: tx });
+      const row = view.participants.find((entry) => entry.userId === userId);
+
+      expect(row?.systemDays).toBe(30);
+      expect(row?.days).toBe(10);
+      expect(row?.adjustment?.systemDays).toBe(30);
+      expect(row?.adjustment?.comment).toBe(REASON);
+    });
+  });
+
+  it('без комментария отказ', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9972');
+      const period = await periodWith(tx, fixture, 30_000);
+
+      await expect(
+        correctUtilityDays(
+          fixture.admin,
+          {
+            periodId: period.id,
+            userId: fixture.residents[2]?.userId ?? '',
+            days: 10,
+            comment: '   ',
+            confirmIncrease: false,
+          },
+          { executor: tx },
+        ),
+      ).rejects.toBeInstanceOf(ValidationError);
+    });
+  });
+
+  it('увеличение без подтверждения отказ, с подтверждением проходит', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9973');
+      const period = await periodWith(tx, fixture, 30_000);
+      const userId = fixture.residents[0]?.userId ?? '';
+
+      const input = {
+        periodId: period.id,
+        userId,
+        days: 20,
+        comment: 'Жил весь месяц, заезд оформлен позже',
+      };
+
+      await expect(
+        correctUtilityDays(fixture.admin, { ...input, confirmIncrease: false }, { executor: tx }),
+      ).rejects.toBeInstanceOf(ValidationError);
+
+      await correctUtilityDays(
+        fixture.admin,
+        { ...input, confirmIncrease: true },
+        { executor: tx },
+      );
+
+      const view = await readUtilityPeriod(fixture.admin, period.id, { executor: tx });
+
+      expect(view.participants.find((entry) => entry.userId === userId)?.days).toBe(20);
+    });
+  });
+
+  it('в журнале оба значения: расчётное и поставленное', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9974');
+      const period = await periodWith(tx, fixture, 30_000);
+
+      await correctUtilityDays(
+        fixture.admin,
+        {
+          periodId: period.id,
+          userId: fixture.residents[2]?.userId ?? '',
+          days: 10,
+          comment: REASON,
+          confirmIncrease: false,
+        },
+        { executor: tx },
+      );
+
+      const [entry] = await tx
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.action, 'utility_days.corrected'));
+
+      expect(entry?.before).toMatchObject({ days: 30, systemDays: 30 });
+      expect(entry?.after).toMatchObject({ days: 10, comment: REASON });
+    });
+  });
+
+  it('пересчёт до сохранения ничего не пишет', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9975');
+      const period = await periodWith(tx, fixture, 30_000);
+      const userId = fixture.residents[2]?.userId ?? '';
+
+      const preview = await previewDayCorrection(
+        fixture.admin,
+        period.id,
+        { userId, days: 10 },
+        { executor: tx },
+      );
+
+      expect(preview.distribution.allocations.map((row) => row.amount)).toEqual([
+        7_500, 7_500, 15_000,
+      ]);
+
+      const saved = await tx
+        .select()
+        .from(schema.utilityDayAdjustments)
+        .where(eq(schema.utilityDayAdjustments.periodId, period.id));
+
+      expect(saved).toEqual([]);
+
+      /* А сам период после предпросмотра считается по-прежнему. */
+      const view = await readUtilityPeriod(fixture.admin, period.id, { executor: tx });
+
+      expect(view.preview.allocations.map((row) => row.days)).toEqual([10, 20, 30]);
+    });
+  });
+
+  it('закрытый период правку не принимает', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9976');
+      const period = await periodWith(tx, fixture, 30_000);
+
+      await closeUtilityPeriod(fixture.admin, period.id, {
+        executor: tx,
+        today: IN_NOVEMBER,
+        instant: INSTANT,
+      });
+
+      await expect(
+        correctUtilityDays(
+          fixture.admin,
+          {
+            periodId: period.id,
+            userId: fixture.residents[2]?.userId ?? '',
+            days: 10,
+            comment: REASON,
+            confirmIncrease: false,
+          },
+          { executor: tx },
+        ),
+      ).rejects.toBeInstanceOf(ConflictError);
+    });
+  });
+
+  it('корректировка уходит в счёт и в раскладку жильца', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9977');
+      const period = await periodWith(tx, fixture, 30_000);
+      const userId = fixture.residents[2]?.userId ?? '';
+
+      await correctUtilityDays(
+        fixture.admin,
+        { periodId: period.id, userId, days: 10, comment: REASON, confirmIncrease: false },
+        { executor: tx },
+      );
+
+      await closeUtilityPeriod(fixture.admin, period.id, {
+        executor: tx,
+        today: IN_NOVEMBER,
+        instant: INSTANT,
+      });
+
+      const share = await readUtilityShareFor(
+        fixture.admin,
+        { userId, month: OCTOBER },
+        { executor: tx },
+      );
+
+      /* Жильцу видно, по какому числу суток посчитано (Приложение №3 п. 4.4). */
+      expect(share).toMatchObject({ days: 10, totalDays: 40, amount: 7_500, total: 30_000 });
+    });
+  });
+
+  it('жилец без суток в доме правке не подлежит', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9978');
+      const period = await periodWith(tx, fixture, 30_000);
+
+      await expect(
+        correctUtilityDays(
+          fixture.admin,
+          {
+            periodId: period.id,
+            userId: fixture.superadmin.context.userId,
+            days: 10,
+            comment: REASON,
+            confirmIncrease: false,
+          },
+          { executor: tx },
+        ),
+      ).rejects.toBeInstanceOf(NotFoundError);
+    });
+  });
+
+  /*
+   * Негативные фикстуры на запреты самой базы: сервис их соблюдает, но
+   * вставок в таблицу со временем станет больше одной. Оба теста краснеют,
+   * если CHECK из схемы убрать.
+   */
+  it('база не принимает корректировку без комментария', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9980');
+      const period = await periodWith(tx, fixture, 30_000);
+
+      const message = await failureText(() =>
+        tx.insert(schema.utilityDayAdjustments).values({
+          periodId: period.id,
+          userId: fixture.residents[2]?.userId ?? '',
+          systemDays: 30,
+          days: 10,
+          comment: '   ',
+          createdBy: fixture.admin.context.userId,
+        }),
+      );
+
+      expect(message).toContain('utility_day_adjustments_comment_present');
+    });
+  });
+
+  it('база не принимает отрицательные сутки', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9981');
+      const period = await periodWith(tx, fixture, 30_000);
+
+      const message = await failureText(() =>
+        tx.insert(schema.utilityDayAdjustments).values({
+          periodId: period.id,
+          userId: fixture.residents[2]?.userId ?? '',
+          systemDays: 30,
+          days: -1,
+          comment: 'минус суток не бывает',
+          createdBy: fixture.admin.context.userId,
+        }),
+      );
+
+      expect(message).toContain('utility_day_adjustments_days_non_negative');
+    });
+  });
+
+  it('админ чужого дома править не может', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9979');
+      const period = await periodWith(tx, fixture, 30_000);
+
+      await expect(
+        correctUtilityDays(
+          fixture.adminOfB,
+          {
+            periodId: period.id,
+            userId: fixture.residents[2]?.userId ?? '',
+            days: 10,
+            comment: REASON,
+            confirmIncrease: false,
+          },
+          { executor: tx },
+        ),
       ).rejects.toBeInstanceOf(NotFoundError);
     });
   });

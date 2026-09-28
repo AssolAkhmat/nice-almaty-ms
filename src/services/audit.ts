@@ -66,6 +66,7 @@ export const AUDIT_ACTIONS = {
   depositBurned: 'deposit.burned',
   damageCreated: 'damage.created',
   damageReversed: 'damage.reversed',
+  utilityDaysCorrected: 'utility_days.corrected',
   utilityPeriodClosed: 'utility_period.closed',
   utilityPeriodReopened: 'utility_period.reopened',
   expenseRecorded: 'expense.recorded',

@@ -8,18 +8,22 @@ import {
   createUtilityPeriod,
   deleteUtilityLine,
   findUtilityLine,
+  findResidentShare,
   findUtilityPeriod,
+  listDayAdjustments,
   listUtilityAllocations,
   listUtilityLines,
   listUtilityHistory,
   listUtilityPeriods,
   requireUtilityPeriod,
+  saveDayAdjustment,
   saveUtilityAllocations,
   updateUtilityLine,
   updateUtilityPeriod,
 } from '@/db/repositories/utilities';
 import {
   absentDaysInMonth,
+  checkDayCorrection,
   daysLivedInHouseInMonth,
   distributeUtilities,
   monthOf,
@@ -36,11 +40,17 @@ import {
   type BusinessDate,
 } from '@/lib/time';
 
-import { AUDIT_ACTIONS, recordAudit } from './audit';
+import { AUDIT_ACTIONS, recordAudit, withAudit } from './audit';
 import { appendInvoiceLine, createInvoice } from './invoices';
 import { postUtilitySurplus } from './ledger';
 
-import type { UtilityAllocation, UtilityLine, UtilityPeriod } from '@/db/schema';
+import type { ResidentUtilityShare } from '@/db/repositories/utilities';
+import type {
+  UtilityAllocation,
+  UtilityDayAdjustment,
+  UtilityLine,
+  UtilityPeriod,
+} from '@/db/schema';
 import type { UserActor } from './users';
 
 /**
@@ -78,6 +88,17 @@ export interface UtilityLineInput {
   receiptFileId?: string | null | undefined;
 }
 
+/** Участник распределения: расчётные сутки, итоговые и правка, если была. */
+export interface UtilityParticipantRow {
+  userId: string;
+  residencyId: string;
+  /** Что посчитала формула §4.2. */
+  systemDays: number;
+  /** Что идёт в деньги: корректировка, если она есть. */
+  days: number;
+  adjustment: UtilityDayAdjustment | null;
+}
+
 export interface UtilityPeriodView {
   period: UtilityPeriod;
   lines: UtilityLine[];
@@ -86,6 +107,8 @@ export interface UtilityPeriodView {
   preview: UtilityDistribution;
   /** Снимок закрытого периода; у открытого — пусто. */
   allocations: UtilityAllocation[];
+  /** Сутки по каждому участнику: расчётные и скорректированные. */
+  participants: UtilityParticipantRow[];
 }
 
 export interface ClosedPeriod {
@@ -110,14 +133,22 @@ function assertAmount(amount: number): void {
  * Кто делит коммуналку месяца: все, кто прожил в доме хотя бы день (§4.2).
  * Съехавшие входят наравне — они жили в этом месяце; админ дома тоже,
  * он платит коммуналку.
+ *
+ * У каждого участника два числа суток: расчётное по §4.2 и то, что идёт
+ * в деньги. Расходятся они, когда админ поставил корректировку (P2-6);
+ * `override` подставляет ещё не сохранённое значение — так предпросмотр
+ * считается тем же кодом, что и сам расчёт, а не вторым его списком.
  */
 async function participantsOf(
   actor: UserActor,
-  houseId: string,
-  month: BusinessDate,
+  period: UtilityPeriod,
   executor: Executor,
-): Promise<{ userId: string; residencyId: string; days: number }[]> {
-  const [residencies, absences, stays] = await Promise.all([
+  override?: { userId: string; days: number },
+): Promise<UtilityParticipantRow[]> {
+  const houseId = period.houseId;
+  const month = period.month as BusinessDate;
+
+  const [residencies, absences, stays, adjustments] = await Promise.all([
     listResidencies(actor.context, { houseId }, executor),
     listApprovedAbsences(
       actor.context,
@@ -126,7 +157,10 @@ async function participantsOf(
       executor,
     ),
     listMonthStaysInHouse(actor.context, houseId, startOfMonth(month), executor),
+    listDayAdjustments(period.id, executor),
   ]);
+
+  const adjustmentOf = new Map(adjustments.map((entry) => [entry.userId, entry]));
 
   /*
    * Кто делит коммуналку дома — решает занятость мест, а не «дом сейчас»
@@ -195,22 +229,36 @@ async function participantsOf(
       .map((residency) => {
         const stay = stayOf.get(residency.id);
 
+        const systemDays =
+          daysLivedInHouseInMonth({
+            month,
+            moveIn: residency.moveInDate === null ? null : (residency.moveInDate as BusinessDate),
+            moveOut:
+              residency.moveOutDate === null ? null : (residency.moveOutDate as BusinessDate),
+            stays: stay?.periods ?? [],
+            elsewhere: stay?.elsewhere ?? false,
+            belongsNow: residency.houseId === houseId,
+          }) - absentDaysInMonth(month, tripsByUser.get(residency.userId) ?? []);
+
+        const adjustment = adjustmentOf.get(residency.userId) ?? null;
+        const pending = override?.userId === residency.userId ? override.days : null;
+
         return {
           userId: residency.userId,
           residencyId: residency.id,
-          days:
-            daysLivedInHouseInMonth({
-              month,
-              moveIn: residency.moveInDate === null ? null : (residency.moveInDate as BusinessDate),
-              moveOut:
-                residency.moveOutDate === null ? null : (residency.moveOutDate as BusinessDate),
-              stays: stay?.periods ?? [],
-              elsewhere: stay?.elsewhere ?? false,
-              belongsNow: residency.houseId === houseId,
-            }) - absentDaysInMonth(month, tripsByUser.get(residency.userId) ?? []),
+          systemDays,
+          days: pending ?? adjustment?.days ?? systemDays,
+          adjustment,
         };
       })
-      .filter((entry) => entry.days > 0)
+      /*
+       * В списке остаётся тот, кого посчитала формула, и тот, о ком есть
+       * прямое утверждение админа. Ноль суток из строя не выбывает:
+       * корректировка «жил ноль дней» — это запись, которую админ должен
+       * видеть на экране и мочь переписать, а не исчезнувшая строка.
+       * Из денег ноль уходит сам — делит только `distributeUtilities`.
+       */
+      .filter((entry) => entry.systemDays > 0 || entry.adjustment !== null || entry.days > 0)
       /*
        * Порядок участников — по числу прожитых дней, затем по жильцу. Проживания
        * приходят отсортированными по времени создания, а у заведённых одной
@@ -221,6 +269,36 @@ async function participantsOf(
         left.days === right.days ? left.userId.localeCompare(right.userId) : left.days - right.days,
       )
   );
+}
+
+/** Период целиком: строки, итог, участники и распределение по ним. */
+async function computePeriod(
+  actor: UserActor,
+  period: UtilityPeriod,
+  executor: Executor,
+  override?: { userId: string; days: number },
+): Promise<{
+  lines: UtilityLine[];
+  total: number;
+  participants: UtilityParticipantRow[];
+  distribution: UtilityDistribution;
+}> {
+  const [lines, participants] = await Promise.all([
+    listUtilityLines(period.id, executor),
+    participantsOf(actor, period, executor, override),
+  ]);
+
+  const total = totalOf(lines);
+
+  return {
+    lines,
+    total,
+    participants,
+    distribution: distributeUtilities(
+      total,
+      participants.map((entry) => ({ userId: entry.userId, days: entry.days })),
+    ),
+  };
 }
 
 /** Период дома за месяц; заводится пустым, если его ещё нет (модуль 6). */
@@ -284,26 +362,163 @@ export async function readUtilityPeriod(
   const { executor } = resolve(deps);
 
   const period = await periodFor(actor, periodId, 'utility.read', executor);
-  const month = period.month as BusinessDate;
 
-  const [lines, allocations, participants] = await Promise.all([
-    listUtilityLines(period.id, executor),
+  const [computed, allocations] = await Promise.all([
+    computePeriod(actor, period, executor),
     listUtilityAllocations(period.id, executor),
-    participantsOf(actor, period.houseId, month, executor),
   ]);
-
-  const total = totalOf(lines);
 
   return {
     period,
-    lines,
-    total,
-    preview: distributeUtilities(
-      total,
-      participants.map((entry) => ({ userId: entry.userId, days: entry.days })),
-    ),
+    lines: computed.lines,
+    total: computed.total,
+    preview: computed.distribution,
     allocations,
+    participants: computed.participants,
   };
+}
+
+/**
+ * Пересчёт периода с подставленным числом суток — до сохранения (P2-6).
+ *
+ * Отдельного расчёта у предпросмотра нет: это тот же `computePeriod`
+ * с одним заменённым значением. Второй список формул рано или поздно
+ * разошёлся бы с первым, и разошёлся бы молча — в деньгах.
+ */
+export async function previewDayCorrection(
+  actor: UserActor,
+  periodId: string,
+  override: { userId: string; days: number },
+  deps: UtilityDeps = {},
+): Promise<{
+  period: UtilityPeriod;
+  total: number;
+  participants: UtilityParticipantRow[];
+  distribution: UtilityDistribution;
+}> {
+  const { executor } = resolve(deps);
+
+  const period = await periodFor(actor, periodId, 'utility.manage', executor);
+
+  /*
+   * Негодное число суток отсекается и в предпросмотре: иначе `splitCeil`
+   * упал бы на NaN, и отказ назвал бы «не удалось выполнить действие»
+   * вместо причины. Комментарий на этом шаге не нужен — он нужен на записи.
+   */
+  const problem = checkDayCorrection({
+    month: period.month as BusinessDate,
+    systemDays: override.days,
+    days: override.days,
+    comment: 'предпросмотр',
+    confirmIncrease: false,
+  });
+
+  if (problem !== null) {
+    throw new ValidationError(`utilities.errors.${problem}`);
+  }
+
+  const computed = await computePeriod(actor, period, executor, override);
+
+  return {
+    period,
+    total: computed.total,
+    participants: computed.participants,
+    distribution: computed.distribution,
+  };
+}
+
+/**
+ * Ручная корректировка суток жильца (P2-6, указание владельца
+ * 27 сентября 2026).
+ *
+ * Инструмент постоянный: он нужен каждый январь, когда жильцы разъезжаются
+ * на каникулы, не оформляя отсутствие, а отопление горит. Поэтому ни флага
+ * «только первый период», ни разовой миграции здесь нет.
+ *
+ * Расчётное значение сохраняется рядом со введённым, а не затирается:
+ * иначе через месяц никто не отличит «админ так решил» от «так посчитала
+ * формула». Правила самой правки — в `checkDayCorrection`.
+ */
+export async function correctUtilityDays(
+  actor: UserActor,
+  input: {
+    periodId: string;
+    userId: string;
+    days: number;
+    comment: string;
+    confirmIncrease: boolean;
+  },
+  deps: UtilityDeps = {},
+): Promise<UtilityDayAdjustment> {
+  const { executor } = resolve(deps);
+
+  const period = await periodFor(actor, input.periodId, 'utility.manage', executor);
+  assertDraft(period);
+
+  const participants = await participantsOf(actor, period, executor);
+  const target = participants.find((entry) => entry.userId === input.userId);
+
+  if (target === undefined) {
+    throw new NotFoundError('Жилец не участвует в распределении этого периода');
+  }
+
+  const problem = checkDayCorrection({
+    month: period.month as BusinessDate,
+    systemDays: target.systemDays,
+    days: input.days,
+    comment: input.comment,
+    confirmIncrease: input.confirmIncrease,
+  });
+
+  if (problem !== null) {
+    throw new ValidationError(`utilities.errors.${problem}`);
+  }
+
+  return withAudit(
+    { context: actor.context, ip: actor.ip, requestId: actor.requestId },
+    async (tx) => {
+      const saved = await saveDayAdjustment(
+        {
+          periodId: period.id,
+          userId: input.userId,
+          systemDays: target.systemDays,
+          days: input.days,
+          comment: input.comment.trim(),
+          createdBy: actor.context.userId,
+        },
+        tx,
+      );
+
+      return {
+        result: saved,
+        /*
+         * В журнале оба значения: что считала система и что поставил админ.
+         * Одного «стало 12» мало — через месяц не восстановить, от чего
+         * отсчитывали, а спор будет именно об этом.
+         *
+         * `systemDays` стоит только в «до» намеренно: журнал пишет лишь
+         * изменившиеся поля, и значение, одинаковое с двух сторон, из записи
+         * выпало бы целиком. Проверено тестом, а не предположено.
+         */
+        audit: {
+          action: AUDIT_ACTIONS.utilityDaysCorrected,
+          entityType: 'utility_day_adjustment',
+          entityId: saved.id,
+          before: {
+            days: target.adjustment?.days ?? target.systemDays,
+            systemDays: target.systemDays,
+          },
+          after: {
+            days: saved.days,
+            comment: saved.comment,
+            userId: saved.userId,
+            month: period.month,
+          },
+        },
+      };
+    },
+    executor,
+  );
 }
 
 function assertDraft(period: UtilityPeriod): void {
@@ -415,14 +630,7 @@ export async function closeUtilityPeriod(
   assertDraft(period);
 
   const month = period.month as BusinessDate;
-  const lines = await listUtilityLines(period.id, executor);
-  const total = totalOf(lines);
-
-  const participants = await participantsOf(actor, period.houseId, month, executor);
-  const distribution = distributeUtilities(
-    total,
-    participants.map((entry) => ({ userId: entry.userId, days: entry.days })),
-  );
+  const { total, participants, distribution } = await computePeriod(actor, period, executor);
 
   /*
    * Ноль — законный итог месяца, а не ошибка: дом мог не платить вовсе
@@ -661,6 +869,23 @@ export async function listUtilityReceiptsFor(
   const { executor } = resolve(deps);
 
   return listClosedReceipts(actor.context, target.userId, startOfMonth(target.month), executor);
+}
+
+/**
+ * Раскладка доли коммуналки для жильца (Приложение №3 п. 4.4).
+ *
+ * В счёте была одна строка с суммой, и по ней нельзя было проверить ничего:
+ * ни за сколько суток посчитано, ни из какого итога сложилась доля
+ * (находка P2-6, 27 сентября 2026).
+ */
+export async function readUtilityShareFor(
+  actor: UserActor,
+  target: { userId: string; month: BusinessDate },
+  deps: UtilityDeps = {},
+): Promise<ResidentUtilityShare | null> {
+  const { executor } = resolve(deps);
+
+  return findResidentShare(actor.context, target.userId, startOfMonth(target.month), executor);
 }
 
 /** Первое число месяца, к которому относится дата: для экрана периода. */

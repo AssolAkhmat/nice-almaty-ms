@@ -1,14 +1,15 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 
 import { FileLinks } from '@/components/files/file-links';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Field, Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Field, Input, Select } from '@/components/ui/input';
 import { Money } from '@/components/ui/money';
 import { Table } from '@/components/ui/table';
 import { ReceiptUpload } from '@/components/upload/receipt-upload';
@@ -16,6 +17,7 @@ import { ReceiptUpload } from '@/components/upload/receipt-upload';
 import {
   addLineAction,
   closePeriodAction,
+  correctDaysAction,
   removeLineAction,
   reopenPeriodAction,
   type UtilityActionState,
@@ -40,8 +42,13 @@ export interface HistoryRowView {
 export interface AllocationRowView {
   userId: string;
   name: string;
+  /** Что посчитала формула §4.2. */
+  systemDays: number;
+  /** Что пошло в деньги: корректировка, если она есть. */
   days: number;
   amount: number;
+  /** Причина корректировки; пусто — правки не было. */
+  comment: string | null;
 }
 
 export interface PeriodScreenProps {
@@ -115,6 +122,153 @@ function RemoveLine({ lineId }: { lineId: string }) {
       <Button disabled={isPending} size="sm" type="submit" variant="ghost">
         {t('common.remove')}
       </Button>
+    </form>
+  );
+}
+
+/**
+ * Корректировка человеко-дней (P2-6, указание владельца 27 сентября 2026).
+ *
+ * Два направления в одной форме, но неравноправные: уменьшение уходит
+ * сохранением сразу, увеличение требует отметки, и предупреждение появляется
+ * ровно тогда, когда введённое число больше расчётного, — а не висит
+ * над формой всегда.
+ *
+ * «Пересчитать» показывает последствия до записи: те же доли, посчитанные
+ * сервером тем же кодом, что и сохранение.
+ */
+function DaysForm({ periodId, rows }: { periodId: string; rows: readonly AllocationRowView[] }) {
+  const t = useTranslations();
+  const [state, action, isPending] = useActionState(correctDaysAction, INITIAL);
+  const [userId, setUserId] = useState(rows[0]?.userId ?? '');
+  const [days, setDays] = useState('');
+  const [comment, setComment] = useState('');
+  const [confirmed, setConfirmed] = useState(false);
+
+  const selected = rows.find((row) => row.userId === userId);
+  const increases = selected !== undefined && days !== '' && Number(days) > selected.systemDays;
+
+  return (
+    <form action={action} className="flex flex-col gap-3" data-testid="days-form">
+      <input name="periodId" type="hidden" value={periodId} />
+
+      <h3 className="font-medium">{t('utilities.correctionTitle')}</h3>
+      <p className="text-text-muted text-[13px]">{t('utilities.correctionHint')}</p>
+
+      {state.error !== undefined && (
+        <p className="text-danger text-[13px]" data-testid="days-error" role="alert">
+          {t(state.error)}
+        </p>
+      )}
+
+      {state.done !== undefined && (
+        <p className="text-[13px]" data-testid="days-done">
+          {t(state.done)}
+        </p>
+      )}
+
+      <div className="grid items-end gap-3 md:grid-cols-[2fr_1fr_3fr]">
+        <Field htmlFor="days-user" label={t('utilities.resident')}>
+          <Select
+            data-testid="days-user"
+            id="days-user"
+            name="userId"
+            onChange={(event) => setUserId(event.target.value)}
+            value={userId}
+          >
+            {rows.map((row) => (
+              <option key={row.userId} value={row.userId}>
+                {row.name} — {row.systemDays}
+              </option>
+            ))}
+          </Select>
+        </Field>
+
+        <Field htmlFor="days-value" label={t('utilities.correctionDays')}>
+          <Input
+            data-testid="days-value"
+            id="days-value"
+            inputMode="numeric"
+            name="days"
+            onChange={(event) => setDays(event.target.value)}
+            step={1}
+            type="number"
+            value={days}
+          />
+        </Field>
+
+        <Field htmlFor="days-comment" label={t('utilities.correctionComment')}>
+          <Input
+            data-testid="days-comment"
+            id="days-comment"
+            name="comment"
+            onChange={(event) => setComment(event.target.value)}
+            value={comment}
+          />
+        </Field>
+      </div>
+
+      {increases && (
+        <div className="flex flex-col gap-2">
+          <p className="text-danger text-[13px]" data-testid="days-warning" role="alert">
+            {t('utilities.correctionWarning')}
+          </p>
+          <label className="flex items-center gap-2 text-[13px]">
+            <Checkbox
+              checked={confirmed}
+              data-testid="days-confirm"
+              name="confirmIncrease"
+              onCheckedChange={(next) => setConfirmed(next === true)}
+              value="on"
+            />
+            <span>{t('utilities.correctionConfirm')}</span>
+          </label>
+        </div>
+      )}
+
+      {state.preview !== undefined && (
+        <div className="border-border flex flex-col gap-1 border-t pt-3 text-[13px]">
+          <h4 className="font-medium">{t('utilities.correctionPreviewTitle')}</h4>
+          <ul className="flex flex-col gap-1" data-testid="days-preview">
+            {state.preview.rows.map((row) => (
+              <li className="flex justify-between gap-4" key={row.userId}>
+                <span>
+                  {row.name} — {row.days}
+                </span>
+                <Money amount={row.amount} />
+              </li>
+            ))}
+          </ul>
+          <div className="flex justify-between gap-4">
+            <span>{t('utilities.surplus')}</span>
+            <Money amount={state.preview.surplus} />
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        <Button
+          data-testid="days-preview-submit"
+          disabled={isPending}
+          name="intent"
+          size="sm"
+          type="submit"
+          value="preview"
+          variant="ghost"
+        >
+          {t('utilities.correctionPreview')}
+        </Button>
+        <Button
+          data-testid="days-save"
+          disabled={isPending || (increases && !confirmed)}
+          name="intent"
+          size="sm"
+          type="submit"
+          value="save"
+        >
+          {t('utilities.correctionSave')}
+        </Button>
+      </div>
     </form>
   );
 }
@@ -239,10 +393,33 @@ export function PeriodScreen({
           <Table
             caption={t('utilities.allocationCaption')}
             columns={[
-              { key: 'name', header: t('utilities.resident'), cell: (row) => row.name },
+              {
+                key: 'name',
+                header: t('utilities.resident'),
+                cell: (row) => (
+                  <span className="flex flex-col">
+                    <span>{row.name}</span>
+                    {row.comment !== null && (
+                      <span className="text-text-muted text-[12px]">{row.comment}</span>
+                    )}
+                  </span>
+                ),
+              },
+              {
+                key: 'systemDays',
+                header: t('utilities.systemDays'),
+                numeric: true,
+                cell: (row) => row.systemDays,
+              },
+              {
+                key: 'correction',
+                header: t('utilities.correctionColumn'),
+                numeric: true,
+                cell: (row) => (row.comment === null ? '—' : row.days),
+              },
               {
                 key: 'days',
-                header: t('utilities.days'),
+                header: t('utilities.daysTotal'),
                 numeric: true,
                 cell: (row) => row.days,
               },
@@ -283,6 +460,12 @@ export function PeriodScreen({
                 {t(state.error)}
               </p>
             ),
+          )}
+
+          {canManage && !closed && rows.length > 0 && (
+            <div className="border-border border-t pt-3">
+              <DaysForm periodId={periodId} rows={rows} />
+            </div>
           )}
 
           <div className="border-border flex flex-wrap gap-2 border-t pt-3">

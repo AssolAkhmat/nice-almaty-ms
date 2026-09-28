@@ -10,10 +10,13 @@ import { parseMonthInput } from '@/domain/utilities';
 import {
   addPeriodLine,
   closeUtilityPeriod,
+  correctUtilityDays,
   openUtilityPeriod,
+  previewDayCorrection,
   removePeriodLine,
   reopenUtilityPeriod,
 } from '@/services/utilities';
+import { houseHistoryNames } from '@/services/residents';
 
 import type { UserActor } from '@/services/users';
 
@@ -21,6 +24,11 @@ import type { UserActor } from '@/services/users';
 export interface UtilityActionState {
   error?: string;
   done?: string;
+  /** Пересчёт с подставленными сутками — до сохранения (P2-6). */
+  preview?: {
+    rows: readonly { userId: string; name: string; days: number; amount: number }[];
+    surplus: number;
+  };
 }
 
 async function actor(): Promise<UserActor | null> {
@@ -170,4 +178,63 @@ export async function reopenPeriodAction(
   refresh();
 
   return { done: 'utilities.done.reopened' };
+}
+
+/**
+ * Корректировка суток: пересчёт и сохранение одной формой (P2-6).
+ *
+ * Кнопка «Пересчитать» показывает последствия до записи, кнопка «Сохранить»
+ * пишет. Считает оба раза один и тот же сервис — предпросмотр не имеет
+ * своей арифметики, иначе он однажды покажет не то, что сохранится.
+ */
+export async function correctDaysAction(
+  _previous: UtilityActionState,
+  formData: FormData,
+): Promise<UtilityActionState> {
+  const current = await actor();
+  if (current === null) {
+    return { error: 'utilities.errors.unauthorized' };
+  }
+
+  const periodId = text(formData, 'periodId');
+  const userId = text(formData, 'userId');
+  const raw = text(formData, 'days');
+  const days = raw === '' ? Number.NaN : Number(raw);
+  const comment = text(formData, 'comment');
+  const confirmIncrease = formData.get('confirmIncrease') !== null;
+
+  if (text(formData, 'intent') === 'preview') {
+    try {
+      const preview = await previewDayCorrection(current, periodId, { userId, days });
+      const names = await houseHistoryNames(
+        current,
+        preview.period.houseId,
+        preview.distribution.allocations.map((row) => row.userId),
+      );
+
+      return {
+        preview: {
+          rows: preview.distribution.allocations.map((row) => ({
+            userId: row.userId,
+            name: names.get(row.userId)?.trim() ?? '',
+            days: row.days,
+            amount: row.amount,
+          })),
+          surplus: preview.distribution.surplus,
+        },
+      };
+    } catch (error) {
+      return failure(error);
+    }
+  }
+
+  try {
+    await correctUtilityDays(current, { periodId, userId, days, comment, confirmIncrease });
+  } catch (error) {
+    return failure(error);
+  }
+
+  refresh();
+
+  return { done: 'utilities.done.daysCorrected' };
 }

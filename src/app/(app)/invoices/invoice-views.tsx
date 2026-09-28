@@ -35,6 +35,12 @@ export interface InvoiceLineView {
    * (указание владельца, 25 сентября 2026). Жильцу видно, за что платит.
    */
   receipts?: readonly { fileId: string; title: string }[];
+  /**
+   * Раскладка доли коммуналки: сутки жильца, человеко-сутки дома и итог
+   * периода (Приложение №3 п. 4.4). Без этих трёх чисел строка счёта
+   * непроверяема: сумма есть, а откуда она — нет.
+   */
+  breakdown?: { days: number; totalDays: number; total: number };
 }
 
 export interface PaymentView {
@@ -157,6 +163,24 @@ export function InvoiceCard({
                 <span>{line.title}</span>
                 <Money amount={line.amount} />
               </span>
+
+              {line.breakdown !== undefined && (
+                <span
+                  className="text-text-muted flex flex-wrap items-center justify-between gap-x-4"
+                  data-testid="utility-breakdown"
+                >
+                  <span>
+                    {t('invoices.utilityBreakdown', {
+                      days: line.breakdown.days,
+                      totalDays: line.breakdown.totalDays,
+                    })}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    {t('invoices.utilityPeriodTotal')}
+                    <Money amount={line.breakdown.total} />
+                  </span>
+                </span>
+              )}
 
               {(line.receipts ?? []).map((receipt) => (
                 <FileLinks fileId={receipt.fileId} key={receipt.fileId} label={receipt.title} />
