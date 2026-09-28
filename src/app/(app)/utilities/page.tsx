@@ -6,10 +6,10 @@ import { listHouses } from '@/db/repositories/houses';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Field, Input } from '@/components/ui/input';
-import { monthOptions, parseMonthInput } from '@/domain/utilities';
+import { defaultUtilityMonth, monthOptions, parseMonthInput } from '@/domain/utilities';
 import { can } from '@/lib/authz';
 import { getCurrentSession } from '@/lib/session';
-import { addMonths, startOfMonth, todayInAlmaty, type BusinessDate } from '@/lib/time';
+import { startOfMonth, todayInAlmaty, type BusinessDate } from '@/lib/time';
 import { houseHistoryNames } from '@/services/residents';
 import {
   findPeriodOfMonth,
@@ -82,7 +82,7 @@ export default async function UtilitiesPage({
   }
 
   const thisMonth = startOfMonth(todayInAlmaty());
-  const month = parseMonthInput(requestedMonth ?? '') ?? addMonths(thisMonth, -1);
+  const month = parseMonthInput(requestedMonth ?? '') ?? defaultUtilityMonth(thisMonth);
 
   const periods = await listPeriodsOfHouse(actor, houseId);
 

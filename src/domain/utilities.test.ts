@@ -6,6 +6,7 @@ import {
   absentDaysInMonth,
   daysLivedInHouseInMonth,
   daysLivedInMonth,
+  defaultUtilityMonth,
   distributeUtilities,
   monthOptions,
   parseMonthInput,
@@ -333,5 +334,32 @@ describe('дни месяца в конкретном доме', () => {
     expect(
       daysLivedInHouseInMonth({ ...range, stays: [], elsewhere: true, belongsNow: true }),
     ).toBe(0);
+  });
+});
+
+describe('месяц по умолчанию (P2-8)', () => {
+  /*
+   * Находка боевой эксплуатации: экран открывался на августе независимо
+   * от сегодняшней даты. Причина была не в базе, а в сдвиге «прошлый месяц»
+   * прямо в коде экрана.
+   */
+  it('в сентябре открывает сентябрь', () => {
+    expect(defaultUtilityMonth(parseBusinessDate('2026-09-28'))).toBe('2026-09-01');
+  });
+
+  it('в январе открывает январь, а не декабрь прошлого года', () => {
+    expect(defaultUtilityMonth(parseBusinessDate('2027-01-03'))).toBe('2027-01-01');
+  });
+
+  it('первое число месяца остаётся своим месяцем', () => {
+    expect(defaultUtilityMonth(parseBusinessDate('2026-12-01'))).toBe('2026-12-01');
+  });
+
+  it('переключатель месяцев переживает границу года', () => {
+    const options = monthOptions(parseBusinessDate('2027-01-01'), [
+      parseBusinessDate('2026-11-01'),
+    ]);
+
+    expect(options).toEqual(['2027-01-01', '2026-12-01', '2026-11-01']);
   });
 });

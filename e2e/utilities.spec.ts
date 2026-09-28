@@ -69,6 +69,21 @@ test.describe('экран коммуналки', () => {
    * поэтому текущего месяца в нём не было и завести его было нечем.
    * Первая ссылка переключателя — самый новый месяц, то есть текущий.
    */
+  /*
+   * Находка P2-8 (27 сентября 2026): экран открывался на прошлом месяце
+   * независимо от сегодняшней даты, и админ каждый раз искал текущий руками.
+   */
+  test('экран открывается на текущем месяце', async ({ page }) => {
+    await login(page, E2E_ACCOUNTS.adminHouse1);
+    await page.goto('/utilities');
+
+    /* Месяц берётся у браузера прогона: подмена времени тут не нужна. */
+    const almaty = new Date(Date.now() + 5 * 3_600_000);
+    const expected = almaty.toISOString().slice(0, 7);
+
+    await expect(page.getByTestId('utility-month')).toHaveValue(expected);
+  });
+
   test('период за текущий месяц заводится с экрана', async ({ page }) => {
     await login(page, E2E_ACCOUNTS.adminHouse1);
     await page.goto('/utilities');
