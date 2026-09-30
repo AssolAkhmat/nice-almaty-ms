@@ -8,6 +8,7 @@ import { listHouseRoster } from '@/db/repositories/residencies';
 import { EmptyState } from '@/components/ui/empty-state';
 import { can } from '@/lib/authz';
 import { getCurrentSession } from '@/lib/session';
+import { todayInAlmaty } from '@/lib/time';
 import { listHouseDamages } from '@/services/damages';
 import { readProfile } from '@/services/resident-profiles';
 
@@ -74,7 +75,8 @@ export default async function DamagesPage({
   }
 
   const [roster, areas, damages] = await Promise.all([
-    listHouseRoster(context, houseId),
+    /* Состав на сегодня: ущерб фиксируют сегодняшней датой (п. 2.2.3). */
+    listHouseRoster(context, houseId, todayInAlmaty()),
     listAreas(context, houseId),
     listHouseDamages(actor, houseId),
   ]);

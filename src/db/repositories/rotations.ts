@@ -508,6 +508,7 @@ export interface EligibilityMemberRow {
 export async function listEligibilityMembers(
   context: AccessContext,
   houseId: string,
+  on: BusinessDate,
   executor: Executor = getDb(),
 ): Promise<EligibilityMemberRow[]> {
   assertHouseVisible(context, houseId);
@@ -521,19 +522,28 @@ export async function listEligibilityMembers(
       firstName: residentProfiles.firstName,
       phone: users.phone,
     })
-    .from(residencies)
-    .leftJoin(
-      bedAssignments,
-      and(eq(bedAssignments.residencyId, residencies.id), sql`upper_inf(${bedAssignments.period})`),
-    )
-    .leftJoin(beds, eq(beds.id, bedAssignments.bedId))
+    /*
+     * Состав дома — занятость койко-места на эту дату, а не статус проживания
+     * (указание владельца, 30 сентября 2026). Роль и статус ортогональны
+     * занятости: админ дома с местом обязан дежурить, как и все, а жилец,
+     * которому место выдали раньше перевода в `active`, не выпадает из ряда.
+     *
+     * Комната тоже берётся у назначения на эту дату, а не у «назначения
+     * без конца»: стоило проставить дату освобождения при расторжении
+     * или плановом переселении, и человек выпадал из группы «жильцы комнаты»,
+     * хотя в этот день жил именно там.
+     */
+    .from(bedAssignments)
+    .innerJoin(residencies, eq(residencies.id, bedAssignments.residencyId))
+    .innerJoin(beds, eq(beds.id, bedAssignments.bedId))
     .leftJoin(residentProfiles, eq(residentProfiles.userId, residencies.userId))
     .innerJoin(users, eq(users.id, residencies.userId))
     .where(
       and(
         eq(residencies.orgId, context.orgId),
-        eq(residencies.houseId, houseId),
-        inArray(residencies.status, ['active', 'terminating']),
+        eq(bedAssignments.houseId, houseId),
+        sql`${bedAssignments.period} @> ${on}::date`,
+        sql`${residencies.status} <> 'archived'`,
       ),
     )
     /*

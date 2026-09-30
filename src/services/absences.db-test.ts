@@ -448,3 +448,105 @@ describe('свои отсутствия', () => {
     });
   });
 });
+
+/**
+ * Дом заявки — по занятости места на дату отсутствия (указание владельца,
+ * 30 сентября 2026).
+ *
+ * Прежде дом брался у проживания. После перевода между домами
+ * `residencies.house_id` меняется сразу, а место старого дома держится
+ * до даты переезда: заявка на ночь до переезда уходила в новый дом —
+ * админу, который за эту ночь не отвечал.
+ */
+describe('дом отсутствия по занятости места', () => {
+  /**
+   * Место в доме A до 20 сентября и в доме B с 20-го — как после перевода.
+   * Порядок важен: триггер базы держит дом места и дом проживания вместе,
+   * поэтому проживание переносится между вставками, ровно как это делает
+   * сам перевод.
+   */
+  async function movedBetweenHouses(
+    tx: Transaction,
+    fixture: Awaited<ReturnType<typeof seed>>,
+  ): Promise<void> {
+    const [residency] = await tx
+      .select()
+      .from(schema.residencies)
+      .where(eq(schema.residencies.userId, fixture.dwellerId));
+
+    const residencyId = residency?.id ?? '';
+
+    async function place(houseId: string, period: string, number: number): Promise<void> {
+      const [area] = await tx
+        .insert(schema.areas)
+        .values({ houseId, name: `Комната ${String(number)}`, type: 'living' })
+        .returning();
+
+      const [bed] = await tx
+        .insert(schema.beds)
+        .values({
+          houseId,
+          areaId: area?.id ?? '',
+          number,
+          tier: 'lower',
+          label: `${String(number)} низ`,
+          defaultPrice: 90_000,
+        })
+        .returning();
+
+      await tx.insert(schema.bedAssignments).values({
+        residencyId,
+        bedId: bed?.id ?? '',
+        houseId,
+        price: 90_000,
+        period,
+      });
+    }
+
+    await place(fixture.houseA, '[2026-09-01,2026-09-20)', 1);
+
+    await tx
+      .update(schema.residencies)
+      .set({ houseId: fixture.houseB })
+      .where(eq(schema.residencies.id, residencyId));
+
+    await place(fixture.houseB, '[2026-09-20,)', 2);
+  }
+
+  it('ночь до переезда уходит в тот дом, где место было занято', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9660');
+      await movedBetweenHouses(tx, fixture);
+
+      const before = await submitAbsence(
+        fixture.dweller,
+        { type: 'short', startDate: parseBusinessDate('2026-09-15'), reason: 'ночная смена' },
+        { executor: tx, today: parseBusinessDate('2026-09-15') },
+      );
+
+      expect(before.houseId).toBe(fixture.houseA);
+
+      const after = await submitAbsence(
+        fixture.dweller,
+        { type: 'short', startDate: parseBusinessDate('2026-09-25'), reason: 'ночная смена' },
+        { executor: tx, today: parseBusinessDate('2026-09-25') },
+      );
+
+      expect(after.houseId).toBe(fixture.houseB);
+    });
+  });
+
+  it('без места на эту дату дом берётся у проживания: право подать остаётся', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9661');
+
+      const absence = await submitAbsence(
+        fixture.dweller,
+        { type: 'short', startDate: parseBusinessDate('2026-09-15'), reason: 'ночная смена' },
+        { executor: tx, today: parseBusinessDate('2026-09-15') },
+      );
+
+      expect(absence.houseId).toBe(fixture.houseA);
+    });
+  });
+});

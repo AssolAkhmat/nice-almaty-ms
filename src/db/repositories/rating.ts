@@ -32,12 +32,17 @@ function houseScope(
   context: AccessContext,
   column: typeof absences.houseId | typeof fines.houseId,
 ) {
+  /*
+   * Жильцу дом не проверяется вовсе: его записи ограничивает `ownScope`
+   * по пользователю, и свою запись человек видит всегда.
+   *
+   * Прежде дом сверялся с домом проживания, и после перевода между домами
+   * жилец терял доступ к собственным заявкам старого дома: дом заявки —
+   * тот, где он жил в эту ночь, а проживание уже числится за новым
+   * (находка аудита 30 сентября 2026).
+   */
   if (context.role === 'resident') {
-    return sql`exists (
-      select 1 from ${residencies}
-      where ${residencies.userId} = ${context.userId}
-        and ${residencies.houseId} = ${column}
-    )`;
+    return sql`true`;
   }
 
   const visible = visibleHouseIds(context);

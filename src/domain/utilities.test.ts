@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { parseBusinessDate } from '@/lib/time';
 
 import {
-  absentDaysInMonth,
   checkDayCorrection,
   defaultUtilityMonth,
   distributeUtilities,
@@ -17,42 +16,6 @@ import {
  * Доля округляется вверх, излишек остаётся дому (§0).
  */
 const SEPTEMBER = parseBusinessDate('2026-09-01');
-
-describe('вычет дней долгосрочного отсутствия', () => {
-  it('пример 4.3: уехал 10-го, вернулся 14-го — не считаются 11, 12 и 13', () => {
-    expect(
-      absentDaysInMonth(SEPTEMBER, [
-        { from: parseBusinessDate('2026-09-10'), to: parseBusinessDate('2026-09-14') },
-      ]),
-    ).toBe(3);
-  });
-
-  it('отъезд и возвращение подряд не дают ни одного вычитаемого дня', () => {
-    expect(
-      absentDaysInMonth(SEPTEMBER, [
-        { from: parseBusinessDate('2026-09-10'), to: parseBusinessDate('2026-09-11') },
-      ]),
-    ).toBe(0);
-  });
-
-  it('отсутствие через границу месяца режется по месяцу', () => {
-    // Уехал 28 сентября, вернулся 3 октября: в сентябре не считаются 29 и 30.
-    expect(
-      absentDaysInMonth(SEPTEMBER, [
-        { from: parseBusinessDate('2026-09-28'), to: parseBusinessDate('2026-10-03') },
-      ]),
-    ).toBe(2);
-  });
-
-  it('несколько отсутствий складываются', () => {
-    expect(
-      absentDaysInMonth(SEPTEMBER, [
-        { from: parseBusinessDate('2026-09-01'), to: parseBusinessDate('2026-09-05') },
-        { from: parseBusinessDate('2026-09-20'), to: parseBusinessDate('2026-09-24') },
-      ]),
-    ).toBe(6);
-  });
-});
 
 describe('распределение коммуналки (§4.2)', () => {
   it('пример 4.1: 30 000 на 10, 20 и 30 дней — 5 000 / 10 000 / 15 000, излишка нет', () => {
@@ -253,6 +216,43 @@ describe('сутки занятости места в месяце', () => {
 
   it('без назначенного места суток нет: участия в раскладке тоже', () => {
     expect(occupiedDaysInMonth({ month: SEPTEMBER, stays: [] })).toBe(0);
+  });
+
+  /* Пример 4.3 §4.2, но вычет идёт внутри занятости места. */
+  it('отъезд вычитается внутри занятости: уехал 10-го, вернулся 14-го — минус три', () => {
+    expect(
+      occupiedDaysInMonth({
+        month: SEPTEMBER,
+        stays: [{ from: day('2026-06-01'), to: null }],
+        absences: [{ from: day('2026-09-10'), to: day('2026-09-14') }],
+      }),
+    ).toBe(27);
+  });
+
+  /*
+   * Отъезд длиннее занятости не уводит сутки в минус. На боевых данных так
+   * и получалось: жилец с занятостью с 25 сентября и отъездом 5–15 сентября
+   * давал −3 суток, и знаменатель уменьшался на отрицательное число.
+   */
+  it('отъезд вне занятости суток не отнимает', () => {
+    expect(
+      occupiedDaysInMonth({
+        month: SEPTEMBER,
+        stays: [{ from: day('2026-09-25'), to: null }],
+        absences: [{ from: day('2026-09-05'), to: day('2026-09-15') }],
+      }),
+    ).toBe(6);
+  });
+
+  it('отъезд, накрывающий всю занятость, оставляет дни границ', () => {
+    /* Заехал 10-го, отъезд 9–20: прожитыми остаются только границы отъезда. */
+    expect(
+      occupiedDaysInMonth({
+        month: SEPTEMBER,
+        stays: [{ from: day('2026-09-10'), to: null }],
+        absences: [{ from: day('2026-09-09'), to: day('2026-09-20') }],
+      }),
+    ).toBe(11);
   });
 
   it('отрезок вне месяца не даёт ни суток', () => {

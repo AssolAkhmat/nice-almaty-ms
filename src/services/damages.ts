@@ -99,9 +99,14 @@ function assertTitle(title: string): void {
 async function computeShares(
   actor: UserActor,
   input: DamageInput,
+  fixedOn: BusinessDate,
   executor: Executor,
 ): Promise<DamagePreview> {
-  const roster = await listHouseRoster(actor.context, input.houseId, executor);
+  /*
+   * Состав — на дату фиксации (п. 2.2.3 Договора), а не «кто в доме сейчас».
+   * Переселившийся отвечает за комнату, в которой жил тогда.
+   */
+  const roster = await listHouseRoster(actor.context, input.houseId, fixedOn, executor);
 
   let participants: string[];
 
@@ -148,12 +153,12 @@ export async function previewDamage(
   input: DamageInput,
   deps: DamageDeps = {},
 ): Promise<DamagePreview> {
-  const { executor } = resolve(deps);
+  const { executor, today } = resolve(deps);
 
   assertCan(actor.context, 'damage.create', { houseId: input.houseId });
   assertAmount(input.amount);
 
-  return computeShares(actor, input, executor);
+  return computeShares(actor, input, today, executor);
 }
 
 /**
@@ -172,7 +177,7 @@ export async function createDamage(
   assertTitle(input.title);
   assertAmount(input.amount);
 
-  const preview = await computeShares(actor, input, executor);
+  const preview = await computeShares(actor, input, today, executor);
 
   return executor.transaction(async (tx) => {
     const damage = await insertDamage(

@@ -5,7 +5,7 @@ import {
   requireAbsence,
   updateAbsence,
 } from '@/db/repositories/rating';
-import { listResidencies } from '@/db/repositories/residencies';
+import { findOccupiedHouseOn, listResidencies } from '@/db/repositories/residencies';
 import { listCalendarDictionaries } from '@/db/repositories/rotations';
 import { assertCan } from '@/lib/authz';
 import { NotFoundError, ValidationError } from '@/lib/errors';
@@ -46,15 +46,29 @@ export interface SubmitAbsenceInput {
 }
 
 /**
- * Дом жильца берётся из проживания: колонки дома у него нет (D11).
+ * Дом заявки — тот, где человек занимал место в эту дату (указание владельца,
+ * 30 сентября 2026), а не тот, за которым числится проживание сейчас.
  *
- * Проживание — своё: у админа видимость на весь дом, и без фильтра по
- * пользователю первым попадалось чужое, а заявка записывалась бы на него.
+ * Разница видна после перевода между домами: `residencies.house_id` меняется
+ * сразу, а место старого дома держится до даты переезда. Заявка на ночь
+ * до переезда уходила в новый дом — админу, который в эту ночь за человека
+ * не отвечал, и не попадала к тому, кто отвечал.
+ *
+ * Когда места на эту дату нет вовсе, дом берётся у проживания: подать
+ * отсутствие на день, когда место ещё не выдано, человек вправе — отказ
+ * тут был бы отказом в праве, а не защитой данных.
  */
 async function houseOfResident(
   actor: UserActor,
+  on: BusinessDate,
   executor: Executor,
 ): Promise<{ houseId: string; userId: string }> {
+  const occupied = await findOccupiedHouseOn(actor.context, actor.context.userId, on, executor);
+
+  if (occupied !== null) {
+    return { houseId: occupied.houseId, userId: actor.context.userId };
+  }
+
   const [residency] = await listResidencies(
     actor.context,
     { userId: actor.context.userId },
@@ -96,7 +110,7 @@ export async function submitAbsence(
     throw new ValidationError('absences.errors.endBeforeStart');
   }
 
-  const { houseId, userId } = await houseOfResident(actor, executor);
+  const { houseId, userId } = await houseOfResident(actor, input.startDate, executor);
 
   assertCan(actor.context, 'absence.create', { houseId, userId });
 

@@ -18,7 +18,7 @@ import {
 import { parseEligibilityRule, resolveEligibility } from '@/domain/eligibility';
 import { assertCan } from '@/lib/authz';
 import { NotFoundError, ValidationError } from '@/lib/errors';
-import { now } from '@/lib/time';
+import { now, todayInAlmaty } from '@/lib/time';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
 
@@ -76,7 +76,7 @@ export async function readRotationSetup(
     listChecklists(actor.context, houseId, {}, executor),
     listEligibilityGroups(actor.context, houseId, executor),
     listAreaEligibility(actor.context, houseId, executor),
-    listEligibilityMembers(actor.context, houseId, executor),
+    listEligibilityMembers(actor.context, houseId, todayInAlmaty(), executor),
     listBeds(actor.context, houseId, {}, executor),
   ]);
 
@@ -342,7 +342,12 @@ export async function resolveGroup(
   const group = await requireEligibilityGroup(actor.context, groupId, executor);
   assertCan(actor.context, 'settings.house.read', { houseId: group.houseId });
 
-  const members = await listEligibilityMembers(actor.context, group.houseId, executor);
+  const members = await listEligibilityMembers(
+    actor.context,
+    group.houseId,
+    todayInAlmaty(),
+    executor,
+  );
 
   return resolveEligibility(parseEligibilityRule(group.rule), members);
 }

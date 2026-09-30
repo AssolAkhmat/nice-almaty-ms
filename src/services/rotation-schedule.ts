@@ -160,7 +160,7 @@ export async function eligibilityOfHouse(
   const [groups, links, members, temporaryMembers] = await Promise.all([
     listEligibilityGroups(actor.context, houseId, executor),
     listAreaEligibility(actor.context, houseId, executor),
-    listEligibilityMembers(actor.context, houseId, executor),
+    listEligibilityMembers(actor.context, houseId, from, executor),
     listTemporaryEligibilityMembers(actor.context, houseId, from, executor),
   ]);
 

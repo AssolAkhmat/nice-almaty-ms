@@ -596,3 +596,131 @@ describe('чек ущерба у жильца', () => {
     });
   });
 });
+
+/**
+ * Состав раскладки ущерба — по занятости места на дату фиксации
+ * (п. 2.2.3 Договора, указание владельца 30 сентября 2026).
+ *
+ * Прежний отбор шёл по статусу проживания, и админ дома с местом в раскладке
+ * не участвовал вовсе: его доля падала на жильцов.
+ */
+describe('ущерб делится по занятости места', () => {
+  async function adminWithBed(tx: Transaction, fixture: Awaited<ReturnType<typeof seed>>) {
+    const [user] = await tx
+      .insert(schema.users)
+      .values({
+        orgId: fixture.orgId,
+        phone: '+77268800001',
+        passwordHash: 'x',
+        role: 'admin',
+        houseId: fixture.houseA,
+      })
+      .returning();
+
+    const [residency] = await tx
+      .insert(schema.residencies)
+      .values({
+        orgId: fixture.orgId,
+        userId: user?.id ?? '',
+        houseId: fixture.houseA,
+        status: 'created',
+      })
+      .returning();
+
+    const [area] = await tx
+      .insert(schema.areas)
+      .values({ houseId: fixture.houseA, name: 'Комната админа', type: 'living' })
+      .returning();
+
+    const [bed] = await tx
+      .insert(schema.beds)
+      .values({
+        houseId: fixture.houseA,
+        areaId: area?.id ?? '',
+        number: 8,
+        tier: 'lower',
+        label: '8 низ',
+        defaultPrice: 0,
+      })
+      .returning();
+
+    await tx.insert(schema.bedAssignments).values({
+      residencyId: residency?.id ?? '',
+      bedId: bed?.id ?? '',
+      houseId: fixture.houseA,
+      price: 0,
+      period: '[2026-08-01,)',
+    });
+
+    return { userId: user?.id ?? '', residencyId: residency?.id ?? '' };
+  }
+
+  it('админ дома с местом делит ущерб наравне с жильцами', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9640', 2);
+      const admin = await adminWithBed(tx, fixture);
+
+      const preview = await previewDamage(
+        fixture.admin,
+        { houseId: fixture.houseA, title: 'Дверь', amount: 30_000, splitMode: 'all' },
+        { executor: tx, today: TODAY },
+      );
+
+      /* Двое жильцов и админ: по 10 000, а не по 15 000. */
+      expect(preview.shares).toHaveLength(3);
+      expect(preview.shares.map((share) => share.amount)).toEqual([10_000, 10_000, 10_000]);
+      expect(preview.shares.map((share) => share.userId)).toContain(admin.userId);
+    });
+  });
+
+  it('с включением админа доля каждого жильца строго уменьшается', async () => {
+    await inRollback(async (tx) => {
+      const without = await seed(tx, '9641', 2);
+      const before = await previewDamage(
+        without.admin,
+        { houseId: without.houseA, title: 'Дверь', amount: 30_000, splitMode: 'all' },
+        { executor: tx, today: TODAY },
+      );
+
+      const fixture = await seed(tx, '9642', 2);
+      await adminWithBed(tx, fixture);
+      const after = await previewDamage(
+        fixture.admin,
+        { houseId: fixture.houseA, title: 'Дверь', amount: 30_000, splitMode: 'all' },
+        { executor: tx, today: TODAY },
+      );
+
+      expect(after.shares[0]?.amount).toBeLessThan(before.shares[0]?.amount ?? 0);
+    });
+  });
+
+  it('состав берётся на дату фиксации, а не «кто в доме сейчас»', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9643', 2);
+      const admin = await adminWithBed(tx, fixture);
+
+      /* Место админа освобождено 10 сентября: на 20-е его там уже нет. */
+      await tx
+        .update(schema.bedAssignments)
+        .set({ period: '[2026-08-01,2026-09-10)' })
+        .where(eq(schema.bedAssignments.residencyId, admin.residencyId));
+
+      const later = await previewDamage(
+        fixture.admin,
+        { houseId: fixture.houseA, title: 'Дверь', amount: 30_000, splitMode: 'all' },
+        { executor: tx, today: parseBusinessDate('2026-09-20') },
+      );
+
+      expect(later.shares.map((share) => share.userId)).not.toContain(admin.userId);
+
+      /* А на 5 сентября — отвечает: тогда место было за ним. */
+      const earlier = await previewDamage(
+        fixture.admin,
+        { houseId: fixture.houseA, title: 'Дверь', amount: 30_000, splitMode: 'all' },
+        { executor: tx, today: parseBusinessDate('2026-09-05') },
+      );
+
+      expect(earlier.shares.map((share) => share.userId)).toContain(admin.userId);
+    });
+  });
+});

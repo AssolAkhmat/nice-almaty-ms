@@ -114,7 +114,8 @@ export async function generateGeneralCleaning(
     listChecklists(actor.context, houseId, {}, executor),
     listEligibilityGroups(actor.context, houseId, executor),
     listAreaEligibility(actor.context, houseId, executor),
-    listEligibilityMembers(actor.context, houseId, executor),
+    /* Состав на день уборки: место в этот день, а не «назначение сейчас». */
+    listEligibilityMembers(actor.context, houseId, date, executor),
     listGeneralCleaningParticipants(actor.context, houseId, executor),
     listOccurrences(actor.context, houseId, { from: date, to: date }, executor),
   ]);

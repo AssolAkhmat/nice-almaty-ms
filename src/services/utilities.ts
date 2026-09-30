@@ -23,7 +23,6 @@ import {
   updateUtilityPeriod,
 } from '@/db/repositories/utilities';
 import {
-  absentDaysInMonth,
   checkDayCorrection,
   distributeUtilities,
   occupiedDaysInMonth,
@@ -170,8 +169,8 @@ async function participantsOf(
   /*
    * Из дней вычитается только одобренный отъезд (§4.2): болезнь идёт
    * полностью, краткосрочное — тем более. День отъезда и день возвращения
-   * прожиты, не считаются лишь дни строго между ними — это и делает
-   * `absentDaysInMonth`.
+   * прожиты, не считаются лишь дни строго между ними — и вычет идёт внутри
+   * занятости места, поэтому в минус сутки уйти не могут.
    */
   const tripsByUser = new Map<string, { from: BusinessDate; to: BusinessDate }[]>();
 
@@ -188,12 +187,17 @@ async function participantsOf(
   return (
     stays
       .map((stay) => {
-        const systemDays =
-          occupiedDaysInMonth({
-            month,
-            stays: stay.periods,
-            moveOut: stay.moveOutDate === null ? null : (stay.moveOutDate as BusinessDate),
-          }) - absentDaysInMonth(month, tripsByUser.get(stay.userId) ?? []);
+        /*
+         * Отъезды вычитаются внутри занятости места, а не из календаря:
+         * иначе отъезд, начавшийся до заселения, уводил сутки в минус
+         * (находка аудита 30 сентября 2026).
+         */
+        const systemDays = occupiedDaysInMonth({
+          month,
+          stays: stay.periods,
+          moveOut: stay.moveOutDate === null ? null : (stay.moveOutDate as BusinessDate),
+          absences: tripsByUser.get(stay.userId) ?? [],
+        });
 
         const adjustment = adjustmentOf.get(stay.userId) ?? null;
         const pending = override?.userId === stay.userId ? override.days : null;

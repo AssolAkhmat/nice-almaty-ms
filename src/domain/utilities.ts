@@ -5,7 +5,6 @@ import {
   daysInMonth,
   businessDate,
   businessDateToParts,
-  differenceInDays,
   endOfMonth,
   startOfMonth,
   tryParseBusinessDate,
@@ -48,36 +47,6 @@ export interface UtilityDistribution {
 
 function lastDayOfMonth(month: BusinessDate): BusinessDate {
   return endOfMonth(month);
-}
-
-/**
- * Дни, которые вычитаются из проживания за долгосрочное отсутствие.
- * День отъезда и день возвращения считаются прожитыми, не считаются только
- * дни строго между ними (§4.2, пример 4.3).
- */
-export function absentDaysInMonth(month: BusinessDate, absences: readonly AbsenceRange[]): number {
-  const first = startOfMonth(month);
-  const last = lastDayOfMonth(month);
-
-  let total = 0;
-
-  for (const absence of absences) {
-    const from = addDays(absence.from, 1);
-    const to = addDays(absence.to, -1);
-
-    if (compareBusinessDates(from, to) > 0) {
-      continue;
-    }
-
-    const start = compareBusinessDates(from, first) > 0 ? from : first;
-    const end = compareBusinessDates(to, last) < 0 ? to : last;
-
-    if (compareBusinessDates(start, end) <= 0) {
-      total += differenceInDays(start, end) + 1;
-    }
-  }
-
-  return total;
 }
 
 /** Число дней в месяце — по календарю Алматы, без переходов на летнее время. */
@@ -210,6 +179,13 @@ export interface HouseOccupancyInput {
   /** Отрезки занятости мест ЭТОГО дома, полуоткрытые `[from, to)`, как в базе. */
   stays: readonly StayRange[];
   /**
+   * Одобренные долгосрочные отъезды (§4.2). Вычитаются **внутри** занятости,
+   * а не из календаря: иначе отъезд длиннее занятости уводил бы сутки
+   * в минус. На боевых данных так и выходило — жилец с датой заселения
+   * 25 сентября и отъездом 5–15 сентября давал −3 суток.
+   */
+  absences?: readonly AbsenceRange[] | undefined;
+  /**
    * Дата выезда из сети, если она есть. Нужна ровно для одного правила §4.2 —
    * «день выезда считается прожитым», — и ни для чего больше: участие
    * в раскладке она не решает.
@@ -251,6 +227,8 @@ export function occupiedDaysInMonth(input: HouseOccupancyInput): number {
     input.moveOut !== undefined &&
     input.stays.some((stay) => stay.to !== null && stay.to === input.moveOut);
 
+  const absences = input.absences ?? [];
+
   let days = 0;
 
   for (let day = first; compareBusinessDates(day, last) <= 0; day = addDays(day, 1)) {
@@ -260,7 +238,22 @@ export function occupiedDaysInMonth(input: HouseOccupancyInput): number {
         (stay.to === null || compareBusinessDates(day, stay.to) < 0),
     );
 
-    if (occupied || (leavesHere && day === input.moveOut)) {
+    if (!occupied && !(leavesHere && day === input.moveOut)) {
+      continue;
+    }
+
+    /*
+     * День отъезда и день возвращения прожиты, не считаются лишь дни строго
+     * между ними (§4.2, пример 4.3). Вычет идёт по дням занятости, поэтому
+     * сутки не могут уйти ниже нуля ни при какой длине отъезда.
+     */
+    const away = absences.some(
+      (absence) =>
+        compareBusinessDates(addDays(absence.from, 1), day) <= 0 &&
+        compareBusinessDates(day, addDays(absence.to, -1)) <= 0,
+    );
+
+    if (!away) {
       days += 1;
     }
   }

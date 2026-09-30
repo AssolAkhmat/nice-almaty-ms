@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, like, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, like, or, sql } from 'drizzle-orm';
 
 import { NotFoundError } from '@/lib/errors';
 import { addMonths, now, startOfMonth, type BusinessDate } from '@/lib/time';
@@ -226,6 +226,40 @@ export async function listOccupiedResidencies(
     .orderBy(asc(residencies.createdAt), asc(residencies.id));
 }
 
+/**
+ * Дом, в котором человек занимал место на указанную дату (указание владельца,
+ * 30 сентября 2026).
+ *
+ * Нужно подаче отсутствия: дом заявки — тот, где человек жил в эту ночь,
+ * а не тот, за которым числится проживание сейчас. После перевода между
+ * домами `residencies.house_id` меняется сразу, а место старого дома держится
+ * до даты переезда, — и сентябрьское отсутствие уходило в новый дом,
+ * где его никто не ждал.
+ */
+export async function findOccupiedHouseOn(
+  context: AccessContext,
+  userId: string,
+  on: BusinessDate,
+  executor: Executor = getDb(),
+): Promise<{ houseId: string; residencyId: string } | null> {
+  const [row] = await executor
+    .select({ houseId: bedAssignments.houseId, residencyId: bedAssignments.residencyId })
+    .from(bedAssignments)
+    .innerJoin(residencies, eq(residencies.id, bedAssignments.residencyId))
+    .where(
+      and(
+        eq(residencies.orgId, context.orgId),
+        eq(residencies.userId, userId),
+        sql`${bedAssignments.period} @> ${on}::date`,
+        sql`${residencies.status} <> 'archived'`,
+      ),
+    )
+    .orderBy(sql`lower(${bedAssignments.period}) desc`, asc(bedAssignments.id))
+    .limit(1);
+
+  return row ?? null;
+}
+
 export interface HouseRosterEntry {
   residencyId: string;
   userId: string;
@@ -234,15 +268,28 @@ export interface HouseRosterEntry {
 }
 
 /**
- * Кто живёт в доме сейчас и в какой комнате — для деления ущерба (§8).
+ * Кто занимал места дома на указанную дату и в какой комнате — для деления
+ * ущерба (§8, п. 2.2.3 Договора).
  *
- * Расторгающиеся входят наравне с действующими: §2.3 п.5 разрешает
- * проводить ущерб все 30 дней до возврата депозита. Архивные не входят:
- * их депозит уже разобран.
+ * Пункт 2.2.3 называет отвечающими тех, кому имущество передано по Акту
+ * и кто проживал в помещении **на дату фиксации**. Поэтому состав берётся
+ * по занятости койко-места на эту дату, а не по статусу проживания
+ * (указание владельца, 30 сентября 2026): роль и статус ортогональны
+ * занятости места.
+ *
+ * Что это меняет. Админ дома с местом и статусом `created` (P9-3) в раскладке
+ * ущерба раньше не участвовал вовсе — его доля падала на жильцов. А комната
+ * человека бралась у «назначения без конца»: стоило проставить дату
+ * освобождения при расторжении или плановом переселении, и человек выпадал
+ * из комнатного режима, хотя на дату фиксации жил именно там.
+ *
+ * Архивные проживания не входят: их депозит разобран. Расторгающиеся входят,
+ * пока место за ними, — §2.3 п. 5 разрешает проводить ущерб все 30 дней.
  */
 export async function listHouseRoster(
   context: AccessContext,
   houseId: string,
+  on: BusinessDate,
   executor: Executor = getDb(),
 ): Promise<HouseRosterEntry[]> {
   assertHouseVisible(context, houseId);
@@ -256,14 +303,33 @@ export async function listHouseRoster(
     .from(residencies)
     .leftJoin(
       bedAssignments,
-      and(eq(bedAssignments.residencyId, residencies.id), sql`upper_inf(${bedAssignments.period})`),
+      and(
+        eq(bedAssignments.residencyId, residencies.id),
+        /* Дом места на тот день, а не «дом проживания сейчас». */
+        eq(bedAssignments.houseId, houseId),
+        /*
+         * День, которым назначение закрыто, тоже считается прожитым (§4.2):
+         * человек выехал в этот день, и за поломку, зафиксированную в день
+         * выезда, он отвечает.
+         */
+        sql`(${bedAssignments.period} @> ${on}::date or upper(${bedAssignments.period}) = ${on}::date)`,
+      ),
     )
     .leftJoin(beds, eq(beds.id, bedAssignments.bedId))
     .where(
       and(
         residencyVisibility(context),
-        eq(residencies.houseId, houseId),
-        inArray(residencies.status, ['active', 'terminating']),
+        sql`${residencies.status} <> 'archived'`,
+        or(
+          isNotNull(bedAssignments.id),
+          /*
+           * Расторгающийся входит и без места: §2.3 п. 5 разрешает проводить
+           * ущерб все тридцать дней до возврата депозита, а место освобождают
+           * в день выезда. Комнатный режим его всё равно не возьмёт — комнаты
+           * за ним уже нет, и это верно.
+           */
+          and(sql`${residencies.status} = 'terminating'`, eq(residencies.houseId, houseId)),
+        ),
       ),
     )
     .orderBy(asc(residencies.createdAt), asc(residencies.id));
