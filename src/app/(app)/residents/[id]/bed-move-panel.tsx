@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
@@ -60,6 +60,16 @@ export function BedMovePanel({
   const t = useTranslations();
   const [state, action, isPending] = useActionState(moveBedAction, INITIAL);
 
+  /*
+   * Поля ручного перерасчёта появляются ровно тогда, когда цена места
+   * отличается от нынешней (D37): при равной цене месяц пересчитывать нечем,
+   * и лишнее поле только сбивало бы.
+   */
+  const [bedId, setBedId] = useState(beds[0]?.bedId ?? '');
+  const chosen = beds.find((bed) => bed.bedId === bedId);
+  const priceChanges =
+    currentPrice !== null && chosen !== undefined && chosen.defaultPrice !== currentPrice;
+
   return (
     <Card data-testid="bed-move-panel">
       <CardHeader>
@@ -96,6 +106,13 @@ export function BedMovePanel({
               </p>
             )}
 
+            {/* Что стало со счётом месяца — словами, а не молчанием (D37). */}
+            {state.done !== undefined && (
+              <p className="text-[13px]" data-testid="bed-move-done" role="status">
+                {t(state.done)}
+              </p>
+            )}
+
             <Field
               hint={t('residents.moveKindHint')}
               htmlFor="move-kind"
@@ -111,7 +128,14 @@ export function BedMovePanel({
             </Field>
 
             <Field htmlFor="move-bed" label={t('residents.moveBed')}>
-              <Select data-testid="move-bed" id="move-bed" name="bedId" required>
+              <Select
+                data-testid="move-bed"
+                id="move-bed"
+                name="bedId"
+                onChange={(event) => setBedId(event.target.value)}
+                required
+                value={bedId}
+              >
                 {beds.map((bed) => (
                   <option key={bed.bedId} value={bed.bedId}>
                     {bed.label} — {bed.defaultPrice}
@@ -141,6 +165,36 @@ export function BedMovePanel({
             <Field htmlFor="move-reason" label={t('residents.moveReason')}>
               <Input data-testid="move-reason" id="move-reason" name="reason" required />
             </Field>
+
+            {priceChanges && (
+              <>
+                <Field
+                  hint={t('residents.moveMonthRentHint')}
+                  htmlFor="move-month-rent"
+                  label={t('residents.moveMonthRent')}
+                >
+                  <Input
+                    data-testid="move-month-rent"
+                    id="move-month-rent"
+                    inputMode="numeric"
+                    name="monthRent"
+                    step={1}
+                    type="number"
+                  />
+                </Field>
+
+                <Field
+                  htmlFor="move-month-rent-comment"
+                  label={t('residents.moveMonthRentComment')}
+                >
+                  <Input
+                    data-testid="move-month-rent-comment"
+                    id="move-month-rent-comment"
+                    name="monthRentComment"
+                  />
+                </Field>
+              </>
+            )}
 
             <label className="flex items-start gap-3 text-[13px]">
               <Checkbox data-testid="move-consent" name="consent" value="on" />

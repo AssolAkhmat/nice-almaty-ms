@@ -54,6 +54,7 @@ export const AUDIT_ACTIONS = {
   bedAssigned: 'bed.assigned',
   bedAssignmentCorrected: 'bed.assignment_corrected',
   bedMovedPermanently: 'bed.moved_permanently',
+  monthRentRecalculated: 'residency_month_rent.recalculated',
   temporaryPlacementCreated: 'temporary_placement.created',
   temporaryPlacementEnded: 'temporary_placement.ended',
   bedReleased: 'bed.released',

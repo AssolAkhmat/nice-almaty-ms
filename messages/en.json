@@ -216,7 +216,8 @@
       "utility_period": "Utility period",
       "profile_field_def": "additional profile field",
       "profile_field_value": "additional field value",
-      "utility_day_adjustment": "Person-day correction"
+      "utility_day_adjustment": "Person-day correction",
+      "residency_month_rent": "Month rent recalculation"
     }
   },
   "auth": {
@@ -1522,7 +1523,13 @@
     "moveConsent": "The resident agrees to the new price (contract cl. 6.2). Needed only when the price changes",
     "moveConsentDate": "Date of agreement",
     "moveSubmit": "Move",
-    "moveDone": "The move is recorded"
+    "moveDone": "The move is recorded",
+    "moveMonthRent": "Amount for this month",
+    "moveMonthRentHint": "The system does not compute it: under cl. 4.1 a month is indivisible, there is no per-day proportion. Enter the amount yourself — the value by the old price is kept beside it",
+    "moveMonthRentComment": "How the amount was calculated",
+    "moveInvoiceUpdated": "The month invoice was corrected to the entered amount",
+    "moveInvoiceClosed": "The month invoice is already paid: the recalculation is recorded, the invoice is untouched",
+    "moveInvoiceNone": "No invoice for this month yet: the amount will go into it when issued"
   },
   "rotationCalendar": {
     "assign": "Assign",
@@ -2235,7 +2242,10 @@
       "consentRequired": "The price changes: the resident’s agreement must be marked",
       "emptyPeriod": "The end date must be later than the start",
       "otherHouse": "That bed belongs to another house: moving between houses is a separate action",
-      "reasonRequired": "State the reason"
+      "reasonRequired": "State the reason",
+      "monthRentRequired": "The price changes: enter this month’s amount manually (cl. 4.1 — a month is indivisible)",
+      "monthRentInvalid": "The month amount must be a whole, non-negative number of tenge",
+      "monthRentComment": "Explain how the month amount was calculated"
     }
   }
 }

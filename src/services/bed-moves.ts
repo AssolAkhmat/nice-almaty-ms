@@ -2,7 +2,13 @@ import { getDb, type Executor } from '@/db/client';
 import { requireBed } from '@/db/repositories/areas';
 import { countDamageSharesOfUser } from '@/db/repositories/damages';
 import { countChargeInvoices } from '@/db/repositories/invoices';
-import { assignBed, findOpenAssignment, requireResidency } from '@/db/repositories/residencies';
+import { listInvoices } from '@/db/repositories/invoices';
+import {
+  assignBed,
+  findOpenAssignment,
+  requireResidency,
+  saveMonthRent,
+} from '@/db/repositories/residencies';
 import { releaseTemporaryOnBed } from '@/db/repositories/temporary-residents';
 import { countAllocationsOfUser } from '@/db/repositories/utilities';
 import { periodLiteral } from '@/db/period';
@@ -18,9 +24,10 @@ import {
 } from '@/lib/time';
 
 import { AUDIT_ACTIONS, recordAudit } from './audit';
+import { editInvoiceLines, readInvoice } from './invoices';
 import { syncFutureAssignments } from './rotation-schedule';
 
-import type { BedAssignment, Residency, TemporaryPlacement } from '@/db/schema';
+import type { BedAssignment, Residency, ResidencyMonthRent, TemporaryPlacement } from '@/db/schema';
 import type { UserActor } from './users';
 import { and, eq, sql } from 'drizzle-orm';
 
@@ -79,6 +86,13 @@ export interface PermanentMoveInput {
    * когда цена меняется: это существенное условие договора (п. 6.2).
    */
   consent?: { agreedOn: BusinessDate } | undefined;
+  /**
+   * Ручной перерасчёт платы за месяц переселения (D37, решение владельца
+   * от 30 сентября 2026). Обязателен, когда цена меняется: система эту сумму
+   * не вычисляет — пропорция по дням противоречила бы п. 4.1 Договора,
+   * где минимальная единица расчёта — календарный месяц.
+   */
+  monthRent?: { amount: number; comment: string } | undefined;
 }
 
 export interface BedMovePreview {
@@ -399,12 +413,22 @@ export async function listTemporaryPlacements(
 /**
  * Постоянное переселение внутри дома.
  *
- * Цена: новая попадает в счёт с первого числа следующего месяца. Это
- * не отдельная механика, а следствие правила §3 — счёт выставляется первого
- * числа по цене назначения, действующего на первое число, и смена места
- * внутри месяца текущий счёт не меняет. Пропорциональный перерасчёт по дням
- * противоречил бы п. 4.1 Договора («минимальная единица расчёта —
- * календарный месяц»); строка `[ОТКРЫТО]` в решениях ждёт слова владельца.
+ * Цена: с первого числа следующего месяца в счёт идёт новая — это следствие
+ * правила §3, а не отдельная механика: счёт выставляется первого числа по цене
+ * назначения, действующего на первое число.
+ *
+ * Месяц самого переезда пересчитывается **вручную** (D37, решение владельца
+ * от 30 сентября 2026). Автоматической пропорции по дням здесь нет и не будет:
+ * п. 4.1 Договора говорит, что минимальная единица расчёта — календарный месяц,
+ * и зашитая формула ему противоречила бы. Администратор вводит сумму сам,
+ * с обязательным комментарием; расчётное значение по старой цене сохраняется
+ * снимком рядом — тем же способом, что человеко-дни в P2-6. Отметка о согласии
+ * жильца (п. 6.2) хранится вместе с суммой, а не только в журнале.
+ *
+ * Введённая сумма не остаётся данными ради данных: счёт месяца, если он ещё
+ * не оплачен, правится на неё тут же. Оплаченный счёт не переписывается
+ * (§3), и тогда ответ это называет — молча расходиться счёт и перерасчёт
+ * не должны.
  *
  * Пункт 8.10 Договора требует нового Акта приёма-передачи имущества.
  * Сущности акта в системе нет — он бумажный, и система о нём только
@@ -414,7 +438,14 @@ export async function moveBedPermanently(
   actor: UserActor,
   input: PermanentMoveInput,
   deps: BedMoveDeps = {},
-): Promise<{ assignment: BedAssignment; priceAppliesFrom: BusinessDate }> {
+): Promise<{
+  assignment: BedAssignment;
+  priceAppliesFrom: BusinessDate;
+  /** Запись ручного перерасчёта; пусто — цена не менялась (D37). */
+  monthRent: ResidencyMonthRent | null;
+  /** Что стало со счётом месяца. */
+  invoice: MonthInvoiceOutcome;
+}> {
   const executor = deps.executor ?? getDb();
   const today = deps.today ?? todayInAlmaty();
 
@@ -450,7 +481,27 @@ export async function moveBedPermanently(
     throw new ValidationError('bedMoves.errors.consentRequired');
   }
 
+  /*
+   * Сумма за месяц переезда: вводится вручную и только при смене цены (D37).
+   * Без неё месяц остался бы по старой цене молча, а это уже не решение
+   * администратора, а поведение по умолчанию, которого никто не выбирал.
+   */
+  if (priceChanges && input.monthRent === undefined) {
+    throw new ValidationError('bedMoves.errors.monthRentRequired');
+  }
+
+  if (input.monthRent !== undefined) {
+    if (!Number.isSafeInteger(input.monthRent.amount) || input.monthRent.amount < 0) {
+      throw new ValidationError('bedMoves.errors.monthRentInvalid');
+    }
+
+    if (input.monthRent.comment.trim() === '') {
+      throw new ValidationError('bedMoves.errors.monthRentComment');
+    }
+  }
+
   const priceAppliesFrom = addMonths(startOfMonth(from), 1);
+  const month = startOfMonth(from);
 
   return executor.transaction(async (tx) => {
     const releasedTemporaries = await releaseTemporaryOnBed(actor.context, bed.id, from, tx);
@@ -501,8 +552,104 @@ export async function moveBedPermanently(
       tx,
     );
 
-    return { assignment, priceAppliesFrom };
+    let monthRent: ResidencyMonthRent | null = null;
+    let invoice: MonthInvoiceOutcome = 'not-applicable';
+
+    if (input.monthRent !== undefined && input.consent !== undefined) {
+      monthRent = await saveMonthRent(
+        {
+          residencyId: residency.id,
+          month,
+          amount: input.monthRent.amount,
+          /* Снимок: что дала бы старая цена за полный месяц (п. 4.1). */
+          computedAmount: open?.price ?? 0,
+          comment: input.monthRent.comment.trim(),
+          consentAgreedOn: input.consent.agreedOn,
+          createdBy: actor.context.userId,
+        },
+        tx,
+      );
+
+      invoice = await applyMonthRent(actor, residency.id, month, input.monthRent.amount, tx);
+
+      await recordAudit(
+        { context: actor.context, ip: actor.ip, requestId: actor.requestId },
+        {
+          action: AUDIT_ACTIONS.monthRentRecalculated,
+          entityType: 'residency_month_rent',
+          entityId: monthRent.id,
+          before: { amount: monthRent.computedAmount, computedAmount: monthRent.computedAmount },
+          after: {
+            amount: monthRent.amount,
+            month,
+            comment: monthRent.comment,
+            consentAgreedOn: monthRent.consentAgreedOn,
+            invoice,
+          },
+        },
+        tx,
+      );
+    }
+
+    return { assignment, priceAppliesFrom, monthRent, invoice };
   });
+}
+
+/** Что стало со счётом месяца после ручного перерасчёта (D37). */
+export type MonthInvoiceOutcome =
+  'updated' | 'no-invoice' | 'closed' | 'no-rent-line' | 'not-applicable';
+
+/**
+ * Перенести пересчитанную сумму в счёт месяца.
+ *
+ * Правится строка проживания, остальные строки счёта не трогаются: коммуналка
+ * и ручные начисления к цене места отношения не имеют. Оплаченный счёт
+ * не переписывается — §3 это прямо запрещает, — и тогда ответ называет причину,
+ * а не делает вид, что перерасчёт применён.
+ */
+async function applyMonthRent(
+  actor: UserActor,
+  residencyId: string,
+  month: BusinessDate,
+  amount: number,
+  tx: Executor,
+): Promise<MonthInvoiceOutcome> {
+  const invoices = await listInvoices(
+    actor.context,
+    { residencyId, type: 'monthly', periodMonth: month },
+    tx,
+  );
+
+  const target = invoices.find((candidate) => candidate.status !== 'cancelled');
+
+  if (target === undefined) {
+    /* Счёт месяца ещё не выставлен: генерация первого числа возьмёт сумму сама. */
+    return 'no-invoice';
+  }
+
+  if (target.status === 'paid') {
+    return 'closed';
+  }
+
+  const view = await readInvoice(actor, target.id, { executor: tx });
+  const rent = view.lines.find((line) => line.kind === 'rent');
+
+  if (rent === undefined) {
+    return 'no-rent-line';
+  }
+
+  await editInvoiceLines(
+    actor,
+    target.id,
+    view.lines.map((line) => ({
+      kind: line.kind,
+      title: line.title,
+      amount: line.id === rent.id ? amount : line.amount,
+    })),
+    { executor: tx },
+  );
+
+  return 'updated';
 }
 
 /** Закрыть временное размещение датой: человек вернулся на своё место. */

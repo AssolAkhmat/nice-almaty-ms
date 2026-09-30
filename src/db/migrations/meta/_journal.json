@@ -281,6 +281,13 @@
       "when": 1790626831101,
       "tag": "0039_pink_black_panther",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1790778699118,
+      "tag": "0040_common_grim_reaper",
+      "breakpoints": true
     }
   ]
 }

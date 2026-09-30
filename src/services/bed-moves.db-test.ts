@@ -231,6 +231,7 @@ describe('постоянное переселение внутри дома', ()
           from: MOVED,
           reason: 'Место дороже',
           consent: { agreedOn: MOVED },
+          monthRent: { amount: 95_000, comment: 'Полмесяца на старом месте, полмесяца на новом' },
         },
         { executor: tx, today: TODAY },
       );
@@ -613,6 +614,257 @@ describe('назначения мест', () => {
       /* Отрезок августа — сентября остался тем же: его закрыли, а не стёрли. */
       expect(rows).toHaveLength(1);
       expect(rows[0]?.period).toBe('[2026-08-01,2026-09-15)');
+    });
+  });
+});
+
+/**
+ * Ручной перерасчёт платы за месяц переезда (D37, решение владельца
+ * от 30 сентября 2026).
+ *
+ * Пропорции по дням в системе нет и быть не должно: п. 4.1 Договора называет
+ * минимальной единицей расчёта календарный месяц. Сумму вводит администратор,
+ * расчётное значение по старой цене остаётся снимком рядом.
+ *
+ * Каждая проверка ниже падала бы до этой работы: поля, таблицы и отказа
+ * не существовало.
+ */
+describe('перерасчёт месяца при смене цены', () => {
+  const REASON = 'Переезд в комнату подороже';
+  const HOW = 'Полмесяца по 90 000, полмесяца по 100 000';
+
+  async function issueMonthly(
+    tx: Transaction,
+    fixture: Awaited<ReturnType<typeof seed>>,
+    status: 'issued' | 'paid' = 'issued',
+  ) {
+    const [invoice] = await tx
+      .insert(schema.invoices)
+      .values({
+        orgId: fixture.orgId,
+        residencyId: fixture.residencyId,
+        userId: fixture.userId,
+        houseId: fixture.houseId,
+        type: 'monthly',
+        status,
+        periodMonth: '2026-09-01',
+        dueDate: '2026-09-05',
+        total: 90_000,
+      })
+      .returning();
+
+    await tx.insert(schema.invoiceLines).values({
+      invoiceId: invoice?.id ?? '',
+      kind: 'rent',
+      title: 'Проживание',
+      amount: 90_000,
+    });
+
+    return invoice?.id ?? '';
+  }
+
+  const move = (extra: Record<string, unknown> = {}) => ({
+    residencyId: '',
+    bedId: '',
+    price: 100_000,
+    from: MOVED,
+    reason: REASON,
+    consent: { agreedOn: MOVED },
+    ...extra,
+  });
+
+  it('смена цены без суммы за месяц не проходит', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '5301');
+
+      await expect(
+        moveBedPermanently(
+          fixture.superadmin,
+          { ...move(), residencyId: fixture.residencyId, bedId: fixture.bedTwo },
+          { executor: tx, today: TODAY },
+        ),
+      ).rejects.toThrow(/monthRentRequired/);
+    });
+  });
+
+  it('сумма без объяснения не проходит', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '5302');
+
+      await expect(
+        moveBedPermanently(
+          fixture.superadmin,
+          {
+            ...move({ monthRent: { amount: 95_000, comment: '   ' } }),
+            residencyId: fixture.residencyId,
+            bedId: fixture.bedTwo,
+          },
+          { executor: tx, today: TODAY },
+        ),
+      ).rejects.toThrow(/monthRentComment/);
+    });
+  });
+
+  it('введённая сумма хранится вместе с расчётной по старой цене и датой согласия', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '5303');
+
+      const { monthRent } = await moveBedPermanently(
+        fixture.superadmin,
+        {
+          ...move({ monthRent: { amount: 95_000, comment: HOW } }),
+          residencyId: fixture.residencyId,
+          bedId: fixture.bedTwo,
+        },
+        { executor: tx, today: TODAY },
+      );
+
+      expect(monthRent).toMatchObject({
+        month: '2026-09-01',
+        amount: 95_000,
+        /* Снимок: полный месяц по старой цене — так велит п. 4.1. */
+        computedAmount: 90_000,
+        comment: HOW,
+        consentAgreedOn: MOVED,
+      });
+    });
+  });
+
+  it('счёт месяца исправляется на введённую сумму, прочие строки целы', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '5304');
+      const invoiceId = await issueMonthly(tx, fixture);
+
+      await tx.insert(schema.invoiceLines).values({
+        invoiceId,
+        kind: 'utilities',
+        title: 'Коммунальные услуги',
+        amount: 4_000,
+      });
+
+      const { invoice } = await moveBedPermanently(
+        fixture.superadmin,
+        {
+          ...move({ monthRent: { amount: 95_000, comment: HOW } }),
+          residencyId: fixture.residencyId,
+          bedId: fixture.bedTwo,
+        },
+        { executor: tx, today: TODAY },
+      );
+
+      expect(invoice).toBe('updated');
+
+      const lines = await tx
+        .select({ kind: schema.invoiceLines.kind, amount: schema.invoiceLines.amount })
+        .from(schema.invoiceLines)
+        .where(eq(schema.invoiceLines.invoiceId, invoiceId));
+
+      expect(lines).toEqual(
+        expect.arrayContaining([
+          { kind: 'rent', amount: 95_000 },
+          { kind: 'utilities', amount: 4_000 },
+        ]),
+      );
+
+      const [updated] = await tx
+        .select({ total: schema.invoices.total })
+        .from(schema.invoices)
+        .where(eq(schema.invoices.id, invoiceId));
+
+      expect(updated?.total).toBe(99_000);
+    });
+  });
+
+  it('оплаченный счёт не переписывается, перерасчёт всё равно записан', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '5305');
+      const invoiceId = await issueMonthly(tx, fixture, 'paid');
+
+      const { invoice, monthRent } = await moveBedPermanently(
+        fixture.superadmin,
+        {
+          ...move({ monthRent: { amount: 95_000, comment: HOW } }),
+          residencyId: fixture.residencyId,
+          bedId: fixture.bedTwo,
+        },
+        { executor: tx, today: TODAY },
+      );
+
+      /* §3: жилец заплатил по тому, что видел. Основание задним числом не правим. */
+      expect(invoice).toBe('closed');
+      expect(monthRent?.amount).toBe(95_000);
+
+      const [line] = await tx
+        .select({ amount: schema.invoiceLines.amount })
+        .from(schema.invoiceLines)
+        .where(eq(schema.invoiceLines.invoiceId, invoiceId));
+
+      expect(line?.amount).toBe(90_000);
+    });
+  });
+
+  it('при равной цене перерасчёта нет вовсе', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '5306');
+
+      const { monthRent, invoice } = await moveBedPermanently(
+        fixture.superadmin,
+        {
+          residencyId: fixture.residencyId,
+          bedId: fixture.bedTwo,
+          price: 90_000,
+          from: MOVED,
+          reason: 'Та же цена, другая комната',
+        },
+        { executor: tx, today: TODAY },
+      );
+
+      expect(monthRent).toBeNull();
+      expect(invoice).toBe('not-applicable');
+    });
+  });
+
+  it('в журнале оба значения: расчётное и поставленное', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '5307');
+
+      await moveBedPermanently(
+        fixture.superadmin,
+        {
+          ...move({ monthRent: { amount: 95_000, comment: HOW } }),
+          residencyId: fixture.residencyId,
+          bedId: fixture.bedTwo,
+        },
+        { executor: tx, today: TODAY },
+      );
+
+      const [entry] = await tx
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.action, 'residency_month_rent.recalculated'));
+
+      expect(entry?.before).toMatchObject({ amount: 90_000 });
+      expect(entry?.after).toMatchObject({ amount: 95_000, comment: HOW, consentAgreedOn: MOVED });
+    });
+  });
+
+  it('база не принимает перерасчёт без объяснения', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '5308');
+
+      const message = await failureText(() =>
+        tx.insert(schema.residencyMonthRents).values({
+          residencyId: fixture.residencyId,
+          month: '2026-09-01',
+          amount: 95_000,
+          computedAmount: 90_000,
+          comment: '  ',
+          consentAgreedOn: MOVED,
+          createdBy: fixture.userId,
+        }),
+      );
+
+      expect(message).toContain('residency_month_rents_comment_present');
     });
   });
 });

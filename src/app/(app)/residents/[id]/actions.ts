@@ -267,6 +267,8 @@ export async function moveBedAction(
   const to = tryParseBusinessDate(text(formData, 'to'));
   const consentAgreedOn = tryParseBusinessDate(text(formData, 'consentAgreedOn'));
   const consentGiven = formData.get('consent') !== null;
+  const monthRentRaw = text(formData, 'monthRent');
+  const monthRentComment = text(formData, 'monthRentComment');
 
   try {
     if (kind === 'correction') {
@@ -280,7 +282,7 @@ export async function moveBedAction(
         ...(to === null ? {} : { to }),
       });
     } else {
-      await moveBedPermanently(current, {
+      const moved = await moveBedPermanently(current, {
         residencyId,
         bedId,
         reason,
@@ -292,7 +294,27 @@ export async function moveBedAction(
         ...(consentGiven && consentAgreedOn !== null
           ? { consent: { agreedOn: consentAgreedOn } }
           : {}),
+        /*
+         * Сумма за месяц переезда — ручная (D37). Пустое поле не превращается
+         * в ноль: отсутствие суммы и сумма «ноль» — разные утверждения,
+         * и при смене цены сервис первое отклоняет.
+         */
+        ...(monthRentRaw === ''
+          ? {}
+          : { monthRent: { amount: Number(monthRentRaw), comment: monthRentComment } }),
       });
+
+      if (moved.invoice === 'updated') {
+        return { done: 'residents.moveInvoiceUpdated' };
+      }
+
+      if (moved.invoice === 'closed') {
+        return { done: 'residents.moveInvoiceClosed' };
+      }
+
+      if (moved.invoice === 'no-invoice' && moved.monthRent !== null) {
+        return { done: 'residents.moveInvoiceNone' };
+      }
     }
   } catch (error) {
     return { error: actionErrorKey(error, 'relocations.errors.unknown') };

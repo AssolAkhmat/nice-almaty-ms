@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   bigint,
+  check,
   boolean,
   customType,
   date,
@@ -102,6 +103,62 @@ export const residencies = pgTable(
   ],
 );
 
+/**
+ * Ручной перерасчёт платы за месяц переселения (решение владельца,
+ * 30 сентября 2026).
+ *
+ * Пункт 4.1 Договора: «минимальной единицей расчёта является календарный
+ * месяц, посуточное и понедельное проживание не предоставляется». Поэтому
+ * пропорция по дням внутри месяца зашита быть не может — она противоречила бы
+ * договору. А разовый ручной ввод не противоречит: администратор считает сам
+ * и отвечает за число.
+ *
+ * Расчётное значение по старой цене хранится снимком рядом с введённым —
+ * тем же способом, что человеко-дни в `utility_day_adjustments`: через месяц
+ * иначе не отличить «админ так решил» от «так посчитала система».
+ *
+ * Дата отметки о согласии жильца (п. 6.2 Договора) лежит здесь же, вместе
+ * с суммой: согласие относится к конкретному числу, а не к факту переезда.
+ */
+export const residencyMonthRents = pgTable(
+  'residency_month_rents',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    residencyId: uuid('residency_id')
+      .notNull()
+      .references(() => residencies.id),
+    /** Первое число месяца, за который пересчитана плата. */
+    month: date('month').notNull(),
+    /** Что поставил администратор. Это значение и идёт в счёт. */
+    amount: bigint('amount', { mode: 'number' }).notNull(),
+    /** Что дала бы старая цена за полный месяц: снимок на момент правки. */
+    computedAmount: bigint('computed_amount', { mode: 'number' }).notNull(),
+    comment: text('comment').notNull(),
+    /** Дата отметки о согласии жильца с новой ценой (п. 6.2). */
+    consentAgreedOn: date('consent_agreed_on').notNull(),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('residency_month_rents_month_unique').on(table.residencyId, table.month),
+    /*
+     * Обязательность комментария и согласия — в базе, а не только в сервисе:
+     * сумма за месяц без объяснения и без отметки согласия нарушает п. 6.2,
+     * а вставок в таблицу со временем станет больше одной.
+     */
+    check('residency_month_rents_comment_present', sql`btrim(${table.comment}) <> ''`),
+    check(
+      'residency_month_rents_amounts_non_negative',
+      sql`${table.amount} >= 0 and ${table.computedAmount} >= 0`,
+    ),
+  ],
+);
+
 export type Residency = typeof residencies.$inferSelect;
 export type NewResidency = typeof residencies.$inferInsert;
 
@@ -167,4 +224,6 @@ export const bedAssignments = pgTable(
 );
 
 export type BedAssignment = typeof bedAssignments.$inferSelect;
+export type ResidencyMonthRent = typeof residencyMonthRents.$inferSelect;
+export type NewResidencyMonthRent = typeof residencyMonthRents.$inferInsert;
 export type NewBedAssignment = typeof bedAssignments.$inferInsert;

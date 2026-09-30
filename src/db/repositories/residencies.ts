@@ -10,9 +10,11 @@ import {
   bedAssignments,
   beds,
   residencies,
+  residencyMonthRents,
   type BedAssignment,
   type NewResidency,
   type Residency,
+  type ResidencyMonthRent,
 } from '../schema';
 
 /**
@@ -457,4 +459,60 @@ function parsePeriodStart(literal: string): BusinessDate {
   }
 
   return start as BusinessDate;
+}
+
+/**
+ * Ручной перерасчёт платы за месяц переселения (D37, 30 сентября 2026).
+ * Одна запись на месяц: повторная правка заменяет прежнюю, полная история —
+ * в `audit_log`.
+ */
+export async function saveMonthRent(
+  input: {
+    residencyId: string;
+    month: BusinessDate;
+    amount: number;
+    computedAmount: number;
+    comment: string;
+    consentAgreedOn: BusinessDate;
+    createdBy: string;
+  },
+  executor: Executor = getDb(),
+): Promise<ResidencyMonthRent> {
+  const [row] = await executor
+    .insert(residencyMonthRents)
+    .values(input)
+    .onConflictDoUpdate({
+      target: [residencyMonthRents.residencyId, residencyMonthRents.month],
+      set: {
+        amount: input.amount,
+        computedAmount: input.computedAmount,
+        comment: input.comment,
+        consentAgreedOn: input.consentAgreedOn,
+        createdBy: input.createdBy,
+        updatedAt: now(),
+      },
+    })
+    .returning();
+
+  if (row === undefined) {
+    throw new NotFoundError('Перерасчёт платы за месяц не сохранён');
+  }
+
+  return row;
+}
+
+export async function findMonthRent(
+  residencyId: string,
+  month: BusinessDate,
+  executor: Executor = getDb(),
+): Promise<ResidencyMonthRent | null> {
+  const [row] = await executor
+    .select()
+    .from(residencyMonthRents)
+    .where(
+      and(eq(residencyMonthRents.residencyId, residencyId), eq(residencyMonthRents.month, month)),
+    )
+    .limit(1);
+
+  return row ?? null;
 }
