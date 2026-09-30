@@ -5,11 +5,10 @@ import { parseBusinessDate } from '@/lib/time';
 import {
   absentDaysInMonth,
   checkDayCorrection,
-  daysLivedInHouseInMonth,
-  daysLivedInMonth,
   defaultUtilityMonth,
   distributeUtilities,
   monthOptions,
+  occupiedDaysInMonth,
   parseMonthInput,
 } from './utilities';
 
@@ -18,60 +17,6 @@ import {
  * Доля округляется вверх, излишек остаётся дому (§0).
  */
 const SEPTEMBER = parseBusinessDate('2026-09-01');
-
-describe('дни проживания в месяце', () => {
-  it('полный месяц засчитывается целиком', () => {
-    expect(
-      daysLivedInMonth({
-        month: SEPTEMBER,
-        moveIn: parseBusinessDate('2026-06-01'),
-        moveOut: null,
-      }),
-    ).toBe(30);
-  });
-
-  it('день заезда прожит: заезд 21 сентября даёт десять дней', () => {
-    expect(
-      daysLivedInMonth({
-        month: SEPTEMBER,
-        moveIn: parseBusinessDate('2026-09-21'),
-        moveOut: null,
-      }),
-    ).toBe(10);
-  });
-
-  it('день выезда прожит: выезд 10 сентября даёт десять дней', () => {
-    expect(
-      daysLivedInMonth({
-        month: SEPTEMBER,
-        moveIn: parseBusinessDate('2026-06-01'),
-        moveOut: parseBusinessDate('2026-09-10'),
-      }),
-    ).toBe(10);
-  });
-
-  it('проживание вне месяца не даёт ни дня', () => {
-    expect(
-      daysLivedInMonth({
-        month: SEPTEMBER,
-        moveIn: parseBusinessDate('2026-10-01'),
-        moveOut: null,
-      }),
-    ).toBe(0);
-
-    expect(
-      daysLivedInMonth({
-        month: SEPTEMBER,
-        moveIn: parseBusinessDate('2026-06-01'),
-        moveOut: parseBusinessDate('2026-08-31'),
-      }),
-    ).toBe(0);
-  });
-
-  it('без даты заезда дней нет: проживание ещё не началось', () => {
-    expect(daysLivedInMonth({ month: SEPTEMBER, moveIn: null, moveOut: null })).toBe(0);
-  });
-});
 
 describe('вычет дней долгосрочного отсутствия', () => {
   it('пример 4.3: уехал 10-го, вернулся 14-го — не считаются 11, 12 и 13', () => {
@@ -222,118 +167,103 @@ describe('месяцы переключателя коммуналки', () => {
     expect(months).toEqual(['2026-01-01', '2025-12-01', '2025-11-01']);
   });
 });
-
 /**
- * Дни в конкретном доме (решение D26). Главное свойство — для того, кто
- * никуда не переезжал, ответ обязан совпадать с прежним расчётом день
- * в день: правка не должна шевельнуть ни один существующий счёт.
+ * Сутки занятости места (указание владельца, 30 сентября 2026).
+ *
+ * Участие в раскладке и число суток определяет занятость койко-места,
+ * а не роль и не дата заселения проживания. До этой правки сутки считались
+ * от `move_in_date`: админ дома и жильцы без даты заселения выпадали
+ * из знаменателя, и их потребление раскладывалось на остальных.
  */
-describe('дни месяца в конкретном доме', () => {
-  const WHOLE = { month: SEPTEMBER, moveIn: parseBusinessDate('2026-01-01'), moveOut: null };
+describe('сутки занятости места в месяце', () => {
+  const day = (value: string) => parseBusinessDate(value);
 
-  it('без переезда отвечает ровно то же, что общий расчёт дней', () => {
-    for (const moveIn of ['2026-01-01', '2026-09-01', '2026-09-11', '2026-09-30'] as const) {
-      const range = { month: SEPTEMBER, moveIn: parseBusinessDate(moveIn), moveOut: null };
-
-      expect(
-        daysLivedInHouseInMonth({ ...range, stays: [], elsewhere: false, belongsNow: true }),
-      ).toBe(daysLivedInMonth(range));
-    }
+  it('открытый отрезок с прошлого месяца даёт весь месяц', () => {
+    expect(
+      occupiedDaysInMonth({ month: SEPTEMBER, stays: [{ from: day('2026-06-01'), to: null }] }),
+    ).toBe(30);
   });
 
-  it('чужой дом без переезда не получает ни дня', () => {
+  it('место занято с 21 сентября — десять суток, день заезда считается', () => {
     expect(
-      daysLivedInHouseInMonth({ ...WHOLE, stays: [], elsewhere: false, belongsNow: false }),
-    ).toBe(0);
+      occupiedDaysInMonth({ month: SEPTEMBER, stays: [{ from: day('2026-09-21'), to: null }] }),
+    ).toBe(10);
   });
 
   /*
-   * Прошлый месяц после переселения: человек весь сентябрь стоял на месте
-   * дома A, а числится теперь за домом B. Прежний расчёт отдал бы сентябрь
-   * дому B, где его не было.
+   * Ядро находки: у админа дома и у части жильцов даты заселения нет вовсе,
+   * а место занято. Сутки от этого не зависят.
    */
-  it('дом, где человек стоял на месте, получает месяц, даже если он уже съехал', () => {
+  it('без даты заселения сутки считаются по занятости места', () => {
     expect(
-      daysLivedInHouseInMonth({
-        ...WHOLE,
-        stays: [{ from: parseBusinessDate('2026-08-01'), to: parseBusinessDate('2026-10-01') }],
-        elsewhere: false,
-        belongsNow: false,
+      occupiedDaysInMonth({
+        month: SEPTEMBER,
+        stays: [{ from: day('2026-08-22'), to: null }],
+        moveOut: null,
       }),
     ).toBe(30);
   });
 
-  /*
-   * Месяц переселения. Прежний расчёт дал бы 30 дней и старому дому,
-   * и новому: человек заплатил бы дважды за один сентябрь.
-   */
-  it('месяц переселения режется по отрезкам, и сумма дней равна месяцу', () => {
-    const oldHouse = daysLivedInHouseInMonth({
-      ...WHOLE,
-      stays: [{ from: parseBusinessDate('2026-06-01'), to: parseBusinessDate('2026-09-10') }],
-      elsewhere: true,
-      belongsNow: false,
+  it('день выезда из сети прожит: выезд 10 сентября даёт десять суток', () => {
+    expect(
+      occupiedDaysInMonth({
+        month: SEPTEMBER,
+        stays: [{ from: day('2026-06-01'), to: day('2026-09-10') }],
+        moveOut: day('2026-09-10'),
+      }),
+    ).toBe(10);
+  });
+
+  it('без выезда из сети закрытый отрезок день закрытия не отдаёт', () => {
+    /* Это переселение, а не выезд: 10-е число принадлежит новому месту. */
+    expect(
+      occupiedDaysInMonth({
+        month: SEPTEMBER,
+        stays: [{ from: day('2026-06-01'), to: day('2026-09-10') }],
+      }),
+    ).toBe(9);
+  });
+
+  it('переселение внутри дома не удваивает день переезда', () => {
+    expect(
+      occupiedDaysInMonth({
+        month: SEPTEMBER,
+        stays: [
+          { from: day('2026-09-01'), to: day('2026-09-15') },
+          { from: day('2026-09-15'), to: null },
+        ],
+      }),
+    ).toBe(30);
+  });
+
+  it('переезд между домами делит месяц без потерь и без удвоения', () => {
+    const oldHouse = occupiedDaysInMonth({
+      month: SEPTEMBER,
+      stays: [{ from: day('2026-08-01'), to: day('2026-09-15') }],
+    });
+    const newHouse = occupiedDaysInMonth({
+      month: SEPTEMBER,
+      stays: [{ from: day('2026-09-15'), to: null }],
     });
 
-    const newHouse = daysLivedInHouseInMonth({
-      ...WHOLE,
-      stays: [{ from: parseBusinessDate('2026-09-10'), to: null }],
-      elsewhere: true,
-      belongsNow: true,
-    });
-
-    expect(oldHouse).toBe(9);
-    expect(newHouse).toBe(21);
+    expect(oldHouse).toBe(14);
+    expect(newHouse).toBe(16);
     expect(oldHouse + newHouse).toBe(30);
   });
 
-  it('день переселения засчитывается новому дому ровно один раз', () => {
-    const on = parseBusinessDate('2026-09-10');
-
-    const oldHouse = daysLivedInHouseInMonth({
-      ...WHOLE,
-      stays: [{ from: parseBusinessDate('2026-06-01'), to: on }],
-      elsewhere: true,
-      belongsNow: false,
-    });
-    const newHouse = daysLivedInHouseInMonth({
-      ...WHOLE,
-      stays: [{ from: on, to: null }],
-      elsewhere: true,
-      belongsNow: true,
-    });
-
-    // 1–9 сентября — старому дому, 10–30 — новому. Десятое не считается дважды.
-    expect(oldHouse).toBe(9);
-    expect(newHouse).toBe(21);
+  it('без назначенного места суток нет: участия в раскладке тоже', () => {
+    expect(occupiedDaysInMonth({ month: SEPTEMBER, stays: [] })).toBe(0);
   });
 
-  it('переезд в месяц заезда считается от дня заезда, а не от первого числа', () => {
-    const range = { month: SEPTEMBER, moveIn: parseBusinessDate('2026-09-05'), moveOut: null };
-
-    const oldHouse = daysLivedInHouseInMonth({
-      ...range,
-      stays: [{ from: parseBusinessDate('2026-09-05'), to: parseBusinessDate('2026-09-20') }],
-      elsewhere: true,
-      belongsNow: false,
-    });
-    const newHouse = daysLivedInHouseInMonth({
-      ...range,
-      stays: [{ from: parseBusinessDate('2026-09-20'), to: null }],
-      elsewhere: true,
-      belongsNow: true,
-    });
-
-    expect(oldHouse).toBe(15);
-    expect(newHouse).toBe(11);
-    expect(oldHouse + newHouse).toBe(daysLivedInMonth(range));
-  });
-
-  it('месяц без единого прожитого дня не даёт дней ни одному дому', () => {
-    const range = { month: SEPTEMBER, moveIn: parseBusinessDate('2026-10-01'), moveOut: null };
-
+  it('отрезок вне месяца не даёт ни суток', () => {
     expect(
-      daysLivedInHouseInMonth({ ...range, stays: [], elsewhere: true, belongsNow: true }),
+      occupiedDaysInMonth({ month: SEPTEMBER, stays: [{ from: day('2026-10-01'), to: null }] }),
+    ).toBe(0);
+    expect(
+      occupiedDaysInMonth({
+        month: SEPTEMBER,
+        stays: [{ from: day('2026-06-01'), to: day('2026-08-31') }],
+      }),
     ).toBe(0);
   });
 });

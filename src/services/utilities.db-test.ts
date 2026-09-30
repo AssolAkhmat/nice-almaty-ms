@@ -1319,3 +1319,147 @@ describe('доля дома', () => {
     });
   });
 });
+
+/**
+ * Участие в раскладке — по занятости места, а не по роли (указание владельца,
+ * 30 сентября 2026).
+ *
+ * На боевой админ дома с местом с 22 августа выпадал из сентябрьской
+ * раскладки: у его проживания статус `created` и пустая дата заселения,
+ * а сутки считались от даты заселения. Его потребление раскладывалось
+ * на жильцов — они переплачивали.
+ *
+ * Каждая проверка ниже падала бы до этой правки.
+ */
+describe('роль и занятость места ортогональны', () => {
+  /** Место админу: своя комната, своё место, назначение на весь октябрь. */
+  async function placeAdmin(
+    tx: Transaction,
+    fixture: Awaited<ReturnType<typeof seed>>,
+    suffix: string,
+  ): Promise<string> {
+    const [area] = await tx
+      .insert(schema.areas)
+      .values({ houseId: fixture.houseA, name: `Комната админа ${suffix}`, type: 'living' })
+      .returning();
+
+    const [bed] = await tx
+      .insert(schema.beds)
+      .values({
+        houseId: fixture.houseA,
+        areaId: area?.id ?? '',
+        number: 9,
+        tier: 'lower',
+        label: `9 низ ${suffix}`,
+        /* У админа цена обычно ноль: он не платит за место, но платит коммуналку. */
+        defaultPrice: 0,
+      })
+      .returning();
+
+    /*
+     * Проживание админа заведено вместе с учётной записью (P9-3): статус
+     * `created`, даты заселения нет — ровно как на боевой.
+     */
+    const [residency] = await tx
+      .insert(schema.residencies)
+      .values({
+        orgId: fixture.orgId,
+        userId: fixture.admin.context.userId,
+        houseId: fixture.houseA,
+        status: 'created',
+      })
+      .returning();
+
+    await tx.insert(schema.bedAssignments).values({
+      residencyId: residency?.id ?? '',
+      bedId: bed?.id ?? '',
+      houseId: fixture.houseA,
+      price: 0,
+      period: '[2026-09-20,)',
+    });
+
+    return residency?.id ?? '';
+  }
+
+  it('админ с назначенным местом попадает в раскладку за период', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9810');
+      await placeAdmin(tx, fixture, '9810');
+      const period = await periodWith(tx, fixture, 30_000);
+
+      const view = await readUtilityPeriod(fixture.admin, period.id, { executor: tx });
+      const adminRow = view.participants.find((row) => row.userId === fixture.admin.context.userId);
+
+      /* Октябрь занят целиком: назначение открыто с 20 сентября. */
+      expect(adminRow?.systemDays).toBe(31);
+      expect(view.preview.allocations.map((row) => row.userId)).toContain(
+        fixture.admin.context.userId,
+      );
+    });
+  });
+
+  it('админ без назначенного места в раскладку не попадает', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9811');
+      const period = await periodWith(tx, fixture, 30_000);
+
+      const view = await readUtilityPeriod(fixture.admin, period.id, { executor: tx });
+
+      expect(view.participants.map((row) => row.userId)).not.toContain(
+        fixture.admin.context.userId,
+      );
+      /* Знаменатель — только жильцы: 10 + 20 + 31 суток занятости. */
+      expect(view.preview.allocations).toHaveLength(3);
+    });
+  });
+
+  it('с включением админа доля каждого жильца строго уменьшается', async () => {
+    await inRollback(async (tx) => {
+      const without = await seed(tx, '9812');
+      const before = await readUtilityPeriod(
+        without.admin,
+        (await periodWith(tx, without, 30_000)).id,
+        { executor: tx },
+      );
+
+      const with_ = await seed(tx, '9813');
+      await placeAdmin(tx, with_, '9813');
+      const after = await readUtilityPeriod(with_.admin, (await periodWith(tx, with_, 30_000)).id, {
+        executor: tx,
+      });
+
+      const shareOf = (
+        view: Awaited<ReturnType<typeof readUtilityPeriod>>,
+        index: number,
+      ): number => view.preview.allocations[index]?.amount ?? 0;
+
+      /* Те же три жильца с теми же сутками — и у каждого доля меньше. */
+      for (const index of [0, 1, 2]) {
+        expect(shareOf(after, index)).toBeLessThan(shareOf(before, index));
+      }
+
+      const total = after.preview.allocations.reduce((sum, row) => sum + row.amount, 0);
+
+      expect(after.preview.allocations).toHaveLength(4);
+      expect(total + after.preview.surplus).toBeGreaterThanOrEqual(30_000);
+    });
+  });
+
+  it('жилец без даты заселения платит за занятые сутки', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9814');
+
+      /* Ровно случай Хусаин Даны с боевой: место есть, даты заселения нет. */
+      await tx
+        .update(schema.residencies)
+        .set({ moveInDate: null, status: 'created' })
+        .where(eq(schema.residencies.id, fixture.residents[2]?.residencyId ?? ''));
+
+      const period = await periodWith(tx, fixture, 30_000);
+      const view = await readUtilityPeriod(fixture.admin, period.id, { executor: tx });
+      const row = view.participants.find((entry) => entry.userId === fixture.residents[2]?.userId);
+
+      expect(row?.systemDays).toBe(30);
+    });
+  });
+});

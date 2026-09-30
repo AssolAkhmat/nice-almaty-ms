@@ -2,7 +2,7 @@ import { getDb, type Executor } from '@/db/client';
 import { listLedgerEntriesBySource } from '@/db/repositories/accounts';
 import { listInvoices } from '@/db/repositories/invoices';
 import { listApprovedAbsences } from '@/db/repositories/rating';
-import { listMonthStaysInHouse, listResidencies } from '@/db/repositories/residencies';
+import { listMonthStaysInHouse } from '@/db/repositories/residencies';
 import {
   addUtilityLine,
   listClosedReceipts,
@@ -25,8 +25,8 @@ import {
 import {
   absentDaysInMonth,
   checkDayCorrection,
-  daysLivedInHouseInMonth,
   distributeUtilities,
+  occupiedDaysInMonth,
   monthOf,
   type UtilityDistribution,
 } from '@/domain/utilities';
@@ -131,11 +131,16 @@ function assertAmount(amount: number): void {
 }
 
 /**
- * Кто делит коммуналку месяца: все, кто прожил в доме хотя бы день (§4.2).
- * Съехавшие входят наравне — они жили в этом месяце; админ дома тоже,
- * он платит коммуналку.
+ * Кто делит коммуналку месяца: все, кто занимал место в этом доме (§4.2
+ * с поправкой от 30 сентября 2026).
  *
- * У каждого участника два числа суток: расчётное по §4.2 и то, что идёт
+ * Участие определяет занятость койко-места, а не роль и не дата заселения:
+ * админ дома с местом платит наравне со всеми, съехавший платит за свои
+ * сутки, а жилец без места не платит вовсе. Прежний отбор шёл по проживаниям
+ * и датам заселения — из-за этого админ и жильцы без даты заселения
+ * выпадали из знаменателя, а их потребление раскладывалось на остальных.
+ *
+ * У каждого участника два числа суток: расчётное по занятости и то, что идёт
  * в деньги. Расходятся они, когда админ поставил корректировку (P2-6);
  * `override` подставляет ещё не сохранённое значение — так предпросмотр
  * считается тем же кодом, что и сам расчёт, а не вторым его списком.
@@ -149,8 +154,7 @@ async function participantsOf(
   const houseId = period.houseId;
   const month = period.month as BusinessDate;
 
-  const [residencies, absences, stays, adjustments] = await Promise.all([
-    listResidencies(actor.context, { houseId }, executor),
+  const [absences, stays, adjustments] = await Promise.all([
     listApprovedAbsences(
       actor.context,
       houseId,
@@ -162,39 +166,6 @@ async function participantsOf(
   ]);
 
   const adjustmentOf = new Map(adjustments.map((entry) => [entry.userId, entry]));
-
-  /*
-   * Кто делит коммуналку дома — решает занятость мест, а не «дом сейчас»
-   * (решение D26). Переселившийся числится за новым домом, но за прожитые
-   * в старом дни платит старому; и наоборот, в новом доме он появляется
-   * только с даты переезда, а не задним числом на весь месяц.
-   *
-   * Для всех, кто никуда не переезжал, число дней не меняется ни на день:
-   * это свойство закреплено тестами `daysLivedInHouseInMonth`.
-   */
-  const stayOf = new Map(stays.map((stay) => [stay.residencyId, stay]));
-
-  const known = new Set(residencies.map((residency) => residency.id));
-
-  interface Participant {
-    id: string;
-    userId: string;
-    houseId: string;
-    moveInDate: string | null;
-    moveOutDate: string | null;
-  }
-
-  /* Съехавшие в другой дом: их проживание уже числится не здесь. */
-  const departed: Participant[] = stays
-    .filter((stay) => !known.has(stay.residencyId))
-    .map((stay) => ({
-      id: stay.residencyId,
-      userId: stay.userId,
-      /* Дом чужой — признак `belongsNow` для них ложный, и это верно. */
-      houseId: '',
-      moveInDate: stay.moveInDate,
-      moveOutDate: stay.moveOutDate,
-    }));
 
   /*
    * Из дней вычитается только одобренный отъезд (§4.2): болезнь идёт
@@ -214,57 +185,40 @@ async function participantsOf(
     tripsByUser.set(absence.userId, trips);
   }
 
-  const all: Participant[] = [
-    ...residencies.map((residency) => ({
-      id: residency.id,
-      userId: residency.userId,
-      houseId: residency.houseId,
-      moveInDate: residency.moveInDate,
-      moveOutDate: residency.moveOutDate,
-    })),
-    ...departed,
-  ];
-
   return (
-    all
-      .map((residency) => {
-        const stay = stayOf.get(residency.id);
-
+    stays
+      .map((stay) => {
         const systemDays =
-          daysLivedInHouseInMonth({
+          occupiedDaysInMonth({
             month,
-            moveIn: residency.moveInDate === null ? null : (residency.moveInDate as BusinessDate),
-            moveOut:
-              residency.moveOutDate === null ? null : (residency.moveOutDate as BusinessDate),
-            stays: stay?.periods ?? [],
-            elsewhere: stay?.elsewhere ?? false,
-            belongsNow: residency.houseId === houseId,
-          }) - absentDaysInMonth(month, tripsByUser.get(residency.userId) ?? []);
+            stays: stay.periods,
+            moveOut: stay.moveOutDate === null ? null : (stay.moveOutDate as BusinessDate),
+          }) - absentDaysInMonth(month, tripsByUser.get(stay.userId) ?? []);
 
-        const adjustment = adjustmentOf.get(residency.userId) ?? null;
-        const pending = override?.userId === residency.userId ? override.days : null;
+        const adjustment = adjustmentOf.get(stay.userId) ?? null;
+        const pending = override?.userId === stay.userId ? override.days : null;
 
         return {
-          userId: residency.userId,
-          residencyId: residency.id,
+          userId: stay.userId,
+          residencyId: stay.residencyId,
           systemDays,
           days: pending ?? adjustment?.days ?? systemDays,
           adjustment,
         };
       })
       /*
-       * В списке остаётся тот, кого посчитала формула, и тот, о ком есть
-       * прямое утверждение админа. Ноль суток из строя не выбывает:
-       * корректировка «жил ноль дней» — это запись, которую админ должен
-       * видеть на экране и мочь переписать, а не исчезнувшая строка.
-       * Из денег ноль уходит сам — делит только `distributeUtilities`.
+       * В списке остаётся тот, кто занимал место, и тот, о ком есть прямое
+       * утверждение админа. Ноль суток из строя не выбывает: корректировка
+       * «жил ноль дней» — это запись, которую админ должен видеть и мочь
+       * переписать, а не исчезнувшая строка. Из денег ноль уходит сам —
+       * делит только `distributeUtilities`.
        */
       .filter((entry) => entry.systemDays > 0 || entry.adjustment !== null || entry.days > 0)
       /*
-       * Порядок участников — по числу прожитых дней, затем по жильцу. Проживания
-       * приходят отсортированными по времени создания, а у заведённых одной
-       * транзакцией оно одно на всех: порядок оставался на усмотрение планировщика,
-       * и распределение показывалось людям каждый раз в новом виде.
+       * Порядок участников — по числу суток, затем по жильцу. Занятости мест
+       * приходят отсортированными по проживанию, а у заведённых одной
+       * транзакцией порядок оставался на усмотрение планировщика, и
+       * распределение показывалось людям каждый раз в новом виде.
        */
       .sort((left, right) =>
         left.days === right.days ? left.userId.localeCompare(right.userId) : left.days - right.days,

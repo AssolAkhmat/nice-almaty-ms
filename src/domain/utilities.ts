@@ -18,14 +18,6 @@ import { splitCeil } from './money';
  * Коммунальные услуги (docs/03-BUSINESS-RULES.md §4).
  * Чистые функции: ни БД, ни часов. Все примеры §4.1–4.3 — в тестах.
  */
-export interface LivedRange {
-  /** Первое число месяца, за который считается коммуналка. */
-  month: BusinessDate;
-  moveIn: BusinessDate | null;
-  /** Пусто — проживание продолжается. */
-  moveOut: BusinessDate | null;
-}
-
 /** Отрезок долгосрочного отсутствия: день отъезда и день возвращения (§4.2). */
 export interface AbsenceRange {
   from: BusinessDate;
@@ -56,30 +48,6 @@ export interface UtilityDistribution {
 
 function lastDayOfMonth(month: BusinessDate): BusinessDate {
   return endOfMonth(month);
-}
-
-/**
- * Сколько дней месяца человек прожил. День заезда и день выезда считаются
- * прожитыми (§4.2) — в отличие от периода занятости места, где день выезда
- * уже свободен: там речь про место, здесь про человека.
- */
-export function daysLivedInMonth(range: LivedRange): number {
-  if (range.moveIn === null) {
-    return 0;
-  }
-
-  const first = startOfMonth(range.month);
-  const last = lastDayOfMonth(range.month);
-
-  const start = compareBusinessDates(range.moveIn, first) > 0 ? range.moveIn : first;
-  const end =
-    range.moveOut !== null && compareBusinessDates(range.moveOut, last) < 0 ? range.moveOut : last;
-
-  if (compareBusinessDates(start, end) > 0) {
-    return 0;
-  }
-
-  return differenceInDays(start, end) + 1;
 }
 
 /**
@@ -236,63 +204,63 @@ export interface StayRange {
   to: BusinessDate | null;
 }
 
-export interface HouseDaysInput extends LivedRange {
-  /** Отрезки занятости мест ЭТОГО дома внутри месяца. */
+export interface HouseOccupancyInput {
+  /** Первое число месяца, за который считается коммуналка. */
+  month: BusinessDate;
+  /** Отрезки занятости мест ЭТОГО дома, полуоткрытые `[from, to)`, как в базе. */
   stays: readonly StayRange[];
-  /** В этом же месяце у жильца было место и в другом доме. */
-  elsewhere: boolean;
-  /** Проживание числится за этим домом сейчас. */
-  belongsNow: boolean;
+  /**
+   * Дата выезда из сети, если она есть. Нужна ровно для одного правила §4.2 —
+   * «день выезда считается прожитым», — и ни для чего больше: участие
+   * в раскладке она не решает.
+   */
+  moveOut?: BusinessDate | null | undefined;
 }
 
 /**
- * Сколько дней месяца человек прожил ИМЕННО В ЭТОМ ДОМЕ (§4.2 с поправкой
- * на переселение, решение D26).
+ * Сколько суток месяца человек занимал место ИМЕННО В ЭТОМ ДОМЕ.
  *
- * Дни проживания глобальны для проживания: заезд и выезд дому не принадлежат.
- * Пока человек весь месяц в одном доме, этого достаточно — и тогда функция
- * отвечает ровно то же, что отвечала прежняя `daysLivedInMonth`. Разница
- * появляется в двух случаях, и оба раньше считались неверно:
+ * Участие в раскладке и число суток определяет занятость койко-места,
+ * а не роль пользователя и не дата заселения проживания (указание владельца,
+ * 30 сентября 2026). Роль и занятость места ортогональны: админ дома с местом
+ * платит коммуналку наравне со всеми, а жилец без места не платит, какой бы
+ * у него ни был статус.
  *
- * 1. Месяц переселения. Старый расчёт давал полный месяц дней **обоим**
- *    домам: человек платил бы дважды, каждому дому за все тридцать дней.
- * 2. Прошлый месяц, пересчитанный после переселения. Старый расчёт брал
- *    «дом сейчас» и переносил август в новый дом, где человека в августе
- *    не было вовсе.
+ * До 30 сентября сутки брались из `residencies.move_in_date`, и это было
+ * неверно дважды. У админа дома и у части жильцов даты заселения нет вовсе
+ * (статус `created`) — они выпадали из знаменателя, и их потребление
+ * раскладывалось на остальных. У многих дата заселения оказалась позже начала
+ * занятости места — сентябрь считался с 25-го числа вместо всего месяца.
+ * На боевой базе это давало знаменатель 75 человеко-суток вместо 428.
  *
- * Поэтому когда месяц чистый (`elsewhere === false`), дни отдаются целиком
- * тому дому, за которым человек числится или где стоял на месте. Когда
- * в месяце есть оба дома — дни режутся по отрезкам занятости.
+ * Сутки складываются по дням, а не по длинам отрезков: отрезков у человека
+ * в месяце бывает несколько (переселение внутри дома), и один день не должен
+ * попасть в сумму дважды.
+ *
+ * Отрезок полуоткрыт: день, которым отрезок закрыт, месту уже не принадлежит —
+ * в этот день человек либо на новом месте, либо уехал. Поэтому «день выезда
+ * прожит» (§4.2) добавляется отдельно и только для настоящего выезда из сети:
+ * иначе день переезда достался бы двум домам сразу.
  */
-export function daysLivedInHouseInMonth(input: HouseDaysInput): number {
-  const lived = daysLivedInMonth(input);
-
-  if (lived === 0) {
-    return 0;
-  }
-
-  if (!input.elsewhere) {
-    return input.belongsNow || input.stays.length > 0 ? lived : 0;
-  }
-
+export function occupiedDaysInMonth(input: HouseOccupancyInput): number {
   const first = startOfMonth(input.month);
   const last = lastDayOfMonth(input.month);
 
-  const start =
-    input.moveIn !== null && compareBusinessDates(input.moveIn, first) > 0 ? input.moveIn : first;
-  const end =
-    input.moveOut !== null && compareBusinessDates(input.moveOut, last) < 0 ? input.moveOut : last;
+  const leavesHere =
+    input.moveOut !== null &&
+    input.moveOut !== undefined &&
+    input.stays.some((stay) => stay.to !== null && stay.to === input.moveOut);
 
   let days = 0;
 
-  for (let day = start; compareBusinessDates(day, end) <= 0; day = addDays(day, 1)) {
-    const inside = input.stays.some(
+  for (let day = first; compareBusinessDates(day, last) <= 0; day = addDays(day, 1)) {
+    const occupied = input.stays.some(
       (stay) =>
         compareBusinessDates(stay.from, day) <= 0 &&
         (stay.to === null || compareBusinessDates(day, stay.to) < 0),
     );
 
-    if (inside) {
+    if (occupied || (leavesHere && day === input.moveOut)) {
       days += 1;
     }
   }
