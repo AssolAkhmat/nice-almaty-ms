@@ -1167,7 +1167,8 @@
       "utilitiesRemind": "Коммуналка за месяц",
       "scheduleRemind": "Расписание на месяц",
       "curfewCheck": "Отбой",
-      "unknown": "Уведомление"
+      "unknown": "Уведомление",
+      "presenceNight": "Заявленные отсутствия на ночь"
     },
     "errors": {
       "unknown": "Не получилось. Попробуйте ещё раз",
@@ -1185,10 +1186,6 @@
       "rotationMissed": {
         "title": "Уборка не подтверждена",
         "body": "Уборка за {date} ещё не отмечена выполненной"
-      },
-      "curfew": {
-        "title": "Не подали уведомление к отбою",
-        "body": "Не сообщили об опоздании {date}: {count}"
       },
       "utilities": {
         "title": "Коммуналка за {month}",
@@ -1213,7 +1210,16 @@
       "depositOverdue": {
         "title": "Возврат депозита просрочен",
         "body": "Крайний срок был {date}, дом {house}"
-      }
+      },
+      "presenceNight": {
+        "title": "Заявленные отсутствия, ночь {date}",
+        "body": "Заявлено на эту ночь: {declared}\n{declaredList}\n\nИстёк срок без нового уведомления: {expired}\n{expiredList}"
+      },
+      "presenceNightRow": "{name} — до {until}, {reason}",
+      "presenceNightRowMinor": "{name}, несовершеннолетний — до {until}, {reason}",
+      "presenceExpiredRow": "{name} — срок истёк {until}, {reason}",
+      "presenceExpiredRowMinor": "{name}, несовершеннолетний — срок истёк {until}, {reason}",
+      "presenceNone": "—"
     }
   },
   "onboarding": {

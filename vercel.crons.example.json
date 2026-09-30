@@ -16,7 +16,7 @@
   "crons": [
     { "path": "/api/v1/cron/rotations-close-day", "schedule": "55 18 * * *" },
     { "path": "/api/v1/cron/rotations-remind", "schedule": "0 4,14 * * *" },
-    { "path": "/api/v1/cron/curfew-check", "schedule": "5 18 * * *" },
+    { "path": "/api/v1/cron/night-absences", "schedule": "5 18 * * *" },
     { "path": "/api/v1/cron/invoices-monthly", "schedule": "5 19 * * *" },
     { "path": "/api/v1/cron/utilities-remind", "schedule": "0 5 25 * *" },
     { "path": "/api/v1/cron/schedule-remind", "schedule": "0 5 25 * *" },

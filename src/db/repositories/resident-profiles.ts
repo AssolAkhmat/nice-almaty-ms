@@ -192,6 +192,34 @@ export async function listProfileNames(
   );
 }
 
+/**
+ * Даты рождения по списку людей: ночная сводка отсутствий помечает
+ * несовершеннолетних и ставит их первыми (Приложение №1 к Договору,
+ * подраздел 2.2 — им нельзя находиться вне Объекта с 23:00 до 06:00).
+ *
+ * Отдельный запрос, а не профиль в цикле: сводка строится на весь дом.
+ */
+export async function listProfileBirthDates(
+  context: AccessContext,
+  userIds: readonly string[],
+  executor: Executor = getDb(),
+): Promise<Map<string, string>> {
+  if (userIds.length === 0) {
+    return new Map();
+  }
+
+  const rows = await executor
+    .select({ userId: residentProfiles.userId, birthDate: residentProfiles.birthDate })
+    .from(residentProfiles)
+    .where(and(visibleUserIds(context, executor), inArray(residentProfiles.userId, [...userIds])));
+
+  return new Map(
+    rows
+      .filter((row): row is { userId: string; birthDate: string } => row.birthDate !== null)
+      .map((row) => [row.userId, row.birthDate]),
+  );
+}
+
 export async function requireProfile(
   context: AccessContext,
   userId: string,

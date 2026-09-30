@@ -1167,7 +1167,8 @@
       "utilitiesRemind": "Айлық коммуналдық",
       "scheduleRemind": "Айға арналған кесте",
       "curfewCheck": "Тыныштық уақыты",
-      "unknown": "Хабарлама"
+      "unknown": "Хабарлама",
+      "presenceNight": "Түнге мәлімделген болмау"
     },
     "errors": {
       "unknown": "Болмады. Қайта көріңіз",
@@ -1185,10 +1186,6 @@
       "rotationMissed": {
         "title": "Жинау расталмаған",
         "body": "{date} жинауы әлі орындалды деп белгіленбеген"
-      },
-      "curfew": {
-        "title": "Тыныштық уақытына хабарлама берілмеген",
-        "body": "{date} кешігуін хабарламағандар: {count}"
       },
       "utilities": {
         "title": "{month} коммуналдық",
@@ -1213,7 +1210,16 @@
       "depositOverdue": {
         "title": "Депозитті қайтару мерзімі өтті",
         "body": "Соңғы мерзім {date} болды, үй {house}"
-      }
+      },
+      "presenceNight": {
+        "title": "Мәлімделген болмау, {date} түні",
+        "body": "Осы түнге мәлімделген: {declared}\n{declaredList}\n\nМерзімі өтті, жаңа хабарлама жоқ: {expired}\n{expiredList}"
+      },
+      "presenceNightRow": "{name} — {until} дейін, {reason}",
+      "presenceNightRowMinor": "{name}, кәмелетке толмаған — {until} дейін, {reason}",
+      "presenceExpiredRow": "{name} — мерзімі {until} өтті, {reason}",
+      "presenceExpiredRowMinor": "{name}, кәмелетке толмаған — мерзімі {until} өтті, {reason}",
+      "presenceNone": "—"
     }
   },
   "onboarding": {

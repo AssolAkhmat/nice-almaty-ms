@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { LOCALES } from './config';
-import { notificationTexts } from './notification-texts';
+import { notificationLines, notificationTexts } from './notification-texts';
 
 /**
  * Тексты уведомлений собираются из словаря, а не пишутся в коде задания:
@@ -45,10 +45,52 @@ describe('тексты уведомления', () => {
   });
 
   it('числовое значение подставляется как число, а не как код', async () => {
-    const texts = await notificationTexts('curfew', { date: '2026-09-07', count: 3 });
+    const texts = await notificationTexts('presenceNight', {
+      date: '2026-09-07',
+      declared: 3,
+      expired: 0,
+      declaredList: '—',
+      expiredList: '—',
+    });
 
     for (const locale of LOCALES) {
       expect(texts.body[locale], locale).toContain('3');
+    }
+  });
+
+  /*
+   * Строки списка переводятся в каждой локали отдельно (сводка отсутствий,
+   * 30 сентября 2026): собрать список на одном языке и раздать его всем
+   * значило бы вернуть захардкоженную строку в уведомление.
+   */
+  it('строки списка приходят на всех языках', async () => {
+    const lines = await notificationLines([
+      {
+        code: 'presenceNightRowMinor',
+        values: { name: 'Иванов И.', until: '2026-10-02', reason: 'к родителям' },
+      },
+      {
+        code: 'presenceNightRow',
+        values: { name: 'Петров П.', until: '2026-10-01', reason: 'ночная смена' },
+      },
+    ]);
+
+    for (const locale of LOCALES) {
+      expect(lines[locale], locale).toContain('Иванов И.');
+      expect(lines[locale].split('\n'), locale).toHaveLength(2);
+    }
+
+    /* Пометка несовершеннолетнего — своя в каждой локали, а не одна на все. */
+    expect(lines.ru).toContain('несовершеннолетний');
+    expect(lines.kk).toContain('кәмелетке толмаған');
+    expect(lines.en).toContain('minor');
+  });
+
+  it('пустой список — пустая строка, а не слово на одном языке', async () => {
+    const lines = await notificationLines([]);
+
+    for (const locale of LOCALES) {
+      expect(lines[locale], locale).toBe('');
     }
   });
 });

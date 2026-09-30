@@ -15,7 +15,7 @@ import {
   type BusinessDate,
 } from '@/lib/time';
 
-import { checkCurfew, CURFEW_CHECK_DISABLED, CURFEW_CHECK_JOB } from './curfew';
+import { NIGHT_ABSENCES_JOB, sendNightAbsences } from './night-absences';
 import { watchDepositRefunds, watchDocumentExpiry } from './expiry-reminders';
 import { remindSchedule, remindUtilities } from './monthly-reminders';
 import { remindRotations } from './rotation-reminders';
@@ -251,57 +251,342 @@ describe('напоминания о ротациях', () => {
   });
 });
 
-describe('отбой', () => {
+describe('ночная сводка заявленных отсутствий', () => {
   /*
-   * Задание выключено 27 сентября 2026 (указание владельца): в ночь на 27-е
-   * оно разослало двенадцать человек как «не подали уведомление к отбою»,
-   * хотя никто ничего не заявлял и не нарушал.
+   * Требование «список тех, кто не подавал уведомление» признано ошибочным
+   * (решение владельца, 30 сентября 2026): события возврата в системе нет,
+   * и сказать «не вернулся» ей нечем. Сводка сообщает обратное — кто заявился.
    *
-   * Прежние проверки здесь закрепляли именно то поведение, которое оказалось
-   * ложным: «жилец без уведомления попадает в список админа». Они не удалены
-   * молча — они заменены на проверки молчания, а правило разослать список
-   * заново придёт вместе с источником события «вернулся домой».
+   * Каждая проверка здесь падала бы на прежнем задании: оно рассылало ровно
+   * противоположную выборку и уходило даже тогда, когда заявлений не было
+   * вовсе.
    */
-  it('выключенное задание не рассылает ничего', async () => {
+  const NIGHT = parseBusinessDate('2027-03-15');
+  const AT_2305 = parseInstant('2027-03-15T23:05:00+05:00');
+
+  async function declare(
+    tx: Transaction,
+    fixture: Awaited<ReturnType<typeof seed>>,
+    input: {
+      userId: string;
+      type: 'short' | 'long' | 'sick';
+      start: string;
+      end?: string | null;
+      status?: 'pending' | 'approved';
+      reason?: string;
+    },
+  ) {
+    await tx.insert(schema.absences).values({
+      orgId: fixture.orgId,
+      userId: input.userId,
+      houseId: fixture.houseId,
+      type: input.type,
+      startDate: input.start,
+      endDate: input.end ?? null,
+      reason: input.reason ?? 'к родителям',
+      status: input.status ?? 'approved',
+    });
+  }
+
+  it('без заявлений сводка не уходит вовсе', async () => {
     await inRollback(async (tx) => {
       const fixture = await seed(tx, '6605');
 
-      const result = await checkCurfew({ executor: tx, instant: MORNING });
+      const result = await sendNightAbsences({ executor: tx, instant: AT_2305 });
 
-      expect(result.skipped).toBe(true);
+      expect(result.houses).toBe(0);
       expect(result.notified).toBe(0);
       expect(await notificationsOf(tx, fixture.adminId ?? '')).toEqual([]);
       expect(await notificationsOf(tx, fixture.superId)).toEqual([]);
-      expect(await notificationsOf(tx, fixture.dwellerId)).toEqual([]);
     });
   });
 
-  it('выключенное задание не занимает прогон дня', async () => {
+  /*
+   * Суть исправления: в сводке только те, кто заявился. Прежнее задание
+   * называло ровно обратных — тех, кто молчал, потому что был дома.
+   */
+  it('жилец, который ничего не заявлял, в сводке не появляется', async () => {
     await inRollback(async (tx) => {
-      await seed(tx, '6606');
+      const fixture = await seed(tx, '6606');
 
-      await checkCurfew({ executor: tx, instant: MORNING });
+      const [silentUser] = await tx
+        .insert(schema.users)
+        .values({
+          orgId: fixture.orgId,
+          phone: '+77190006606',
+          passwordHash: 'x',
+          role: 'resident',
+        })
+        .returning();
+
+      await tx.insert(schema.residencies).values({
+        orgId: fixture.orgId,
+        userId: silentUser?.id ?? '',
+        houseId: fixture.houseId,
+        status: 'active',
+        moveInDate: '2027-03-01',
+      });
+
+      await tx
+        .insert(schema.residentProfiles)
+        .values({ userId: silentUser?.id ?? '', lastName: 'Домов', firstName: 'Дома' });
+      await tx
+        .insert(schema.residentProfiles)
+        .values({ userId: fixture.dwellerId, lastName: 'Уехалов', firstName: 'Уехал' });
+
+      await declare(tx, fixture, {
+        userId: fixture.dwellerId,
+        type: 'short',
+        start: NIGHT,
+        reason: 'ночная смена',
+      });
+
+      await sendNightAbsences({ executor: tx, instant: AT_2305 });
+
+      const body =
+        (
+          (await notificationsOf(tx, fixture.adminId ?? ''))[0]?.bodyI18n as
+            Record<string, string> | undefined
+        )?.ru ?? '';
+
+      expect(body).toContain('Уехалов');
+      expect(body).not.toContain('Домов');
+    });
+  });
+
+  it('заявленное на эту ночь отсутствие попадает в сводку с датой и причиной', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6607');
+
+      await declare(tx, fixture, {
+        userId: fixture.dwellerId,
+        type: 'long',
+        start: '2027-03-14',
+        end: '2027-03-20',
+        reason: 'соревнования',
+      });
+
+      const result = await sendNightAbsences({ executor: tx, instant: AT_2305 });
+
+      expect(result.houses).toBe(1);
+
+      const [notification] = await notificationsOf(tx, fixture.adminId ?? '');
+
+      expect(notification?.type).toBe('presence.night');
+
+      const body = (notification?.bodyI18n as Record<string, string>).ru;
+
+      expect(body).toContain('2027-03-20');
+      expect(body).toContain('соревнования');
+
+      /* Выводов сводка не делает: слов о невозвращении в ней нет. */
+      expect(body).not.toContain('не вернул');
+      expect(body).not.toContain('наруш');
+    });
+  });
+
+  it('неодобренное заявление в сводку не идёт', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6608');
+
+      await declare(tx, fixture, {
+        userId: fixture.dwellerId,
+        type: 'long',
+        start: '2027-03-14',
+        end: '2027-03-20',
+        status: 'pending',
+      });
+
+      expect((await sendNightAbsences({ executor: tx, instant: AT_2305 })).notified).toBe(0);
+    });
+  });
+
+  it('краткосрочное уведомление годится фактом подачи, без одобрения', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6610');
+
+      await declare(tx, fixture, {
+        userId: fixture.dwellerId,
+        type: 'short',
+        start: NIGHT,
+        status: 'pending',
+        reason: 'ночная смена',
+      });
+
+      const result = await sendNightAbsences({ executor: tx, instant: AT_2305 });
+
+      expect(result.houses).toBe(1);
+      expect(
+        ((await notificationsOf(tx, fixture.adminId ?? ''))[0]?.bodyI18n as Record<string, string>)
+          .ru,
+      ).toContain('ночная смена');
+    });
+  });
+
+  it('истёкший срок без нового уведомления попадает во вторую секцию', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6611');
+
+      await declare(tx, fixture, {
+        userId: fixture.dwellerId,
+        type: 'long',
+        start: '2027-03-05',
+        end: '2027-03-10',
+        reason: 'домой',
+      });
+
+      const result = await sendNightAbsences({ executor: tx, instant: AT_2305 });
+
+      expect(result.houses).toBe(1);
+
+      const body = (
+        (await notificationsOf(tx, fixture.adminId ?? ''))[0]?.bodyI18n as
+          Record<string, string> | undefined
+      )?.ru;
+
+      expect(body).toContain('2027-03-10');
+      expect(body).toContain('домой');
+    });
+  });
+
+  it('новое заявление на эту ночь снимает человека из истёкших', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6612');
+
+      await declare(tx, fixture, {
+        userId: fixture.dwellerId,
+        type: 'long',
+        start: '2027-03-05',
+        end: '2027-03-10',
+        reason: 'домой',
+      });
+      await declare(tx, fixture, {
+        userId: fixture.dwellerId,
+        type: 'long',
+        start: '2027-03-12',
+        end: '2027-03-20',
+        reason: 'продлил',
+      });
+
+      await sendNightAbsences({ executor: tx, instant: AT_2305 });
+
+      const body = (
+        (await notificationsOf(tx, fixture.adminId ?? ''))[0]?.bodyI18n as
+          Record<string, string> | undefined
+      )?.ru;
+
+      /* Он в первой секции, а не в истёкших: строка про истёкший срок одна. */
+      expect(body).toContain('продлил');
+      expect(body).not.toContain('домой');
+    });
+  });
+
+  it('давно истёкшее заявление в сводке не висит', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6613');
+
+      /* Полтора месяца назад: за пределами окна в две недели. */
+      await declare(tx, fixture, {
+        userId: fixture.dwellerId,
+        type: 'long',
+        start: '2027-01-20',
+        end: '2027-01-31',
+      });
+
+      expect((await sendNightAbsences({ executor: tx, instant: AT_2305 })).notified).toBe(0);
+    });
+  });
+
+  it('несовершеннолетний помечен и идёт первым', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6614');
+
+      const [minorUser] = await tx
+        .insert(schema.users)
+        .values({
+          orgId: fixture.orgId,
+          phone: '+77190006614',
+          passwordHash: 'x',
+          role: 'resident',
+        })
+        .returning();
+
+      await tx.insert(schema.residencies).values({
+        orgId: fixture.orgId,
+        userId: minorUser?.id ?? '',
+        houseId: fixture.houseId,
+        status: 'active',
+        moveInDate: '2027-03-01',
+      });
+
+      /* Профили: у несовершеннолетнего — «Юнов», у взрослого — «Адамов». */
+      await tx.insert(schema.residentProfiles).values({
+        userId: minorUser?.id ?? '',
+        lastName: 'Юнов',
+        firstName: 'Юн',
+        birthDate: '2010-06-01',
+      });
+      await tx.insert(schema.residentProfiles).values({
+        userId: fixture.dwellerId,
+        lastName: 'Адамов',
+        firstName: 'Адам',
+        birthDate: '1999-06-01',
+      });
+
+      await declare(tx, fixture, {
+        userId: minorUser?.id ?? '',
+        type: 'short',
+        start: NIGHT,
+        reason: 'у родственников',
+      });
+      await declare(tx, fixture, {
+        userId: fixture.dwellerId,
+        type: 'short',
+        start: NIGHT,
+        reason: 'ночная смена',
+      });
+
+      await sendNightAbsences({ executor: tx, instant: AT_2305 });
+
+      const body =
+        (
+          (await notificationsOf(tx, fixture.adminId ?? ''))[0]?.bodyI18n as
+            Record<string, string> | undefined
+        )?.ru ?? '';
+
+      expect(body).toContain('несовершеннолетний');
 
       /*
-       * Прогон не помечается выполненным: иначе в день включения правила
-       * задание сочло бы день уже отработанным и промолчало бы ещё сутки.
+       * Первым идёт несовершеннолетний, хотя по алфавиту он второй:
+       * у него ночная норма строже (Приложение №1, подраздел 2.2).
        */
+      expect(body.indexOf('Юнов')).toBeLessThan(body.indexOf('Адамов'));
+    });
+  });
+
+  it('повторный вызов за ту же ночь второй сводки не рассылает', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '6615');
+
+      await declare(tx, fixture, {
+        userId: fixture.dwellerId,
+        type: 'short',
+        start: NIGHT,
+      });
+
+      await sendNightAbsences({ executor: tx, instant: AT_2305 });
+      const again = await sendNightAbsences({ executor: tx, instant: AT_2305 });
+
+      expect(again.skipped).toBe(true);
+      expect(await notificationsOf(tx, fixture.adminId ?? '')).toHaveLength(1);
+
       const runs = await tx
         .select()
         .from(schema.jobRuns)
-        .where(eq(schema.jobRuns.job, CURFEW_CHECK_JOB));
+        .where(eq(schema.jobRuns.job, NIGHT_ABSENCES_JOB));
 
-      expect(runs).toEqual([]);
+      expect(runs).toHaveLength(1);
     });
-  });
-
-  it('снять флаг молча нельзя: он и есть выключатель', () => {
-    /*
-     * Проверка краснеет, стоит вернуть задание в строй, не тронув эту строку.
-     * Строка меняется вместе с правилом — и тогда же возвращаются проверки
-     * рассылки, уже по согласованному условию.
-     */
-    expect(CURFEW_CHECK_DISABLED).toBe(true);
   });
 });
 

@@ -1167,7 +1167,8 @@
       "utilitiesRemind": "Monthly utilities",
       "scheduleRemind": "Monthly schedule",
       "curfewCheck": "Curfew",
-      "unknown": "Notification"
+      "unknown": "Notification",
+      "presenceNight": "Declared absences for the night"
     },
     "errors": {
       "unknown": "It did not work. Try again",
@@ -1185,10 +1186,6 @@
       "rotationMissed": {
         "title": "Cleaning not confirmed",
         "body": "Cleaning for {date} is still not marked done"
-      },
-      "curfew": {
-        "title": "No curfew notice submitted",
-        "body": "Did not report being late on {date}: {count}"
       },
       "utilities": {
         "title": "Utilities for {month}",
@@ -1213,7 +1210,16 @@
       "depositOverdue": {
         "title": "Deposit refund overdue",
         "body": "The deadline was {date}, house {house}"
-      }
+      },
+      "presenceNight": {
+        "title": "Declared absences, night of {date}",
+        "body": "Declared for this night: {declared}\n{declaredList}\n\nTerm expired with no new notice: {expired}\n{expiredList}"
+      },
+      "presenceNightRow": "{name} — until {until}, {reason}",
+      "presenceNightRowMinor": "{name}, minor — until {until}, {reason}",
+      "presenceExpiredRow": "{name} — term expired {until}, {reason}",
+      "presenceExpiredRowMinor": "{name}, minor — term expired {until}, {reason}",
+      "presenceNone": "—"
     }
   },
   "onboarding": {

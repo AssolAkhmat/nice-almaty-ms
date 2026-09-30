@@ -2,7 +2,7 @@ import { NotFoundError } from '@/lib/errors';
 import { assertCronSecret } from '@/lib/api/cron';
 import { apiJson, apiRoute } from '@/lib/api/route';
 import { loadEnv } from '@/lib/env/load';
-import { checkCurfew, CURFEW_CHECK_JOB } from '@/services/curfew';
+import { NIGHT_ABSENCES_JOB, sendNightAbsences } from '@/services/night-absences';
 import {
   DEPOSIT_REFUND_WATCH_JOB,
   DOCUMENTS_EXPIRY_JOB,
@@ -37,7 +37,7 @@ const HANDLERS: Readonly<Record<string, JobHandler>> = {
   [RATING_YEAR_RESET_JOB]: () => resetRatingYear(),
   [NOTIFICATIONS_DISPATCH_JOB]: () => dispatchNotifications(),
   [ROTATIONS_REMIND_JOB]: () => remindRotations(),
-  [CURFEW_CHECK_JOB]: () => checkCurfew(),
+  [NIGHT_ABSENCES_JOB]: () => sendNightAbsences(),
   [UTILITIES_REMIND_JOB]: () => remindUtilities(),
   [SCHEDULE_REMIND_JOB]: () => remindSchedule(),
   [DOCUMENTS_EXPIRY_JOB]: () => watchDocumentExpiry(),

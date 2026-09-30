@@ -35,6 +35,36 @@ function valuesIn(values: TextValues, locale: Locale): PlainValues {
   );
 }
 
+/**
+ * Строки списка внутри уведомления — сразу во всех локалях.
+ *
+ * Понадобилось ночной сводке отсутствий (указание владельца, 30 сентября 2026):
+ * админу нужен не счётчик, а кто именно заявился, до какой даты и по какой
+ * причине. Имена и даты — данные, а слова вокруг них — ключи словаря, как
+ * и везде (CLAUDE.md §4), поэтому каждая строка переводится в каждой локали
+ * отдельно, а не собирается на одном языке и раздаётся всем.
+ */
+export async function notificationLines(
+  rows: readonly { code: string; values?: TextValues }[],
+): Promise<Record<Locale, string>> {
+  const lines: Partial<Record<Locale, string>> = {};
+
+  for (const locale of LOCALES) {
+    const translate = createTranslator({
+      locale,
+      messages: await messagesFor(locale),
+      timeZone: ALMATY_TIME_ZONE,
+      namespace: 'notifications.messages',
+    }) as unknown as Translate;
+
+    lines[locale] = rows
+      .map((row) => translate(row.code, valuesIn(row.values ?? {}, locale)))
+      .join('\n');
+  }
+
+  return lines as Record<Locale, string>;
+}
+
 export interface NotificationTexts {
   title: Record<Locale, string>;
   body: Record<Locale, string>;
