@@ -5,7 +5,7 @@ import { parsePeriod } from '@/db/period';
 import { claimJobRun, finishJobRun } from '@/db/repositories/job-runs';
 import { listDepositTransactions, listInvoices } from '@/db/repositories/invoices';
 import { updateFine } from '@/db/repositories/rating';
-import { listAssignments, listResidencies } from '@/db/repositories/residencies';
+import { listAssignments, listOccupiedResidencies } from '@/db/repositories/residencies';
 import { organizations, users } from '@/db/schema';
 import { depositBalance } from '@/domain/invoice';
 import { buildMonthlyInvoice, rentForMonth } from '@/domain/monthly-invoice';
@@ -190,7 +190,14 @@ export async function generateMonthlyInvoices(
         continue;
       }
 
-      const residencies = await listResidencies(actor.context, { status: 'active' }, executor);
+      /*
+       * Счёт получает тот, кто занимает место в этом месяце, а не тот,
+       * у кого статус `active` (указание владельца, 30 сентября 2026).
+       * По статусу без счёта оставались админ дома с местом и жилец,
+       * которому место выдали раньше перевода в `active`: они жили,
+       * а начислений им не было.
+       */
+      const residencies = await listOccupiedResidencies(actor.context, month, executor);
 
       for (const residency of residencies) {
         const draft = await draftFor(actor, residency, month, executor);

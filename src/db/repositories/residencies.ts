@@ -9,6 +9,7 @@ import { closedPeriodLiteral, periodLiteral } from '../period';
 import {
   bedAssignments,
   beds,
+  invoices,
   residencies,
   residencyMonthRents,
   type BedAssignment,
@@ -164,6 +165,65 @@ export async function listMonthStaysInHouse(
   return [...byResidency.values()].sort((left, right) =>
     left.residencyId.localeCompare(right.residencyId),
   );
+}
+
+/**
+ * Проживания, у которых в этом месяце занято место (указание владельца,
+ * 30 сентября 2026).
+ *
+ * Счёт получает тот, кто занимает койко-место, а не тот, у кого статус
+ * `active`: роль, статус и занятость места ортогональны. Прежний отбор
+ * по статусу оставлял без счёта админа дома с местом — он жил, платил
+ * коммуналку, а начислений ему не было.
+ *
+ * Два условия сверх занятости, и оба — про факты, а не про ярлыки:
+ *
+ * 1. Архивные не входят: проживание закончено, депозит разобран.
+ * 2. Депозит урегулирован — это депозитный шлюз §1.2: оплата депозита и есть
+ *    заселение, до неё рента не начисляется. Урегулированность доказывается
+ *    двумя путями, и любого достаточно: либо проживание дошло до `active`
+ *    (в эти статусы иначе не попасть — §1.2), либо у него есть **оплаченный**
+ *    счёт на депозит.
+ *
+ *    Второй путь и нужен: у админа дома статус `created` навсегда (P9-3),
+ *    а счёт на депозит оплачен — ноль тоже оплата. У жильца с недоплаченным
+ *    депозитом статус бывает тот же `created`, и начислять ему нельзя.
+ *    Разницу видно по счёту, а не по ярлыку статуса.
+ */
+export async function listOccupiedResidencies(
+  context: AccessContext,
+  month: BusinessDate,
+  executor: Executor = getDb(),
+): Promise<Residency[]> {
+  const from = startOfMonth(month);
+  const to = addMonths(from, 1);
+
+  const occupied = executor
+    .select({ id: bedAssignments.residencyId })
+    .from(bedAssignments)
+    .where(sql`${bedAssignments.period} && daterange(${from}::date, ${to}::date)`);
+
+  const depositPaid = executor
+    .select({ id: invoices.residencyId })
+    .from(invoices)
+    .where(and(eq(invoices.type, 'deposit'), eq(invoices.status, 'paid')));
+
+  return executor
+    .select()
+    .from(residencies)
+    .where(
+      and(
+        eq(residencies.orgId, context.orgId),
+        houseScope(context),
+        sql`${residencies.status} <> 'archived'`,
+        inArray(residencies.id, occupied),
+        or(
+          sql`${residencies.status} in ('active', 'terminating')`,
+          inArray(residencies.id, depositPaid),
+        ),
+      ),
+    )
+    .orderBy(asc(residencies.createdAt), asc(residencies.id));
 }
 
 export interface HouseRosterEntry {

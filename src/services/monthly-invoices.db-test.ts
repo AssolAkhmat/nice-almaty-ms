@@ -301,3 +301,138 @@ describe('генерация 1 числа', () => {
     });
   });
 });
+
+/**
+ * Счёт получает тот, кто занимает место (указание владельца, 30 сентября 2026).
+ *
+ * На боевой админ дома с местом с 22 августа не получал ни одного месячного
+ * счёта: отбор шёл по статусу `active`, а его проживание навсегда `created`
+ * (P9-3). Он жил, потреблял коммунальные — и начислений ему не было.
+ */
+describe('счёт по занятости места, а не по статусу', () => {
+  /** Админ дома: место есть, статус `created`, депозит нулевой и оплачен. */
+  async function adminWithBed(tx: Transaction, fixture: Awaited<ReturnType<typeof seed>>) {
+    const [user] = await tx
+      .insert(schema.users)
+      .values({
+        orgId: fixture.orgId,
+        phone: '+77248800001',
+        passwordHash: 'x',
+        role: 'admin',
+        houseId: fixture.houseId,
+      })
+      .returning();
+
+    const [residency] = await tx
+      .insert(schema.residencies)
+      .values({
+        orgId: fixture.orgId,
+        userId: user?.id ?? '',
+        houseId: fixture.houseId,
+        status: 'created',
+      })
+      .returning();
+
+    const [area] = await tx
+      .insert(schema.areas)
+      .values({ houseId: fixture.houseId, name: 'Комната админа', type: 'living' })
+      .returning();
+
+    const [bed] = await tx
+      .insert(schema.beds)
+      .values({
+        houseId: fixture.houseId,
+        areaId: area?.id ?? '',
+        number: 7,
+        tier: 'lower',
+        label: '7 низ',
+        defaultPrice: 0,
+      })
+      .returning();
+
+    await tx.insert(schema.bedAssignments).values({
+      residencyId: residency?.id ?? '',
+      bedId: bed?.id ?? '',
+      houseId: fixture.houseId,
+      price: 0,
+      period: '[2026-09-20,)',
+    });
+
+    return { residencyId: residency?.id ?? '', userId: user?.id ?? '' };
+  }
+
+  it('админ дома с местом получает счёт, хотя статус не active', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9820');
+      const admin = await adminWithBed(tx, fixture);
+
+      /* Депозит нулевой и оплачен: шлюз §1.2 проверяется деньгами. */
+      await tx.insert(schema.invoices).values({
+        orgId: fixture.orgId,
+        residencyId: admin.residencyId,
+        userId: admin.userId,
+        houseId: fixture.houseId,
+        type: 'deposit',
+        status: 'paid',
+        total: 0,
+      });
+
+      await generateMonthlyInvoices({ executor: tx, instant: FIRST_OF_OCTOBER });
+
+      expect(await invoicesOf(tx, admin.residencyId)).toHaveLength(1);
+    });
+  });
+
+  it('без оплаченного депозита место счёта не даёт: шлюз §1.2 на месте', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9821');
+      const admin = await adminWithBed(tx, fixture);
+
+      /* Тот же человек, но депозит недоплачен — начислять нельзя. */
+      await tx.insert(schema.invoices).values({
+        orgId: fixture.orgId,
+        residencyId: admin.residencyId,
+        userId: admin.userId,
+        houseId: fixture.houseId,
+        type: 'deposit',
+        status: 'partially_paid',
+        total: 45_000,
+      });
+
+      await generateMonthlyInvoices({ executor: tx, instant: FIRST_OF_OCTOBER });
+
+      expect(await invoicesOf(tx, admin.residencyId)).toHaveLength(0);
+    });
+  });
+
+  it('без назначенного места счёта нет даже у активного проживания', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '9822');
+
+      const [user] = await tx
+        .insert(schema.users)
+        .values({
+          orgId: fixture.orgId,
+          phone: '+77248800002',
+          passwordHash: 'x',
+          role: 'resident',
+        })
+        .returning();
+
+      const [residency] = await tx
+        .insert(schema.residencies)
+        .values({
+          orgId: fixture.orgId,
+          userId: user?.id ?? '',
+          houseId: fixture.houseId,
+          status: 'active',
+          moveInDate: '2026-01-01',
+        })
+        .returning();
+
+      await generateMonthlyInvoices({ executor: tx, instant: FIRST_OF_OCTOBER });
+
+      expect(await invoicesOf(tx, residency?.id ?? '')).toHaveLength(0);
+    });
+  });
+});
