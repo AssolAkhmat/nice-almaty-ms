@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import en from '../../../messages/en.json';
 import kk from '../../../messages/kk.json';
 import ru from '../../../messages/ru.json';
+import { NOTIFICATION_TYPES, notificationTypeKey } from '../../domain/notifications';
 import { DEFAULT_LOCALE, isLocale, LOCALES } from './config';
 
 type MessageTree = { [key: string]: string | MessageTree };
@@ -107,6 +108,72 @@ describe('локали', () => {
         expect(
           typeof (entities as MessageTree | undefined)?.[type],
           `${locale}: audit.entities.${type}`,
+        ).toBe('string');
+      }
+    }
+  });
+
+  /**
+   * Код события, которым пользуется боевой код, обязан быть объявлен
+   * и подписан — иначе уведомление приходит, но в центре показывается
+   * общим заголовком «Уведомление» и не находится фильтром по типу.
+   *
+   * Правило написано по собственной недоделке от 30 сентября 2026:
+   * ночная сводка отсутствий ушла на боевую с кодом `presence.night`,
+   * которого не было в `NOTIFICATION_TYPES`. Подпись в словарях лежала,
+   * список — нет, и ни один тест этого не видел: связь между тем, что
+   * передают в `notify`, и закрытым списком кодов не проверялась вовсе.
+   *
+   * Фикстуры исключены намеренно: синтетический код в тесте нужен, чтобы
+   * доказать запасной заголовок у неизвестного типа (`invoice.due`
+   * в `notifications.db-test.ts` — ровно такой случай).
+   */
+  it('каждый код события из боевого кода объявлен и подписан', () => {
+    const codes = new Set<string>();
+
+    function walk(directory: string): void {
+      for (const entry of readdirSync(directory, { withFileTypes: true })) {
+        const path = join(directory, entry.name);
+
+        if (entry.isDirectory()) {
+          walk(path);
+          continue;
+        }
+
+        if (!entry.name.endsWith('.ts') && !entry.name.endsWith('.tsx')) {
+          continue;
+        }
+
+        if (entry.name.includes('.test.') || entry.name.includes('.db-test.')) {
+          continue;
+        }
+
+        for (const match of readFileSync(path, 'utf8').matchAll(/type: '([a-z]+\.[a-zA-Z]+)'/g)) {
+          const code = match[1];
+          if (code !== undefined) {
+            codes.add(code);
+          }
+        }
+      }
+    }
+
+    walk(join(import.meta.dirname, '..', '..'));
+
+    expect(codes.size).toBeGreaterThan(0);
+
+    for (const code of codes) {
+      expect((NOTIFICATION_TYPES as readonly string[]).includes(code), code).toBe(true);
+    }
+
+    for (const locale of LOCALES) {
+      const labels = (catalogues[locale]?.notifications as MessageTree | undefined)?.types;
+
+      for (const code of NOTIFICATION_TYPES) {
+        const key = notificationTypeKey(code);
+
+        expect(
+          typeof (labels as MessageTree | undefined)?.[key],
+          `${locale}: notifications.types.${key}`,
         ).toBe('string');
       }
     }

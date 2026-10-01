@@ -2,19 +2,5 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "pnpm build",
-  "crons": [
-    {
-      "path": "/api/v1/cron/invoices-monthly",
-      "schedule": "5 19 * * *"
-    },
-    {
-      "path": "/api/v1/cron/rotations-close-day",
-      "schedule": "55 18 * * *"
-    },
-    {
-      "path": "/api/v1/cron/rating-year-reset",
-      "schedule": "10 19 30 6 *"
-    }
-  ]
+  "buildCommand": "pnpm build"
 }
