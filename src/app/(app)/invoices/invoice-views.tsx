@@ -395,6 +395,26 @@ export function HouseInvoicesTable({ rows }: { rows: readonly InvoiceRowView[] }
           numeric: true,
           cell: (row) => <Money amount={row.remaining} />,
         },
+        /*
+         * Отметка оплаты живёт на карточке счёта, и до 1 октября 2026 единственной
+         * дорогой туда было имя жильца в первой колонке. Владелец её не нашёл:
+         * подчёркивание появляется только под курсором, а «нажмите на имя, чтобы
+         * отметить оплату» ниоткуда не следует. Действие названо словами прямо
+         * в строке — у тех счетов, где платить ещё есть что.
+         *
+         * Право не проверяется: таблицу видит только персонал, а `payment.record`
+         * у админа дома включено всегда (в `DEFAULT_OFF_FOR_ADMIN` его нет).
+         */
+        {
+          key: 'action',
+          header: t('invoices.paymentColumn'),
+          cell: (row) =>
+            row.remaining > 0 && row.status !== 'cancelled' ? (
+              <AppLink className="underline underline-offset-2" href={`/invoices/${row.id}`}>
+                {t('invoices.recordPayment')}
+              </AppLink>
+            ) : null,
+        },
       ]}
       emptyState={<EmptyState description={t('invoices.emptyHint')} title={t('invoices.empty')} />}
       rowKey={(row) => row.id}

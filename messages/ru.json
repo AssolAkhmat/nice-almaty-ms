@@ -990,6 +990,7 @@
     "submit": "Выставить",
     "total": "Итог",
     "paid": "Оплачено",
+    "paymentColumn": "Оплата",
     "remaining": "Осталось",
     "overdue": "Долг",
     "paymentHistory": "История платежей",

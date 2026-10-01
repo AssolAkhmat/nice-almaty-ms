@@ -990,6 +990,7 @@
     "submit": "Issue",
     "total": "Total",
     "paid": "Paid",
+    "paymentColumn": "Payment",
     "remaining": "Remaining",
     "overdue": "Overdue",
     "paymentHistory": "Payment history",

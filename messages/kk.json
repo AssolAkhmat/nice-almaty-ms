@@ -990,6 +990,7 @@
     "submit": "Ұсыну",
     "total": "Жиыны",
     "paid": "Төленді",
+    "paymentColumn": "Төлем",
     "remaining": "Қалды",
     "overdue": "Қарыз",
     "paymentHistory": "Төлемдер тарихы",
