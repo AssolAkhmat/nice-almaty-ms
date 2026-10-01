@@ -541,6 +541,7 @@ export async function applyThresholds(
           amount: triggered.fineAmount,
           reason: `rating.threshold:${String(triggered.threshold)}`,
           ruleId,
+          createdAt: instant,
         },
         executor,
       );
@@ -617,6 +618,7 @@ export async function addFine(
   deps: RatingDeps = {},
 ): Promise<Fine> {
   const executor = executorOf(deps);
+  const instant = deps.instant ?? now();
 
   const houseId = await houseOfUser(actor.context, input.userId, executor);
 
@@ -639,7 +641,7 @@ export async function addFine(
   return executor.transaction(async (tx) => {
     const fine = await createFine(
       actor.context,
-      { userId: input.userId, houseId, amount: input.amount, reason },
+      { userId: input.userId, houseId, amount: input.amount, reason, createdAt: instant },
       tx,
     );
 

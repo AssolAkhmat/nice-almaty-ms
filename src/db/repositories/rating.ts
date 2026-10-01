@@ -571,6 +571,18 @@ export interface CreateFineInput {
   amount: number;
   reason: string;
   ruleId?: string | null;
+  /**
+   * Момент начисления — от часов приложения, а не от `defaultNow()` базы.
+   *
+   * По нему решается, в какой счёт штраф попадёт: §3 берёт начисленные
+   * до первого числа месяца. Пока момент ставила база, бизнес-решение
+   * зависело от часов сервера БД, которые в тесты не подставляются, —
+   * и проверка «штраф попадает в ближайший счёт» проходила тридцать дней
+   * в месяц, а первого числа краснела: событие датировано сентябрём,
+   * строка — первым октября. Поле обязательное намеренно: значение
+   * по умолчанию вернуло бы молчаливый откат к часам базы.
+   */
+  createdAt: Date;
 }
 
 export async function createFine(
@@ -590,6 +602,8 @@ export async function createFine(
       reason: input.reason,
       ruleId: input.ruleId ?? null,
       createdBy: context.userId,
+      createdAt: input.createdAt,
+      updatedAt: input.createdAt,
     })
     .returning();
 

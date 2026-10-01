@@ -5,7 +5,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import * as schema from '@/db/schema';
 import { testDatabaseUrl } from '@/db/testing/database-url';
 import { NotFoundError } from '@/lib/errors';
-import { parseBusinessDate } from '@/lib/time';
+import { parseBusinessDate, parseInstant } from '@/lib/time';
 
 import {
   createAbsence,
@@ -37,6 +37,9 @@ const db = drizzle(client, { schema }) as unknown as Database;
 afterAll(async () => {
   await client.end();
 });
+
+/** Момент начисления штрафа: фикстура не спрашивает часы базы. */
+const FINE_AT = parseInstant('2026-09-07T12:00:00+05:00');
 
 class Rollback extends Error {}
 
@@ -511,6 +514,7 @@ describe('штрафы', () => {
           houseId: fixture.houseA,
           amount: 2_500,
           reason: 'Рейтинг ниже 30',
+          createdAt: FINE_AT,
         },
         tx,
       );
@@ -520,6 +524,35 @@ describe('штрафы', () => {
       expect(mine).toHaveLength(1);
       expect(mine[0]?.status).toBe('pending');
       expect(await listFines(fixture.adminB, { houseId: fixture.houseB }, tx)).toHaveLength(0);
+    });
+  });
+
+  /*
+   * Момент начисления решает, в какой счёт штраф попадёт (§3: начисленные
+   * до первого числа месяца). Пока его ставила база своим `defaultNow()`,
+   * бизнес-решение зависело от часов сервера БД: событие датировалось
+   * сентябрём, строка — днём прогона, и проверка «штраф попадает в ближайший
+   * счёт» краснела ровно первого числа, а остальные тридцать дней молчала.
+   * Этот тест краснеет в любой день, если значение снова начнёт приходить
+   * от базы, — потому и сравнивается точным равенством.
+   */
+  it('момент начисления приходит от часов приложения, а не от базы', async () => {
+    await inRollback(async (tx) => {
+      const fixture = await seed(tx, '5242');
+
+      const fine = await createFine(
+        fixture.adminA,
+        {
+          userId: fixture.residentId,
+          houseId: fixture.houseA,
+          amount: 1_000,
+          reason: 'Проверка часов',
+          createdAt: FINE_AT,
+        },
+        tx,
+      );
+
+      expect(fine.createdAt.toISOString()).toBe(FINE_AT.toISOString());
     });
   });
 
@@ -535,6 +568,7 @@ describe('штрафы', () => {
             houseId: fixture.houseA,
             amount: 5_000,
             reason: 'Чужой дом',
+            createdAt: FINE_AT,
           },
           tx,
         ),
